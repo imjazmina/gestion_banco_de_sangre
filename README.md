@@ -46,10 +46,6 @@ Crear únicamente la base de datos vacía desde PostgreSQL:
 ```sql
 CREATE DATABASE gestion_donantes;
 ```
-
-> **Importante:** no es necesario crear las tablas manualmente.
-> La estructura completa se encuentra en `database/schema.sql`.
-
 ---
 
 ## 🔐 3. Configurar `.env`
