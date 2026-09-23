@@ -1,0 +1,13 @@
+venv/
+.venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.env
+instance/
+.idea/
+.vscode/
+*.log
+_doc_modelo_datos.txt
+schema.sql
+*.sql
