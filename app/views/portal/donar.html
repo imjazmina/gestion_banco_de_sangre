@@ -1,0 +1,154 @@
+{% extends "portal/layout.html" %}
+{% from "portal/_ui.html" import ico %}
+{% from "portal/_agenda.html" import tira_fechas, grilla_horarios %}
+{% set activo = 'donar' %}
+{% block titulo %}Agendar donación · Banco de sangre{% endblock %}
+
+{% block contenido %}
+<section class="block" style="padding-top:32px;">
+  <div class="wrap center-narrow">
+
+  {# ---------- ya tiene una cita activa ---------- #}
+  {% if ya_tiene_cita %}
+    <div class="banner info">
+      {{ ico('info') }}
+      <p><b>Ya tenés una cita agendada</b>Para el {{ ya_tiene_cita.fecha_cita.strftime('%d/%m/%Y') }} a las {{ ya_tiene_cita.horario.hora_inicio.strftime('%H:%M') }}. Gestionala antes de agendar una nueva.</p>
+    </div>
+    <a class="btn btn-primary" href="{{ url_for('mi_cita.ver') }}">Ver mi cita</a>
+
+  {% else %}
+    <div class="section-head">
+      <h1>Agendar donación</h1>
+      <p class="sub" style="margin-top:4px;">Elegí fecha, horario y tipo de donación.</p>
+    </div>
+
+    {# ---------- diferimiento vigente: nunca se muestra la causa ---------- #}
+    {% if diferimiento %}
+    <div class="card" style="border-top:3px solid var(--warn); margin-bottom:20px;">
+      <div style="display:flex; gap:14px; align-items:flex-start;">
+        <div class="ico" style="background:#FEF3E2; color:var(--warn); width:44px; height:44px; box-shadow:inset 0 0 0 1.5px currentColor;">{{ ico('info') }}</div>
+        <div style="flex:1;">
+          <h2 style="margin-bottom:6px;">Agendamiento no disponible</h2>
+          <p class="sub" style="margin-bottom:12px;">El banco de sangre registró una condición que impide agendar una cita por ahora. Para conocer los detalles, comunicate con el banco de sangre.</p>
+          <p class="meta" style="margin-bottom:2px;">Fecha estimada de habilitación</p>
+          <p style="font-weight:600; margin-bottom:12px;">
+            {{ diferimiento.fecha_fin.strftime('%d/%m/%Y') if diferimiento.fecha_fin else 'A definir por el personal de salud' }}
+            <span class="meta" style="font-weight:400;">(orientativa)</span>
+          </p>
+          <div class="banner info" style="margin-bottom:12px;">
+            {{ ico('info') }}
+            <p><b>Dato orientativo</b>Esta fecha es estimada y no garantiza la habilitación. La aptitud para donar la determina el personal de salud en la evaluación presencial.</p>
+          </div>
+          <p class="meta">¿Dudas? Banco de sangre HRL · (021) 645-xxx · bancodesangre@hrl.gov.py</p>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="{{ 'form-locked' if diferimiento }}" {% if diferimiento %}aria-disabled="true"{% endif %}>
+
+      {# ---------- pasos 1 y 2 ---------- #}
+      <div class="card" style="margin-bottom:20px;">
+        <h2 style="margin-bottom:14px;">1. Elegí una fecha</h2>
+        {{ tira_fechas(dias, 'donar.agendar', {'solicitud': preseleccion} if preseleccion else {}) }}
+
+        {% if fecha %}
+        <h2 style="margin:20px 0 14px;">2. Elegí un horario</h2>
+        {{ grilla_horarios(franjas, sin_horarios, fecha, horario, 'donar.agendar', {'solicitud': preseleccion} if preseleccion else {}) }}
+        {% endif %}
+      </div>
+
+      {# ---------- paso 3: tipo ---------- #}
+      {% if horario %}
+      <div class="card" style="margin-bottom:20px;">
+        <h2 style="margin-bottom:14px;">3. Tipo de donación</h2>
+        <div class="type-grid">
+          {% for clave, etiqueta, descripcion, necesita in tipos %}
+          <a class="type-card {{ 'selected' if tipo == clave }}"
+             href="{{ url_for('donar.agendar', fecha=fecha.isoformat(), horario=horario.id_horario, tipo=clave, solicitud=preseleccion) }}">
+            {% if tipo == clave %}<div class="type-check">{{ ico('check') }}</div>{% endif %}
+            <h3>{{ etiqueta }}</h3><p>{{ descripcion }}</p>
+          </a>
+          {% endfor %}
+        </div>
+
+        {# ---------- paso 3b: para quién ---------- #}
+        {% if pide_solicitud %}
+        <div class="divider"></div>
+        <h2 style="margin-bottom:4px;">¿Para quién donás?</h2>
+        <p class="sub" style="margin-bottom:14px;">Elegí una de las solicitudes publicadas por el banco de sangre.</p>
+
+        {% if solicitudes %}
+        <div class="type-grid" style="grid-template-columns:1fr;">
+          {% for s in solicitudes %}
+          <a class="type-card {{ 'selected' if solicitud and solicitud.id_solicitud == s.id_solicitud }}"
+             href="{{ url_for('donar.agendar', fecha=fecha.isoformat(), horario=horario.id_horario, tipo=tipo, solicitud=s.id_solicitud) }}">
+            {% if solicitud and solicitud.id_solicitud == s.id_solicitud %}<div class="type-check">{{ ico('check') }}</div>{% endif %}
+            <div class="flex-between" style="gap:12px;">
+              <div>
+                <h3>{{ s.solicitante.nombre_completo }}</h3>
+                <p>{{ s.unidades_asignadas }} de {{ s.unidades_requeridas }} unidades reunidas{% if s.fecha_limite %} · hasta el {{ s.fecha_limite.strftime('%d/%m/%Y') }}{% endif %}</p>
+              </div>
+              <span class="blood-tag">{{ s.tipo_sangre.etiqueta }}</span>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+        {% else %}
+        <div class="banner warn">
+          {{ ico('info') }}
+          <p><b>No hay solicitudes publicadas</b>Por ahora no hay a quién asignar esta donación. Podés donar de forma altruista: la unidad va a la reserva general del banco.</p>
+        </div>
+        {% endif %}
+        {% endif %}
+      </div>
+      {% endif %}
+
+      {# ---------- paso 4: confirmar ---------- #}
+      {% if puede_confirmar %}
+      <form method="post" action="{{ url_for('donar.confirmar') }}">
+        <input type="hidden" name="fecha"   value="{{ fecha.isoformat() }}">
+        <input type="hidden" name="horario" value="{{ horario.id_horario }}">
+        <input type="hidden" name="tipo"    value="{{ tipo }}">
+        {% if solicitud %}<input type="hidden" name="solicitud" value="{{ solicitud.id_solicitud }}">{% endif %}
+
+        <div class="card" style="background:var(--hero); border-color:#F3D9D9; margin-bottom:20px;">
+          <h2 style="margin-bottom:10px;">4. Confirmar cita</h2>
+          <table class="data" style="width:100%; margin-bottom:14px;">
+            <tbody>
+              <tr><td style="color:var(--ink2);">Fecha</td><td style="text-align:right; font-weight:600;">{{ fecha.strftime('%d/%m/%Y') }}</td></tr>
+              <tr><td style="color:var(--ink2);">Horario</td><td style="text-align:right; font-weight:600;">{{ horario.hora_inicio.strftime('%H:%M') }} a {{ horario.hora_fin.strftime('%H:%M') }}</td></tr>
+              <tr><td style="color:var(--ink2);">Tipo</td><td style="text-align:right; font-weight:600;">{{ etiqueta }}</td></tr>
+              {% if solicitud %}
+              <tr><td style="color:var(--ink2);">Donás para</td><td style="text-align:right; font-weight:600;">{{ solicitud.solicitante.nombre_completo }} ({{ solicitud.tipo_sangre.etiqueta }})</td></tr>
+              {% endif %}
+              <tr><td style="color:var(--ink2);">Lugar</td><td style="text-align:right; font-weight:600;">Banco de sangre, Hospital Regional de Luque</td></tr>
+            </tbody>
+          </table>
+
+          <ul class="req-list" style="margin-bottom:14px;">
+            <li class="req-yes">{{ ico('check') }} Llevá tu documento de identidad</li>
+            <li class="req-yes">{{ ico('check') }} Dormí bien y comé liviano antes de venir</li>
+            <li class="req-yes">{{ ico('check') }} Evitá alcohol 12 horas antes</li>
+          </ul>
+
+          <div class="banner info" style="margin-bottom:16px;">
+            {{ ico('info') }}
+            <p><b>Evaluación presencial</b>El día de la cita, el personal de salud realiza el cuestionario y las mediciones que determinan la aptitud para donar.</p>
+          </div>
+
+          <label class="check-row" style="margin-bottom:18px;">
+            <input type="checkbox" name="consentimiento" required checked>
+            Confirmo que la información brindada es correcta y acepto el tratamiento de mis datos.
+          </label>
+
+          <button class="btn btn-donate btn-block" type="submit">Confirmar cita</button>
+        </div>
+      </form>
+      {% endif %}
+
+    </div>
+  {% endif %}
+  </div>
+</section>
+{% endblock %}

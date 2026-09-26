@@ -1,0 +1,84 @@
+{% extends "portal/layout.html" %}
+{% from "portal/_ui.html" import ico %}
+{% block titulo %}Crear cuenta · Banco de sangre{% endblock %}
+
+{% block contenido %}
+<div class="auth-shell">
+  <div class="auth-card" style="max-width:520px;">
+    <div class="auth-head">
+      <div class="mark-lg">{{ ico('drop') }}</div>
+      <h1>Crear cuenta</h1>
+      <p class="sub" style="margin-top:6px;">Registro de donantes. Los campos con * son obligatorios.</p>
+    </div>
+
+    <div class="card">
+      <form method="post">
+        <div class="two-col">
+          <div class="field">
+            <label for="nombre">Nombre *</label>
+            <input type="text" id="nombre" name="nombre" value="{{ datos.nombre or '' }}"
+                   maxlength="80" required autofocus>
+          </div>
+          <div class="field">
+            <label for="apellido">Apellido *</label>
+            <input type="text" id="apellido" name="apellido" value="{{ datos.apellido or '' }}"
+                   maxlength="80" required>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="documento">Número de documento *</label>
+          <input type="text" id="documento" name="documento" value="{{ datos.documento or '' }}"
+                 inputmode="numeric" pattern="[0-9]+" maxlength="20" required>
+          <div class="hint">Sin puntos ni guiones.</div>
+        </div>
+
+        <div class="two-col">
+          <div class="field">
+            <label for="fecha_nacimiento">Fecha de nacimiento *</label>
+            <input type="date" id="fecha_nacimiento" name="fecha_nacimiento"
+                   value="{{ datos.fecha_nacimiento or '' }}" required>
+          </div>
+          <div class="field">
+            <label for="genero">Género *</label>
+            <select id="genero" name="genero" required>
+              <option value="">Seleccionar…</option>
+              <option value="Femenino" {{ 'selected' if datos.genero == 'Femenino' }}>Femenino</option>
+              <option value="Masculino" {{ 'selected' if datos.genero == 'Masculino' }}>Masculino</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="correo">Correo electrónico *</label>
+          <input type="email" id="correo" name="correo" value="{{ datos.correo or '' }}"
+                 maxlength="120" required>
+        </div>
+
+        <div class="field">
+          <label for="telefono">Teléfono</label>
+          <input type="tel" id="telefono" name="telefono" value="{{ datos.telefono or '' }}" maxlength="30">
+        </div>
+
+        <div class="field">
+          <label for="contrasena">Contraseña *</label>
+          <input type="password" id="contrasena" name="contrasena" minlength="8" required>
+          <div class="hint">Al menos 8 caracteres.</div>
+        </div>
+
+        <label class="check-row" style="margin-bottom:20px;">
+          <input type="checkbox" name="acepta" required>
+          <span>Acepto la
+                <a class="muted-link" href="{{ url_for('legal.privacidad') }}" target="_blank">política de privacidad</a>
+                y el tratamiento de mis datos personales conforme a la
+                Ley N.º 1682/01 de Paraguay. *</span>
+        </label>
+
+        <button class="btn btn-donate btn-block" type="submit">Crear cuenta</button>
+      </form>
+    </div>
+
+    <p class="auth-foot">¿Ya tenés cuenta? <a href="{{ url_for('auth.ingresar') }}">Iniciá sesión</a></p>
+  </div>
+</div>
+{% endblock %}

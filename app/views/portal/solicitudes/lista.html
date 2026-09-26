@@ -1,0 +1,76 @@
+{% extends "portal/layout.html" %}
+{% from "portal/_ui.html" import ico %}
+{% set activo = 'solicitudes' %}
+{% block titulo %}Personas que necesitan donantes · Banco de sangre{% endblock %}
+
+{% block contenido %}
+<section class="block" style="padding-top:32px;">
+  <div class="wrap">
+    <div class="section-head">
+      <h1>Personas que necesitan donantes</h1>
+      <p class="sub" style="margin-top:4px;">Solicitudes publicadas por el banco de sangre que todavía necesitan unidades.</p>
+    </div>
+
+    {% if solicitudes %}
+    <div class="card">
+      {% for s in solicitudes %}
+      <div class="request-row">
+        <div class="request-main">
+          <b>{{ s.solicitante.nombre_completo }}</b>
+          <span>Publicada el {{ s.fecha_creacion.strftime('%d/%m/%Y') }}</span>
+        </div>
+        <div class="request-mid">
+          <div class="request-field">
+            <div class="lbl">Grupo requerido</div>
+            <div class="val"><span class="blood-tag">{{ s.tipo_sangre.etiqueta }}</span></div>
+          </div>
+          {% if s.medico_tratante %}
+          <div class="request-field">
+            <div class="lbl">Médico tratante</div>
+            <div class="val">{{ s.medico_tratante }}</div>
+          </div>
+          {% endif %}
+          {% if s.fecha_limite %}
+          <div class="request-field">
+            <div class="lbl">Fecha límite</div>
+            <div class="val">{{ s.fecha_limite.strftime('%d/%m/%Y') }}</div>
+          </div>
+          {% endif %}
+          <div class="request-field request-progress">
+            <div class="lbl">{{ s.unidades_asignadas }} de {{ s.unidades_requeridas }} unidades</div>
+            <div class="progress-bar">
+              <div class="progress-fill" style="width:{{ (s.unidades_asignadas / s.unidades_requeridas * 100) | round | int }}%;"></div>
+            </div>
+          </div>
+        </div>
+        <div>
+          {% if s.id_solicitante == id_actual %}
+            {# RN03: no se dona a la propia solicitud. Se muestra igual para
+               que se entienda por qué no aparece el botón. #}
+            <span class="badge badge-canc">Tu solicitud</span>
+          {% else %}
+            <a class="btn btn-donate btn-sm"
+               href="{{ url_for('donar.agendar', solicitud=s.id_solicitud) }}">
+              {{ ico('drop') }} Donar para esta persona
+            </a>
+          {% endif %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">
+      <div class="ico">{{ ico('users') }}</div>
+      <h3>No hay solicitudes publicadas</h3>
+      <p>Cuando el banco de sangre publique un pedido de donantes, lo vas a ver acá.</p>
+      <a class="btn btn-donate btn-sm" href="{{ url_for('donar.agendar') }}">Agendar una donación</a>
+    </div>
+    {% endif %}
+
+    <div class="banner info" style="margin-top:24px;">
+      {{ ico('info') }}
+      <p><b>¿Necesitás donantes?</b>Las solicitudes las publica el personal del banco de sangre. Acercate o comunicate al (021) 645-xxx para que registren la tuya.</p>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,72 @@
+{% extends "portal/layout.html" %}
+{% from "portal/_ui.html" import ico %}
+{% block titulo %}Buzón de sugerencias · Banco de sangre{% endblock %}
+
+{% block contenido %}
+{% if enviado %}
+<section class="block" style="padding-top:56px;">
+  <div class="wrap center-narrow">
+    <div class="card decor-circles" style="text-align:center; padding:48px 32px;">
+      <div class="ico" style="background:#E7F6EF; color:var(--ok); margin:0 auto 20px; width:60px; height:60px; box-shadow:inset 0 0 0 1.5px currentColor;">{{ ico('check') }}</div>
+      <h1 style="font-size:23px; margin-bottom:10px;">Mensaje recibido</h1>
+      <p class="sub" style="margin-bottom:28px; max-width:42ch; margin-left:auto; margin-right:auto;">
+        Tu {{ tipo | lower }} fue enviada al equipo del Banco de Sangre HRL. Agradecemos tu tiempo y colaboración.
+      </p>
+      <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+        <a class="btn btn-primary" href="{{ url_for('buzon.formulario') }}">Enviar otro mensaje</a>
+        <a class="btn btn-ghost" href="{{ url_for('main.index') }}">Ir al inicio</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% else %}
+<section class="block" style="padding-top:40px;">
+  <div class="wrap center-narrow">
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('main.index') }}" style="margin-bottom:20px;">{{ ico('arrowLeft') }} Volver</a>
+
+    <div class="section-head">
+      <div class="eyebrow-badge">{{ ico('megaphone') }} Tu opinión importa</div>
+      <h1 style="font-size:24px;">Buzón de sugerencias</h1>
+      <p class="sub" style="margin-top:6px;">Escribinos tus sugerencias, comentarios o reclamos. Tu opinión nos ayuda a mejorar.</p>
+    </div>
+
+    <div class="card" style="padding:32px;">
+      <h2 style="margin-bottom:4px;">Tipo de mensaje</h2>
+      <p class="meta" style="margin-bottom:16px;">Elegí la opción que mejor describe tu mensaje.</p>
+
+      <div class="type-grid" style="margin-bottom:{{ '24' if tipo else '4' }}px;">
+        {% for clave, icono, descripcion, fondo, color in tipos %}
+          {% set sel = (tipo == clave) %}
+          <a class="type-card {{ 'selected' if sel }}"
+             {% if sel %}style="border-color:{{ color }}; background:{{ fondo }};"{% endif %}
+             href="{{ url_for('buzon.formulario', tipo=clave) }}#mensaje">
+            {% if sel %}<div class="type-check" style="background:{{ color }};">{{ ico('check') }}</div>{% endif %}
+            <div class="type-card-icon" style="background:{{ fondo }}; color:{{ color }};">{{ ico(icono) }}</div>
+            <h3>{{ clave }}</h3><p>{{ descripcion }}</p>
+          </a>
+        {% endfor %}
+      </div>
+
+      {% if tipo %}
+      <form method="post" action="{{ url_for('buzon.enviar') }}">
+        <input type="hidden" name="tipo" value="{{ tipo }}">
+        <div class="field">
+          <label for="mensaje">Mensaje</label>
+          <textarea id="mensaje" name="mensaje" required minlength="10" maxlength="2000"
+                    placeholder="Escribí acá tu {{ tipo | lower }}..." style="min-height:130px;"></textarea>
+        </div>
+
+        <div class="banner info">
+          {{ ico('shield') }}
+          <p><b>Quién lo lee</b>Tu mensaje llega al equipo del Banco de Sangre junto con tu nombre, para que puedan responderte si hace falta. No se publica en el portal.</p>
+        </div>
+
+        <button class="btn btn-primary btn-block" type="submit" style="margin-top:20px;">Enviar mensaje</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

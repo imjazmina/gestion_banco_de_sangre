@@ -1,9 +1,6 @@
-from flask import render_template
-from sqlalchemy import text
+"""
+Controladores: la lógica que hay entre las rutas y los modelos.
 
-from app.models import db
-
-
-def mostrar_estado():
-    db.session.execute(text("SELECT 1"))
-    return render_template("base.html")
+Cada módulo tiene su carpeta: controllers/portal/ y controllers/admin/.
+Lo que va acá afuera es lo que comparten los dos, como la sesión.
+"""

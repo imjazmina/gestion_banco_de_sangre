@@ -1,0 +1,89 @@
+{% extends "portal/layout.html" %}
+{% from "portal/_ui.html" import ico %}
+{% set activo = 'mi-cita' %}
+{% block titulo %}Mi cita · Banco de sangre{% endblock %}
+
+{% block contenido %}
+<section class="block" style="padding-top:32px;">
+  <div class="wrap center-narrow">
+    <div class="section-head"><h1>Mi cita</h1></div>
+
+    {% if cita %}
+    <div class="card">
+      <div class="flex-between" style="margin-bottom:16px;">
+        <h2>Cita vigente</h2>
+        <span class="badge {{ 'badge-conf' if cita.estado == 'Confirmada' else 'badge-pend' }}">
+          <span class="badge-dot"></span>{{ cita.estado }}
+        </span>
+      </div>
+
+      <table class="data" style="width:100%; margin-bottom:16px;">
+        <tbody>
+          <tr><td style="color:var(--ink2);">Fecha</td><td style="text-align:right; font-weight:600;">{{ cita.fecha_cita.strftime('%d/%m/%Y') }}</td></tr>
+          <tr><td style="color:var(--ink2);">Horario</td><td style="text-align:right; font-weight:600;">{{ cita.horario.hora_inicio.strftime('%H:%M') }} a {{ cita.horario.hora_fin.strftime('%H:%M') }}</td></tr>
+          <tr><td style="color:var(--ink2);">Tipo</td><td style="text-align:right; font-weight:600;">{{ etiqueta_tipo(cita.tipo_cita) }}</td></tr>
+          {% if cita.solicitud %}
+          <tr><td style="color:var(--ink2);">Donás para</td><td style="text-align:right; font-weight:600;">{{ cita.solicitud.solicitante.nombre_completo }}</td></tr>
+          {% endif %}
+          <tr><td style="color:var(--ink2);">Lugar</td><td style="text-align:right; font-weight:600;">Banco de sangre, Hospital Regional de Luque</td></tr>
+        </tbody>
+      </table>
+
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <a class="btn btn-secondary" href="{{ url_for('mi_cita.reprogramar') }}">{{ ico('calendar') }} Reprogramar</a>
+        <a class="btn btn-danger" href="{{ url_for('mi_cita.ver', confirmar='cancelar') }}">{{ ico('x') }} Cancelar cita</a>
+      </div>
+    </div>
+
+    {% else %}
+    <div class="empty">
+      <div class="ico">{{ ico('calendar') }}</div>
+      <h3>No tenés una cita vigente</h3>
+      <p>Cuando agendes una donación, la vas a poder gestionar desde acá.</p>
+      <a class="btn btn-donate btn-sm" href="{{ url_for('donar.agendar') }}">Agendar donación</a>
+    </div>
+    {% endif %}
+
+    <div class="section-head" style="margin-top:36px;"><h2>Historial de citas</h2></div>
+    {% if historial %}
+    <div class="card table-wrap">
+      <table class="data">
+        <thead><tr><th>Fecha</th><th>Horario</th><th>Tipo</th><th>Estado</th></tr></thead>
+        <tbody>
+          {% for h in historial %}
+          <tr>
+            <td>{{ h.fecha_cita.strftime('%d/%m/%Y') }}</td>
+            <td>{{ h.horario.hora_inicio.strftime('%H:%M') }}</td>
+            <td>{{ etiqueta_tipo(h.tipo_cita) }}</td>
+            <td>
+              <span class="badge {{ 'badge-comp' if h.estado == 'Completada'
+                                    else ('badge-aus' if h.estado == 'Ausente' else 'badge-canc') }}">{{ h.estado }}</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% else %}
+    <div class="card"><p class="sub">Todavía no tenés citas anteriores registradas.</p></div>
+    {% endif %}
+  </div>
+</section>
+
+{# Confirmación de cancelación. Va con ?confirmar=cancelar para que funcione
+   igual sin JavaScript. #}
+{% if cita and confirmar == 'cancelar' %}
+<div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="t-cancelar">
+  <div class="modal-box">
+    <h3 id="t-cancelar">Cancelar cita</h3>
+    <p>¿Confirmás que querés cancelar tu cita del {{ cita.fecha_cita.strftime('%d/%m/%Y') }} a las {{ cita.horario.hora_inicio.strftime('%H:%M') }}? El lugar queda libre para otra persona y esta acción no se puede deshacer.</p>
+    <div class="modal-actions">
+      <a class="btn btn-ghost" href="{{ url_for('mi_cita.ver') }}">Volver</a>
+      <form method="post" action="{{ url_for('mi_cita.cancelar') }}">
+        <button class="btn btn-danger" type="submit">Sí, cancelar cita</button>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

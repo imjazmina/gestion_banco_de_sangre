@@ -1,0 +1,134 @@
+{% extends "portal/layout.html" %}
+{% from "portal/_ui.html" import ico, foto %}
+{% from "portal/_ilustraciones.html" import ilu_durante_recortada %}
+{% set activo = 'inicio' %}
+{% block titulo %}Inicio · Banco de sangre{% endblock %}
+
+{% block contenido %}
+<section class="block" style="padding-top:32px;">
+  <div class="wrap">
+
+    <div class="dash-hero-grid">
+      <div class="dash-hero">
+        <div>
+          <div class="greet">Hola, {{ usuario.nombre }}</div>
+          <div class="greet-sub">Bienvenida al portal de donantes del Banco de Sangre HRL.</div>
+        </div>
+        {% if not cita %}
+        <a class="btn btn-donate" href="{{ url_for('donar.agendar') }}">{{ ico('drop') }} Agendar donación</a>
+        {% endif %}
+      </div>
+      {# La ilustración primero y la foto encima: las dos ocupan el mismo
+         lugar, así que la que se dibuja al final es la que se ve. #}
+      <div class="dash-hero-figure">{{ ilu_durante_recortada() }}{{ foto('donacion15.jpg', 'Persona donando sangre') }}</div>
+    </div>
+
+    <div class="section-head" style="margin-top:28px;"><h2>¿Qué necesitás hacer hoy?</h2></div>
+    <div class="action-grid">
+      <a class="action-card" href="{{ url_for('donar.agendar') }}">
+        <div class="ico" style="background:var(--hero); color:var(--blood-ink);">{{ ico('drop') }}</div>
+        <h3>Donar sangre</h3>
+        <p>Elegí fecha y horario para tu próxima donación.</p>
+      </a>
+      <a class="action-card" href="{{ url_for('solicitudes.listar') }}">
+        <div class="ico" style="background:#FDECEC; color:var(--danger);">{{ ico('users') }}</div>
+        <h3>Personas que necesitan donantes</h3>
+        <p>Mirá las solicitudes activas y ayudá a alguien puntual.</p>
+      </a>
+      <a class="action-card" href="{{ url_for('mi_cita.ver') }}">
+        <div class="ico" style="background:#E6F4F3; color:var(--teal-ink);">{{ ico('calendar') }}</div>
+        <h3>Mi cita</h3>
+        <p>Consultá, reprogramá o cancelá tu cita.</p>
+      </a>
+      <a class="action-card" href="{{ url_for('perfil.ver') }}">
+        <div class="ico" style="background:var(--bg); color:var(--ink2);">{{ ico('user') }}</div>
+        <h3>Mi perfil</h3>
+        <p>Tus datos personales y de contacto.</p>
+      </a>
+      <a class="action-card" href="{{ url_for('buzon.formulario') }}">
+        <div class="ico" style="background:#E6F4F3; color:var(--teal-ink);">{{ ico('megaphone') }}</div>
+        <h3>Buzón de sugerencias</h3>
+        <p>Contanos qué podemos mejorar.</p>
+      </a>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="flex-between" style="margin-bottom:6px;">
+          <h2>Tu próxima cita</h2>
+        </div>
+        {% if cita %}
+        <div class="appt-row" style="border:none; padding-top:12px;">
+          <div class="appt-left">
+            <div class="appt-date appt-date-upcoming">
+              <div class="d">{{ cita.fecha_cita.strftime('%d') }}</div>
+              <div class="m">{{ meses[cita.fecha_cita.month] }}</div>
+            </div>
+            <div class="appt-info">
+              <b>{{ cita.fecha_cita.strftime('%d/%m/%Y') }} · {{ cita.horario.hora_inicio.strftime('%H:%M') }}</b>
+              <span>{{ cita.tipo_cita }}</span>
+            </div>
+          </div>
+          <span class="badge {{ 'badge-conf' if cita.estado == 'Confirmada' else 'badge-pend' }}">
+            <span class="badge-dot"></span>{{ cita.estado }}
+          </span>
+        </div>
+        {% else %}
+        <div class="empty">
+          <div class="ico">{{ ico('calendar') }}</div>
+          <h3>No tenés una cita vigente</h3>
+          <p>Elegí el día y el horario que te queden cómodos.</p>
+          <a class="btn btn-donate btn-sm" href="{{ url_for('donar.agendar') }}">Agendar donación</a>
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="card">
+        <div class="flex-between" style="margin-bottom:10px;">
+          <h2>Novedades</h2>
+          <a class="muted-link" href="{{ url_for('notificaciones.listar') }}">Ver todas</a>
+        </div>
+        {% if avisos %}
+          {% for a in avisos %}
+          <div class="notif-row">
+            <div class="notif-ico" style="background:#EAF1FE; color:var(--info);">{{ ico('bell') }}</div>
+            <div class="notif-body">
+              <b>{{ a.tipo.replace('_', ' ') | capitalize }}</b>
+              <p>{{ a.mensaje }}</p>
+              <p class="meta">{{ a.fecha_envio.strftime('%d/%m/%Y · %H:%M') }}</p>
+            </div>
+          </div>
+          {% endfor %}
+        {% else %}
+          <p class="sub" style="padding:12px 0;">Todavía no tenés notificaciones. Acá van a aparecer los recordatorios de tus citas y los avisos del banco de sangre.</p>
+        {% endif %}
+      </div>
+    </div>
+
+    {% if historial %}
+    <div class="section-head" style="margin-top:36px;"><h2>Historial reciente</h2></div>
+    <div class="card table-wrap">
+      <table class="data">
+        <thead><tr><th>Fecha</th><th>Horario</th><th>Tipo</th><th>Estado</th></tr></thead>
+        <tbody>
+          {% for h in historial %}
+          <tr>
+            <td>{{ h.fecha_cita.strftime('%d/%m/%Y') }}</td>
+            <td>{{ h.horario.hora_inicio.strftime('%H:%M') }}</td>
+            <td>{{ h.tipo_cita }}</td>
+            <td>
+              <span class="badge {{ 'badge-comp' if h.estado == 'Completada'
+                                    else ('badge-aus' if h.estado == 'Ausente' else 'badge-canc') }}">{{ h.estado }}</span>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+  </div>
+</section>
+{% endblock %}

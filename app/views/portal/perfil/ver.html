@@ -1,0 +1,87 @@
+{% extends "portal/layout.html" %}
+{% from "portal/_ui.html" import ico %}
+{% set activo = 'perfil' %}
+{% block titulo %}Mi perfil · Banco de sangre{% endblock %}
+
+{% block contenido %}
+<section class="block" style="padding-top:32px;">
+  <div class="wrap center-narrow">
+    <div class="section-head"><h1>Mi perfil</h1></div>
+
+    {% if editando %}
+    <div class="card">
+      <h2 style="margin-bottom:16px;">Editar mis datos</h2>
+      <form method="post" action="{{ url_for('perfil.guardar') }}">
+        <div class="two-col">
+          <div class="field">
+            <label for="nombre">Nombre *</label>
+            <input type="text" id="nombre" name="nombre" value="{{ usuario.nombre }}"
+                   maxlength="80" required autofocus>
+          </div>
+          <div class="field">
+            <label for="apellido">Apellido *</label>
+            <input type="text" id="apellido" name="apellido" value="{{ usuario.apellido }}"
+                   maxlength="80" required>
+          </div>
+        </div>
+        <div class="field">
+          <label for="correo">Correo electrónico *</label>
+          <input type="email" id="correo" name="correo" value="{{ correo }}" maxlength="120" required>
+        </div>
+        <div class="field">
+          <label for="telefono">Teléfono</label>
+          <input type="tel" id="telefono" name="telefono" value="{{ telefono }}" maxlength="30">
+          <div class="hint">Dejalo vacío si no querés registrar un número.</div>
+        </div>
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+          <button class="btn btn-primary" type="submit">Guardar cambios</button>
+          <a class="btn btn-ghost" href="{{ url_for('perfil.ver') }}">Cancelar</a>
+        </div>
+      </form>
+    </div>
+
+    {% else %}
+    <div class="card">
+      <div class="flex-between" style="margin-bottom:16px;">
+        <h2>Datos personales</h2>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('perfil.ver', editar=1) }}">{{ ico('edit') }} Editar</a>
+      </div>
+      <table class="data" style="width:100%;">
+        <tbody>
+          <tr><td style="color:var(--ink2);">Nombre</td><td style="text-align:right; font-weight:600;">{{ usuario.nombre_completo }}</td></tr>
+          <tr><td style="color:var(--ink2);">Documento</td><td style="text-align:right; font-weight:600;">{{ usuario.documento }}</td></tr>
+          <tr><td style="color:var(--ink2);">Fecha de nacimiento</td><td style="text-align:right; font-weight:600;">{{ usuario.fecha_nacimiento.strftime('%d/%m/%Y') }}</td></tr>
+          <tr><td style="color:var(--ink2);">Género</td><td style="text-align:right; font-weight:600;">{{ usuario.genero }}</td></tr>
+          <tr><td style="color:var(--ink2);">Correo</td><td style="text-align:right; font-weight:600;">{{ correo or '—' }}</td></tr>
+          <tr><td style="color:var(--ink2);">Teléfono</td><td style="text-align:right; font-weight:600;">{{ telefono or '—' }}</td></tr>
+          <tr><td style="color:var(--ink2);">Rol</td><td style="text-align:right; font-weight:600;">{{ roles | join(', ') or '—' }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+      <h2 style="margin-bottom:14px;">Estado de donación</h2>
+      <div class="stat-row">
+        <div class="blood-tag" style="font-size:16px; min-width:44px; height:36px;">{{ grupo or '—' }}</div>
+        <div class="txt">
+          {% if grupo %}Grupo sanguíneo registrado
+          {% else %}Grupo sanguíneo sin registrar{% endif %}
+        </div>
+      </div>
+      {% if not grupo %}
+      <div class="banner info" style="margin:16px 0 0;">
+        {{ ico('info') }}
+        <p><b>Todavía no tenés grupo registrado</b>El grupo sanguíneo lo confirma el laboratorio a partir de una donación, no se declara al registrarse.</p>
+      </div>
+      {% endif %}
+    </div>
+
+    <div class="card" style="margin-top:20px; border-top:3px solid var(--danger);">
+      <h2 style="margin-bottom:6px;">Eliminar cuenta</h2>
+      <p class="sub" style="margin-bottom:16px;">Elimina tu acceso al portal y tus datos de contacto, conforme a la Ley N.º 1682/01. El historial de donaciones se conserva por obligación sanitaria, desvinculado de tus datos de contacto.</p>
+      <a class="btn btn-danger btn-sm" href="{{ url_for('perfil.confirmar_supresion') }}">{{ ico('trash') }} Suprimir mi cuenta</a>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

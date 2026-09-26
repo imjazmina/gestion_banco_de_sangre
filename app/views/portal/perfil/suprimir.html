@@ -1,0 +1,33 @@
+{% extends "portal/layout.html" %}
+{% from "portal/_ui.html" import ico %}
+{% set activo = 'perfil' %}
+{% block titulo %}Suprimir cuenta · Banco de sangre{% endblock %}
+
+{% block contenido %}
+<section class="block" style="padding-top:32px;">
+  <div class="wrap center-narrow">
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('perfil.ver') }}" style="margin-bottom:14px;">{{ ico('arrowLeft') }} Volver al perfil</a>
+    <div class="section-head"><h1>Suprimir cuenta</h1></div>
+
+    <div class="card" style="border-top:3px solid var(--danger);">
+      <p class="sub" style="margin-bottom:14px;">Esta acción es permanente y no se puede deshacer. Al confirmar:</p>
+      <ul class="req-list" style="margin-bottom:18px;">
+        <li class="req-no">{{ ico('x') }} Se elimina tu acceso al portal</li>
+        <li class="req-no">{{ ico('x') }} Se borran tu correo y tu teléfono del sistema</li>
+        <li class="req-no">{{ ico('x') }} Si tenés una cita agendada, dejás de poder gestionarla desde acá</li>
+      </ul>
+
+      <div class="banner info">
+        {{ ico('shield') }}
+        <p><b>Tu historial de donaciones se conserva</b>Queda desvinculado de tus datos de contacto. El banco de sangre está obligado a mantener la trazabilidad sanitaria de cada unidad.</p>
+      </div>
+
+      <form method="post" action="{{ url_for('perfil.suprimir') }}"
+            style="display:flex; gap:12px; flex-wrap:wrap; margin-top:20px;">
+        <button class="btn btn-danger" type="submit">{{ ico('trash') }} Sí, suprimir mi cuenta</button>
+        <a class="btn btn-ghost" href="{{ url_for('perfil.ver') }}">Cancelar</a>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}

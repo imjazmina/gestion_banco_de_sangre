@@ -11,3 +11,8 @@ instance/
 _doc_modelo_datos.txt
 schema.sql
 *.sql
+# ...pero estos sí se suben: sin ellos el proyecto no arranca en otra máquina,
+# y sin las migraciones los cambios de esquema no llegan a la otra base.
+!database/schema.sql
+!database/catalogos.sql
+!database/migraciones/*.sql

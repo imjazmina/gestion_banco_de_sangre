@@ -4,7 +4,7 @@ from sqlalchemy.exc import OperationalError
 
 from app.config import Config
 from app.models import db
-from app.routes import main_bp
+from app.routes import registrar as registrar_blueprints
 
 
 def create_app(config_class=Config):
@@ -18,8 +18,15 @@ def create_app(config_class=Config):
     _validar_configuracion(app)
 
     db.init_app(app)
-    app.register_blueprint(main_bp)
+    registrar_blueprints(app)
     _registrar_errores(app)
+
+    from app.controllers.sesion import usuario_actual
+
+    @app.context_processor
+    def inyectar_usuario():
+        """Deja `usuario` disponible en todas las plantillas."""
+        return {"usuario": usuario_actual()}
 
     with app.app_context():
         _inicializar_base_de_datos(app)
@@ -70,6 +77,7 @@ def _inicializar_base_de_datos(app):
 
     if tablas:
         print("Estructura de la BD ya existe; no se ejecuta schema.sql")
+        _avisar_migraciones_pendientes(app)
         return
 
     schema_path = app.config["SCHEMA_SQL_PATH"]
@@ -89,3 +97,23 @@ def _inicializar_base_de_datos(app):
         raw_connection.close()
 
     print("Estructura aplicada desde database/schema.sql")
+
+
+def _avisar_migraciones_pendientes(app):
+    """
+    schema.sql solo se aplica sobre una base vacía. Si la otra integrante
+    agregó una migración después, esta base se quedó atrás y las consultas
+    van a fallar con "column does not exist", que no dice cuál es el problema
+    real. Mejor avisarlo al arrancar.
+    """
+    try:
+        from database.migraciones import pendientes
+    except ImportError:
+        return
+
+    faltan = pendientes(db.engine)
+    if faltan:
+        print(f"\n  ATENCIÓN: hay {len(faltan)} migración/es sin aplicar en tu base:")
+        for nombre in faltan:
+            print(f"    - {nombre}")
+        print("  Ejecutá:  python database/migrar.py\n")

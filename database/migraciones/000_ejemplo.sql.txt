@@ -1,0 +1,42 @@
+-- Plantilla para una migración. Copiala, numerala y ponele extensión .sql.
+--
+-- Nombre del archivo: NNN_descripcion_corta.sql
+--   El número decide el orden. Usá el siguiente libre: si la última es
+--   003_..., la tuya es 004_...
+--
+-- Reglas:
+--
+--   1. Una vez que subiste la migración al repositorio, NO se edita más.
+--      Si te equivocaste, la arreglás con una migración nueva. Editarla
+--      dejaría tu base y la de la otra en estados distintos sin que se note.
+--
+--   2. Cada migración tiene que poder aplicarse sobre una base que ya tiene
+--      datos. Nada de DROP TABLE de tablas con información.
+--
+--   3. Si agregás una columna NOT NULL a una tabla con filas, necesita un
+--      DEFAULT, o el ALTER falla.
+--
+--   4. El runner envuelve todo en una transacción. Si algo falla, no queda
+--      nada aplicado a medias: no hace falta poner BEGIN ni COMMIT acá.
+--
+--   5. Avisale a la otra en cuanto la subas. Ella corre:
+--          git pull
+--          python database/migrar.py
+--
+--   6. Si la migración cambia una tabla que ya tiene modelo en app/models/,
+--      actualizá el modelo en el mismo commit. Después corré:
+--          python database/verificar_modelos.py
+--
+-- Ejemplo:
+
+ALTER TABLE cita
+    ADD COLUMN fecha_cita date;
+
+UPDATE cita
+   SET fecha_cita = fecha_hora_creacion::date
+ WHERE fecha_cita IS NULL;
+
+ALTER TABLE cita
+    ALTER COLUMN fecha_cita SET NOT NULL;
+
+CREATE INDEX idx_cita_fecha ON cita (fecha_cita, id_horario);

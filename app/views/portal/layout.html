@@ -1,0 +1,178 @@
+{# Estructura común de las pantallas del portal del donante.
+
+   Es propia del portal: el panel de administración tiene su
+   app/views/admin/layout.html. Así ninguna de las dos tiene que tocar la
+   plantilla de la otra para cambiar su cabecera o su pie. #}
+<!DOCTYPE html>
+<html lang="es-PY">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>{% block titulo %}Banco de sangre · Hospital Regional de Luque{% endblock %}</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/portal.css') }}">
+</head>
+<body{% if usuario %} class="has-bottom-nav"{% endif %}>
+<div id="app">
+
+{% from "portal/_ui.html" import ico %}
+
+{# ------------------------------ CABECERA ------------------------------ #}
+<header class="site">
+  <div class="wrap header-inner">
+    <a class="logo" href="{{ url_for('main.index') }}">
+      <span class="mark">{{ ico('drop') }}</span> Banco de sangre
+    </a>
+    <div class="header-right">
+      {% if usuario %}
+        <nav class="main-nav">
+          <a class="nav-link {{ 'active' if activo == 'inicio' }}" href="{{ url_for('main.index') }}">Inicio</a>
+          <a class="nav-link {{ 'active' if activo == 'donar' }}" href="{{ url_for('donar.agendar') }}">Donar</a>
+          <a class="nav-link {{ 'active' if activo == 'solicitudes' }}" href="{{ url_for('solicitudes.listar') }}">Solicitudes</a>
+          <a class="nav-link {{ 'active' if activo == 'mi-cita' }}" href="{{ url_for('mi_cita.ver') }}">Mi cita</a>
+          <a class="nav-link {{ 'active' if activo == 'informacion' }}" href="{{ url_for('informacion.ver') }}">Información</a>
+          <a class="nav-link {{ 'active' if activo == 'perfil' }}" href="{{ url_for('perfil.ver') }}">Mi perfil</a>
+        </nav>
+        <div class="header-actions">
+          <a class="btn btn-ghost bell-wrap" href="{{ url_for('notificaciones.listar') }}" aria-label="Notificaciones">{{ ico('bell') }}</a>
+          <a class="avatar" href="{{ url_for('perfil.ver') }}"
+             title="{{ usuario.nombre_completo }}">{{ usuario.nombre[0] }}{{ usuario.apellido[0] }}</a>
+          <a class="btn btn-ghost btn-sm hide-sm" href="{{ url_for('auth.salir') }}">{{ ico('logout') }} Salir</a>
+        </div>
+      {% else %}
+        <nav class="main-nav">
+          <a class="nav-link {{ 'active' if activo == 'home' }}" href="{{ url_for('main.index') }}">Inicio</a>
+          <a class="nav-link {{ 'active' if activo == 'informacion' }}" href="{{ url_for('informacion.ver') }}">Información</a>
+        </nav>
+        <div class="header-actions">
+          <a class="btn btn-ghost hide-sm"     href="{{ url_for('auth.ingresar') }}">Iniciar sesión</a>
+          <a class="btn btn-secondary hide-sm" href="{{ url_for('auth.registro') }}">Crear cuenta</a>
+          <a class="btn btn-donate"            href="{{ url_for('auth.ingresar') }}">{{ ico('drop') }} Quiero donar</a>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+</header>
+
+<main>
+  {# Los errores van juntos en un solo aviso: uno por mensaje empuja el
+     contenido fuera de la pantalla cuando fallan varias validaciones. #}
+  {% with mensajes = get_flashed_messages(with_categories=true) %}
+    {% if mensajes %}
+    <div class="wrap" style="padding-top:20px;">
+      {% set errores = mensajes | selectattr('0', 'equalto', 'error') | map(attribute=1) | list %}
+      {% if errores | length == 1 %}
+        <div class="banner warn">{{ ico('info') }}<p>{{ errores[0] }}</p></div>
+      {% elif errores %}
+        <div class="banner warn">
+          {{ ico('info') }}
+          <div><b>Revisá estos datos</b>
+            <ul class="legal-list">{% for e in errores %}<li>{{ e }}</li>{% endfor %}</ul>
+          </div>
+        </div>
+      {% endif %}
+      {% for categoria, texto in mensajes if categoria != 'error' %}
+        <div class="banner {{ 'info' if categoria != 'ok' else 'ok' }}">
+          {{ ico('check' if categoria == 'ok' else 'info') }}<p>{{ texto }}</p>
+        </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+  {% endwith %}
+
+  {% block contenido %}{% endblock %}
+</main>
+
+{# -------------------------------- PIE -------------------------------- #}
+<footer class="site">
+  <div class="wrap">
+    <div class="footer-grid">
+      <div class="footer-col" style="max-width:280px;">
+        <div class="logo" style="margin-bottom:12px;"><span class="mark">{{ ico('drop') }}</span>Banco de sangre</div>
+        <p>Hospital Regional de Luque. Portal de donantes para agendar cita e informarse de forma segura.</p>
+      </div>
+      <div class="footer-col">
+        <h4>Portal</h4>
+        <a href="{{ url_for('informacion.ver') }}">Información</a>
+        {% if usuario %}
+          <a href="{{ url_for('solicitudes.listar') }}">Solicitudes</a>
+          <a href="{{ url_for('buzon.formulario') }}">Buzón de sugerencias</a>
+          <a href="{{ url_for('auth.salir') }}">Cerrar sesión</a>
+        {% else %}
+          <a href="{{ url_for('auth.ingresar') }}">Iniciar sesión</a>
+          <a href="{{ url_for('auth.registro') }}">Crear cuenta</a>
+        {% endif %}
+      </div>
+      <div class="footer-col">
+        <h4>Contacto</h4>
+        <p>{{ ico('mapPin') }} Av. Mcal. López, Luque</p>
+        <p>{{ ico('phone') }} (021) 645-xxx</p>
+        <p>{{ ico('mail') }} bancodesangre@hrl.gov.py</p>
+      </div>
+      <div class="footer-col">
+        <h4>Horario</h4>
+        <p>Lunes a viernes, 07:00–15:00</p>
+        <p>Sábados, 07:00–11:00</p>
+      </div>
+      <div class="footer-col">
+        <h4>Legal</h4>
+        <a href="{{ url_for('legal.terminos') }}">Términos y condiciones de uso</a>
+        <a href="{{ url_for('legal.privacidad') }}">Política de privacidad</a>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      © 2026 Hospital Regional de Luque · Banco de sangre. Tus datos se procesan
+      conforme a la
+      <a class="muted-link" href="{{ url_for('legal.privacidad') }}">política de privacidad</a>
+      y a la Ley N.º 1682/01 de Paraguay.
+    </div>
+  </div>
+</footer>
+
+{% if usuario %}
+<div class="bottom-nav show">
+  <a class="bn-item {{ 'active' if activo == 'inicio' }}"      href="{{ url_for('main.index') }}">{{ ico('activity') }}<span>Inicio</span></a>
+  <a class="bn-item {{ 'active' if activo == 'donar' }}" href="{{ url_for('donar.agendar') }}">{{ ico('drop') }}<span>Donar</span></a>
+  <a class="bn-item {{ 'active' if activo == 'mi-cita' }}" href="{{ url_for('mi_cita.ver') }}">{{ ico('calendar') }}<span>Mi cita</span></a>
+  <a class="bn-item {{ 'active' if activo == 'notificaciones' }}" href="{{ url_for('notificaciones.listar') }}">{{ ico('bell') }}<span>Avisos</span></a>
+  <a class="bn-item {{ 'active' if activo == 'perfil' }}"      href="{{ url_for('perfil.ver') }}">{{ ico('user') }}<span>Perfil</span></a>
+</div>
+{% endif %}
+
+</div>
+
+<script>
+/* Aparición al hacer scroll. Umbral 0: uno mayor nunca se cumple en bloques
+   más altos que la pantalla, y la sección queda invisible para siempre. */
+(function(){
+  const els = document.querySelectorAll('.reveal');
+  const mostrarTodo = () => els.forEach(e => e.classList.add('visible'));
+  if(!('IntersectionObserver' in window) ||
+     (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches)){
+    mostrarTodo(); return;
+  }
+  const obs = new IntersectionObserver(entradas => {
+    entradas.forEach(e => { if(e.isIntersecting){ e.target.classList.add('visible'); obs.unobserve(e.target); } });
+  }, {threshold:0, rootMargin:'0px 0px -40px 0px'});
+  els.forEach(e => obs.observe(e));
+  /* Red de seguridad: si el observador no llegó a disparar, se muestra lo que
+     ya está en pantalla, sin arruinar la animación de lo que viene más abajo. */
+  setTimeout(() => els.forEach(e => {
+    const r = e.getBoundingClientRect();
+    if(r.top < window.innerHeight && r.bottom > 0) e.classList.add('visible');
+  }), 900);
+})();
+
+window.addEventListener('scroll', () => {
+  const h = document.querySelector('header.site');
+  if(h) h.classList.toggle('scrolled', window.scrollY > 8);
+}, {passive:true});
+
+document.addEventListener('click', e => {
+  const b = e.target.closest('.faq-q');
+  if(b) b.parentElement.classList.toggle('open');
+});
+</script>
+</body>
+</html>
