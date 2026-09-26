@@ -16,3 +16,4 @@ schema.sql
 !database/schema.sql
 !database/catalogos.sql
 !database/migraciones/*.sql
+aplicar_cambios.py
