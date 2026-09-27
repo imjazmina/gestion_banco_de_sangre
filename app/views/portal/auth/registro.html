@@ -1,10 +1,10 @@
 {% extends "portal/layout.html" %}
 {% from "portal/_ui.html" import ico %}
+{% import "portal/auth/_marco.html" as marco %}
 {% block titulo %}Crear cuenta · Banco de sangre{% endblock %}
 
 {% block contenido %}
-<div class="auth-shell">
-  <div class="auth-card" style="max-width:520px;">
+{% call marco.pantalla(ancho='520px') %}
     <div class="auth-head">
       <div class="mark-lg">{{ ico('drop') }}</div>
       <h1>Crear cuenta</h1>
@@ -79,6 +79,5 @@
     </div>
 
     <p class="auth-foot">¿Ya tenés cuenta? <a href="{{ url_for('auth.ingresar') }}">Iniciá sesión</a></p>
-  </div>
-</div>
+{% endcall %}
 {% endblock %}

@@ -1,0 +1,39 @@
+{% extends "portal/layout.html" %}
+{% from "portal/_ui.html" import ico %}
+{% import "portal/auth/_marco.html" as marco %}
+{% block titulo %}Revisá tu correo · Banco de sangre{% endblock %}
+
+{% block contenido %}
+{% call marco.pantalla() %}
+  <div class="card" style="text-align:center; padding:36px 28px;">
+    <div class="ico" style="background:#E7F6EF; color:var(--ok); margin:0 auto 16px; width:52px; height:52px; border-radius:14px; display:flex; align-items:center; justify-content:center;">
+      {{ ico('check') }}
+    </div>
+    <h1 style="font-size:19px; margin-bottom:8px;">Revisá tu correo</h1>
+    {# El mensaje no confirma ni desmiente que la cuenta exista: si lo
+       hiciera, este formulario sería una forma de averiguar qué correos
+       están registrados. #}
+    <p class="sub" style="margin-bottom:22px;">
+      Si {{ correo or 'ese correo' }} corresponde a una cuenta, te enviamos un enlace
+      para restablecer la contraseña. Puede tardar unos minutos en llegar y vence
+      en {{ horas }} horas.
+    </p>
+    <a class="btn btn-secondary btn-block" href="{{ url_for('auth.ingresar') }}">Volver a iniciar sesión</a>
+  </div>
+
+  {% if enlace %}<!-- dev-enlace -->
+  {# Solo en desarrollo: todavía no hay servidor de correo configurado, así
+     que el enlace se muestra acá y también se imprime en la consola. En
+     producción (debug apagado) este bloque no existe. #}
+  <div class="banner warn" style="margin-top:18px;">
+    {{ ico('info') }}
+    <div>
+      <b>Modo desarrollo</b>
+      El correo no salió (no hay SMTP configurado en el .env, o falló el envío),
+      así que va el enlace directo para poder seguir probando:
+      <p style="margin-top:8px; word-break:break-all;"><a class="muted-link" href="{{ enlace }}">{{ enlace }}</a></p>
+    </div>
+  </div>
+  <!-- /dev-enlace -->{% endif %}
+{% endcall %}
+{% endblock %}

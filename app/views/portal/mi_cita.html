@@ -35,6 +35,37 @@
       </div>
     </div>
 
+    {# El cuestionario también llega por correo unas horas antes, pero tiene
+       que poder responderse desde acá sin esperar ese correo. #}
+    <div class="card" style="margin-top:20px;">
+      <div class="flex-between" style="margin-bottom:8px;">
+        <h2>Cuestionario previo</h2>
+        {% if cuestionario.respondidas %}
+        <span class="badge {{ 'badge-comp' if cuestionario.completo else 'badge-pend' }}">
+          {{ cuestionario.respondidas }} de {{ cuestionario.total }}
+        </span>
+        {% endif %}
+      </div>
+      {% if cuestionario.completo %}
+      <p class="sub" style="margin-bottom:16px;">
+        Ya lo respondiste. El personal lo va a repasar con vos antes de la extracción.
+      </p>
+      <a class="btn btn-ghost btn-sm" href="{{ url_for('cuestionario.ver', id_cita=cita.id_cita) }}">
+        {{ ico('fileText') }} Ver mis respuestas
+      </a>
+      {% else %}
+      <p class="sub" style="margin-bottom:16px;">
+        Son 36 preguntas cortas sobre tu salud, en tres pasos. Te llega también
+        por correo unas horas antes de tu cita, pero podés dejarlo listo ahora
+        y ganar tiempo en el mostrador.
+      </p>
+      <a class="btn btn-primary btn-sm" href="{{ url_for('cuestionario.responder', id_cita=cita.id_cita) }}">
+        {{ ico('fileText') }}
+        {{ 'Continuar el cuestionario' if cuestionario.respondidas else 'Responder el cuestionario' }}
+      </a>
+      {% endif %}
+    </div>
+
     {% else %}
     <div class="empty">
       <div class="ico">{{ ico('calendar') }}</div>
@@ -48,13 +79,12 @@
     {% if historial %}
     <div class="card table-wrap">
       <table class="data">
-        <thead><tr><th>Fecha</th><th>Horario</th><th>Tipo</th><th>Estado</th></tr></thead>
+        <thead><tr><th>Fecha y hora</th><th class="hide-sm">Tipo</th><th>Estado</th></tr></thead>
         <tbody>
           {% for h in historial %}
           <tr>
-            <td>{{ h.fecha_cita.strftime('%d/%m/%Y') }}</td>
-            <td>{{ h.horario.hora_inicio.strftime('%H:%M') }}</td>
-            <td>{{ etiqueta_tipo(h.tipo_cita) }}</td>
+            <td style="white-space:nowrap;">{{ h.fecha_cita.strftime('%d/%m/%Y') }} · {{ h.horario.hora_inicio.strftime('%H:%M') }}</td>
+            <td class="hide-sm">{{ etiqueta_tipo(h.tipo_cita) }}</td>
             <td>
               <span class="badge {{ 'badge-comp' if h.estado == 'Completada'
                                     else ('badge-aus' if h.estado == 'Ausente' else 'badge-canc') }}">{{ h.estado }}</span>

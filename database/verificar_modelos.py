@@ -62,7 +62,7 @@ def main():
 
         # 4. Los catálogos tienen que estar cargados.
         esperado = {"rol": 4, "tipo_sangre": 8, "compatibilidad_abo_rh": 27,
-                    "tipo_medicion": 5, "diferimiento": 12, "pregunta": 13,
+                    "tipo_medicion": 5, "diferimiento": 12, "pregunta": 49,
                     "horario_disponible": 88, "contenido_portal": 3}
         vacios = []
         for tabla, cuantos in esperado.items():

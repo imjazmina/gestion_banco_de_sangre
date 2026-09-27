@@ -3,7 +3,7 @@ from flask import (Blueprint, render_template, request, redirect,
                    url_for, flash)
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.controllers.portal import agenda
+from app.controllers.portal import agenda, cuestionario
 from app.controllers.sesion import requiere_login, usuario_actual
 from app.models import db
 
@@ -14,12 +14,23 @@ mi_cita_bp = Blueprint("mi_cita", __name__, url_prefix="/mi-cita")
 @requiere_login
 def ver():
     usuario = usuario_actual()
+    cita = agenda.cita_vigente(usuario)
     return render_template(
         "portal/mi_cita.html",
-        cita=agenda.cita_vigente(usuario),
+        cita=cita,
+        cuestionario=_estado_cuestionario(cita),
         historial=agenda.historial(usuario),
         etiqueta_tipo=agenda.etiqueta_tipo,
         confirmar=request.args.get("confirmar"))
+
+
+def _estado_cuestionario(cita):
+    """Cuánto del cuestionario previo lleva respondido esta cita."""
+    if cita is None:
+        return {"respondidas": 0, "total": 0, "completo": False}
+    respondidas, total = cuestionario.avance(cita)
+    return {"respondidas": respondidas, "total": total,
+            "completo": total > 0 and respondidas >= total}
 
 
 @mi_cita_bp.get("/reprogramar")

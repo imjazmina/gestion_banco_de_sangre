@@ -1,0 +1,57 @@
+{% extends "portal/layout.html" %}
+{% from "portal/_ui.html" import ico %}
+{% set activo = 'mi-cita' %}
+{% block titulo %}Cuestionario enviado · Banco de sangre{% endblock %}
+
+{% block contenido %}
+<section class="block" style="padding-top:24px;">
+  <div class="wrap center-narrow">
+
+    <div class="card" style="text-align:center;">
+      <div class="ico" style="background:#E7F6EF; color:var(--ok); margin:0 auto 14px; width:52px; height:52px; border-radius:14px; display:flex; align-items:center; justify-content:center;">
+        {{ ico('check') }}
+      </div>
+      <h1 style="font-size:19px; margin-bottom:8px;">Cuestionario completo</h1>
+      <p class="sub">
+        Lo respondiste para tu cita del {{ cita.fecha_cita.strftime('%d/%m/%Y') }}
+        a las {{ cita.horario.hora_inicio.strftime('%H:%M') }}. El personal de salud
+        lo va a repasar con vos antes de la extracción.
+      </p>
+    </div>
+
+    {% if atencion %}
+    {# Se le avisa que algunas respuestas se conversan, sin decirle que está
+       rechazado: el portal no decide la aptitud, la decide el personal. #}
+    <div class="banner info" style="margin-top:18px;">
+      {{ ico('info') }}
+      <p><b>Algunas respuestas se conversan en el mostrador</b>
+        Es habitual y no significa que no puedas donar. Vení igual a tu cita:
+        el personal te va a hacer un par de preguntas más antes de decidir.</p>
+    </div>
+    {% endif %}
+
+    <div class="card" style="margin-top:18px;">
+      <div class="flex-between" style="margin-bottom:12px;">
+        <h2>Tus respuestas</h2>
+        <a class="btn btn-ghost btn-sm" href="{{ url_for('cuestionario.responder', id_cita=cita.id_cita,
+                                                         seccion=SECCIONES_LISTA[0]) }}">{{ ico('edit') }} Corregir</a>
+      </div>
+      <ul class="q-resumen">
+        {% for p, valor, marcada in filas %}
+        <li>
+          <span class="q-num">{{ p.orden }}</span>
+          <span class="q-resumen-txt">{{ p.enunciado }}</span>
+          <span class="badge {{ 'badge-pend' if marcada else 'badge-comp' }}">{{ valor }}</span>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+
+    <div style="margin-top:18px; display:flex; gap:10px; flex-wrap:wrap;">
+      <a class="btn btn-secondary" href="{{ url_for('mi_cita.ver') }}">{{ ico('calendar') }} Ver mi cita</a>
+      <a class="btn btn-ghost" href="{{ url_for('main.index') }}">Volver al inicio</a>
+    </div>
+
+  </div>
+</section>
+{% endblock %}

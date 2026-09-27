@@ -26,6 +26,9 @@ class Notificacion(db.Model):
 
     CONFIRMACION_CITA = "CONFIRMACION_CITA"
     RECORDATORIO_CITA = "RECORDATORIO_CITA"
+    # Agregado por la migración 004: el correo con el cuestionario
+    # previo. Guardarlo sirve además para no mandarlo dos veces.
+    CUESTIONARIO_PREVIO = "CUESTIONARIO_PREVIO"
     HABILITACION = "HABILITACION"
     AGRADECIMIENTO = "AGRADECIMIENTO"
     ASIGNACION_DONANTE = "ASIGNACION_DONANTE"

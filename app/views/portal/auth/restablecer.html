@@ -1,0 +1,34 @@
+{% extends "portal/layout.html" %}
+{% from "portal/_ui.html" import ico %}
+{% import "portal/auth/_marco.html" as marco %}
+{% block titulo %}Nueva contraseña · Banco de sangre{% endblock %}
+
+{% block contenido %}
+{% call marco.pantalla() %}
+  <div class="auth-head">
+    <div class="mark-lg">{{ ico('shield') }}</div>
+    <h1>Elegí una contraseña nueva</h1>
+    <p class="sub" style="margin-top:6px;">Este enlace sirve una sola vez.</p>
+  </div>
+
+  <div class="card">
+    <form method="post">
+      <div class="field">
+        <label for="contrasena">Contraseña nueva</label>
+        <input type="password" id="contrasena" name="contrasena"
+               minlength="8" required autofocus>
+        <div class="hint">Al menos 8 caracteres.</div>
+      </div>
+      <div class="field">
+        <label for="repetir">Repetí la contraseña</label>
+        <input type="password" id="repetir" name="repetir" minlength="8" required>
+      </div>
+      <button class="btn btn-primary btn-block" type="submit">Guardar contraseña</button>
+    </form>
+  </div>
+
+  <p class="auth-foot">
+    <a href="{{ url_for('auth.ingresar') }}">{{ ico('arrowLeft') }} Volver a iniciar sesión</a>
+  </p>
+{% endcall %}
+{% endblock %}

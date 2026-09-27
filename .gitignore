@@ -16,4 +16,7 @@ schema.sql
 !database/schema.sql
 !database/catalogos.sql
 !database/migraciones/*.sql
+
+# Script de sincronización: lleva una copia de todo el código adentro, así
+# que subirlo duplicaría el repositorio y daría conflictos en cada cambio.
 aplicar_cambios.py

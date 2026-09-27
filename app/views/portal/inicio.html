@@ -111,13 +111,12 @@
     <div class="section-head" style="margin-top:36px;"><h2>Historial reciente</h2></div>
     <div class="card table-wrap">
       <table class="data">
-        <thead><tr><th>Fecha</th><th>Horario</th><th>Tipo</th><th>Estado</th></tr></thead>
+        <thead><tr><th>Fecha y hora</th><th class="hide-sm">Tipo</th><th>Estado</th></tr></thead>
         <tbody>
           {% for h in historial %}
           <tr>
-            <td>{{ h.fecha_cita.strftime('%d/%m/%Y') }}</td>
-            <td>{{ h.horario.hora_inicio.strftime('%H:%M') }}</td>
-            <td>{{ h.tipo_cita }}</td>
+            <td style="white-space:nowrap;">{{ h.fecha_cita.strftime('%d/%m/%Y') }} · {{ h.horario.hora_inicio.strftime('%H:%M') }}</td>
+            <td class="hide-sm">{{ h.tipo_cita }}</td>
             <td>
               <span class="badge {{ 'badge-comp' if h.estado == 'Completada'
                                     else ('badge-aus' if h.estado == 'Ausente' else 'badge-canc') }}">{{ h.estado }}</span>

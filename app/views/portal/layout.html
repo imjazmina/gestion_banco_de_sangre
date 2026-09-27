@@ -25,6 +25,12 @@
       <span class="mark">{{ ico('drop') }}</span> Banco de sangre
     </a>
     <div class="header-right">
+      {# En el celular la barra de arriba no entra, así que las opciones se
+         mueven a este panel. Sin él, quien no tiene sesión se queda sin
+         menú, y quien la tiene no puede llegar a Información, Solicitudes
+         ni Salir: la barra de abajo no las lleva. #}
+      <button class="mobile-toggle" type="button" aria-label="Abrir menú"
+              aria-expanded="false" aria-controls="menu-movil">{{ ico('menu') }}</button>
       {% if usuario %}
         <nav class="main-nav">
           <a class="nav-link {{ 'active' if activo == 'inicio' }}" href="{{ url_for('main.index') }}">Inicio</a>
@@ -48,11 +54,31 @@
         <div class="header-actions">
           <a class="btn btn-ghost hide-sm"     href="{{ url_for('auth.ingresar') }}">Iniciar sesión</a>
           <a class="btn btn-secondary hide-sm" href="{{ url_for('auth.registro') }}">Crear cuenta</a>
-          <a class="btn btn-donate"            href="{{ url_for('auth.ingresar') }}">{{ ico('drop') }} Quiero donar</a>
+          <a class="btn btn-donate"            href="{{ url_for('auth.ingresar', donar=1) }}">{{ ico('drop') }} Quiero donar</a>
         </div>
       {% endif %}
     </div>
   </div>
+
+  <nav class="menu-movil" id="menu-movil" hidden>
+    <div class="wrap">
+      {% if usuario %}
+        <a href="{{ url_for('main.index') }}">{{ ico('activity') }} Inicio</a>
+        <a href="{{ url_for('donar.agendar') }}">{{ ico('drop') }} Donar</a>
+        <a href="{{ url_for('solicitudes.listar') }}">{{ ico('users') }} Solicitudes</a>
+        <a href="{{ url_for('mi_cita.ver') }}">{{ ico('calendar') }} Mi cita</a>
+        <a href="{{ url_for('informacion.ver') }}">{{ ico('info') }} Información</a>
+        <a href="{{ url_for('perfil.ver') }}">{{ ico('user') }} Mi perfil</a>
+        <a href="{{ url_for('buzon.formulario') }}">{{ ico('megaphone') }} Buzón de sugerencias</a>
+        <a href="{{ url_for('auth.salir') }}">{{ ico('logout') }} Cerrar sesión</a>
+      {% else %}
+        <a href="{{ url_for('main.index') }}">{{ ico('activity') }} Inicio</a>
+        <a href="{{ url_for('informacion.ver') }}">{{ ico('info') }} Información</a>
+        <a href="{{ url_for('auth.ingresar') }}">{{ ico('user') }} Iniciar sesión</a>
+        <a href="{{ url_for('auth.registro') }}">{{ ico('edit') }} Crear cuenta</a>
+      {% endif %}
+    </div>
+  </nav>
 </header>
 
 <main>
@@ -107,7 +133,7 @@
       <div class="footer-col">
         <h4>Contacto</h4>
         <p>{{ ico('mapPin') }} Av. Mcal. López, Luque</p>
-        <p>{{ ico('phone') }} (021) 645-xxx</p>
+        <p>{{ ico('phone') }} (021) 645-000</p>
         <p>{{ ico('mail') }} bancodesangre@hrl.gov.py</p>
       </div>
       <div class="footer-col">
@@ -173,6 +199,26 @@ document.addEventListener('click', e => {
   const b = e.target.closest('.faq-q');
   if(b) b.parentElement.classList.toggle('open');
 });
+
+/* Menú del celular. El panel arranca con [hidden] puesto desde el HTML: si
+   el navegador no ejecuta este script, queda oculto y no estorba, y las
+   mismas opciones siguen estando en el pie de página. */
+(function(){
+  const boton = document.querySelector('.mobile-toggle');
+  const panel = document.getElementById('menu-movil');
+  if(!boton || !panel) return;
+  const cerrar = () => { panel.hidden = true; boton.setAttribute('aria-expanded','false'); };
+  boton.addEventListener('click', () => {
+    const abierto = !panel.hidden;
+    panel.hidden = abierto;
+    boton.setAttribute('aria-expanded', String(!abierto));
+  });
+  panel.addEventListener('click', e => { if(e.target.closest('a')) cerrar(); });
+  document.addEventListener('keydown', e => { if(e.key === 'Escape') cerrar(); });
+  /* Al pasar a pantalla grande el panel no tiene sentido y el menú de
+     arriba vuelve solo. */
+  window.matchMedia('(min-width:901px)').addEventListener('change', cerrar);
+})();
 </script>
 </body>
 </html>

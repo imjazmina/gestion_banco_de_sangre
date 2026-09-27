@@ -1,31 +1,33 @@
 {% extends "portal/layout.html" %}
 {% from "portal/_ui.html" import ico %}
+{% import "portal/auth/_marco.html" as marco %}
 {% block titulo %}Iniciar sesión · Banco de sangre{% endblock %}
 
 {% block contenido %}
-<div class="auth-shell">
-  <div class="auth-card">
-    <div class="auth-head">
-      <div class="mark-lg">{{ ico('drop') }}</div>
-      <h1>Iniciar sesión</h1>
-      <p class="sub" style="margin-top:6px;">Ingresá con el correo que registraste.</p>
-    </div>
-
-    <div class="card">
-      <form method="post">
-        <div class="field">
-          <label for="correo">Correo electrónico</label>
-          <input type="email" id="correo" name="correo" value="{{ correo }}" required autofocus>
-        </div>
-        <div class="field">
-          <label for="contrasena">Contraseña</label>
-          <input type="password" id="contrasena" name="contrasena" required>
-        </div>
-        <button class="btn btn-primary btn-block" type="submit">Ingresar</button>
-      </form>
-    </div>
-
-    <p class="auth-foot">¿No tenés cuenta? <a href="{{ url_for('auth.registro') }}">Creá una</a></p>
+{% call marco.pantalla() %}
+  <div class="auth-head">
+    <div class="mark-lg">{{ ico('drop') }}</div>
+    <h1>Iniciar sesión</h1>
+    <p class="sub" style="margin-top:6px;">Ingresá con el correo que registraste.</p>
   </div>
-</div>
+
+  <div class="card">
+    <form method="post">
+      <div class="field">
+        <label for="correo">Correo electrónico</label>
+        <input type="email" id="correo" name="correo" value="{{ correo }}" required autofocus>
+      </div>
+      <div class="field">
+        <label for="contrasena">Contraseña</label>
+        <input type="password" id="contrasena" name="contrasena" required>
+        <div class="hint" style="text-align:right;">
+          <a class="muted-link" href="{{ url_for('auth.recuperar') }}">¿Olvidaste tu contraseña?</a>
+        </div>
+      </div>
+      <button class="btn btn-primary btn-block" type="submit">Ingresar</button>
+    </form>
+  </div>
+
+  <p class="auth-foot">¿No tenés cuenta? <a href="{{ url_for('auth.registro') }}">Creá una</a></p>
+{% endcall %}
 {% endblock %}

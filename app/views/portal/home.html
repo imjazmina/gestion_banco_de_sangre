@@ -16,7 +16,7 @@
         {% if usuario %}
         <a class="btn btn-donate" href="{{ url_for('solicitudes.listar') }}">{{ ico('drop') }} Ver solicitudes</a>
         {% else %}
-        <a class="btn btn-donate" href="{{ url_for('auth.ingresar') }}">{{ ico('drop') }} Quiero donar</a>
+        <a class="btn btn-donate" href="{{ url_for('auth.ingresar', donar=1) }}">{{ ico('drop') }} Quiero donar</a>
         {% endif %}
         <a class="btn btn-secondary" href="{{ url_for('informacion.ver') }}">{{ ico('info') }} Informarme</a>
       </div>
@@ -126,7 +126,7 @@
       <div class="card card-hover" style="background:var(--hero); border-color:#F3D9D9;">
         <h2 style="margin-bottom:10px;">{{ ico('mapPin') }} ¿Dónde estamos?</h2>
         <p class="sub" style="margin-bottom:16px;">Atendemos en el Hospital Regional de Luque. Traé tu documento de identidad el día de tu cita, no necesitás nada más.</p>
-        <a class="btn btn-secondary" href="{{ url_for('auth.ingresar') if not usuario else url_for('donar.agendar') }}">
+        <a class="btn btn-secondary" href="{{ url_for('auth.ingresar', donar=1) if not usuario else url_for('donar.agendar') }}">
           {{ 'Agendar mi cita' if not usuario else 'Agendar donación' }} {{ ico('chevronRight') }}
         </a>
       </div>

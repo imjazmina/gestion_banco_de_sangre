@@ -70,6 +70,18 @@ class Pregunta(db.Model):
     parte = db.Column(db.String(1), nullable=False)
     enunciado = db.Column(db.Text, nullable=False)
     preselecciona_exclusion = db.Column(db.Boolean, nullable=False)
+    # Columnas de la migración 004.
+    seccion = db.Column(db.String(40))
+    orden = db.Column(db.Integer)
+    pide_detalle = db.Column(db.Boolean, nullable=False, default=False)
+    etiqueta_detalle = db.Column(db.String(60))
+    nota = db.Column(db.Text)
+    activa = db.Column(db.Boolean, nullable=False, default=True)
+    # 'Si' o 'No': cuál de las dos respuestas tiene que revisar el personal.
+    alerta_si = db.Column(db.String(2))
+
+    PARTE_DONANTE = "A"
+    PARTE_PERSONAL = "B"
 
 
 class Diferimiento(db.Model):

@@ -192,42 +192,53 @@ las marcas `<<<<<<<` y `>>>>>>>`, y se commitea. Si el archivo es de las dos
 
 ## 5. Lo que hay que decidir entre las dos
 
-El `schema.sql` actual tiene cuatro puntos que chocan con el portal. Los cuatro
-afectan también al panel de administración, así que la decisión es de las dos:
+Estos son todos los cambios de esquema que pidió el portal. Los de arriba ya
+están hechos y versionados; los de abajo tocan al panel, así que la decisión
+es de las dos.
 
-| Punto | Estado | Detalle |
+### Ya aplicado
+
+| Migración | Qué cambia | Por qué |
 |---|---|---|
-| **`cita.fecha_cita`** | Resuelto · migración 001 | La tabla no guardaba el día del turno. Se agregó la columna y un trigger que exige que la fecha caiga en el día de semana de su franja. |
-| **`cita.id_personal`** | Resuelto · migración 002 | Pasó a nullable: al reservar por el portal todavía no hay nadie asignado. El banco lo completa al organizar el día. |
-| **`buzon.id_usuario`** | Pendiente | Es NOT NULL, así que el mensaje no puede ser anónimo. El prototipo lo prometía. Tampoco hay columna para el tipo, que por ahora va al principio del texto (`[Sugerencia] ...`). |
-| **`notificacion.leido`** | Pendiente | No existe, así que no se puede marcar una notificación como vista ni mostrar el punto rojo en la campana. |
+| **001** | Agrega `cita.fecha_cita` y un trigger que exige que la fecha caiga en el día de semana de su franja. | La tabla no guardaba el día del turno, solo la franja semanal. Sin eso no hay agenda posible ni en el portal ni en el panel. |
+| **002** | `cita.id_personal` pasa a nullable. Suma controles de cupo por franja y fecha, una sola cita activa por donante, y bloqueo con diferimiento vigente o fecha pasada. | Al reservar por el portal todavía no hay personal asignado, y como quien agenda ya no es alguien del banco mirando la agenda, las reglas las tiene que hacer cumplir la base. |
+| **003** | Tabla nueva `recuperacion_contrasena`. | El "¿Olvidaste tu contraseña?" necesita guardar un token temporal. **No toca ninguna tabla existente y nadie más la usa**, pero igual hay que correr `migrar.py` o la pantalla falla. |
+| **004** | `pregunta` gana `seccion`, `orden`, `alerta_si`, `pide_detalle`, `etiqueta_detalle`, `nota` y `activa`. El CHECK de `notificacion.tipo` acepta además `CUESTIONARIO_PREVIO`. | El cuestionario oficial del banco son 36 preguntas en tres bloques y numeradas; sin dónde guardar el bloque y el número, la pantalla las muestra en cualquier orden. `alerta_si` dice cuál de las dos respuestas mira el personal, porque no siempre es el "sí". **Todo suma: ninguna columna cambia de tipo y el CHECK se amplía, no se achica.** Las preguntas de prueba que había quedan marcadas `activa = false`, no se borran. |
 
-### Lo que la migración 002 le cambia al panel
+### Lo que falta decidir entre las dos
 
-Los controles que agrega valen para **toda** cita, venga del portal o del
-panel. Es a propósito: una regla que solo vale para una mitad del sistema no
-es una regla. Concretamente, el panel tampoco va a poder:
+| # | Cambio | Por qué hace falta | A quién afecta |
+|---|---|---|---|
+| 1 | `correo.verificado boolean NOT NULL DEFAULT false` | **RN17** pide que el donante inicie sesión solo con correo verificado. Hoy no hay dónde guardar ese estado, así que la regla no se puede cumplir. | Portal: registro y login. Panel: ver quién confirmó. |
+| 2 | `notificacion.leido boolean NOT NULL DEFAULT false` | Sin esto no se puede marcar una notificación como vista ni mostrar el aviso en la campana. | Portal: listarlas. Panel: saber si el donante vio el recordatorio. |
+| 3 | `buzon.id_usuario` a nullable | El prototipo promete que el mensaje es anónimo, y hoy la columna es NOT NULL. | Panel: tiene que tolerar mensajes sin remitente. |
+| 4 | `buzon.tipo varchar(20)` con CHECK | No hay columna para Sugerencia / Comentario / Reclamo. Hoy el tipo va al principio del texto (`[Sugerencia] ...`), que funciona pero impide filtrar y contar. | Panel: leer y clasificar. |
 
-- crear una segunda cita activa para un donante que ya tiene una;
-- pasar el cupo de una franja en una fecha;
-- agendar para alguien con un diferimiento vigente;
-- crear una cita con fecha pasada (cerrarla como Completada o Ausente sí,
-  eso es un UPDATE y está permitido).
+Los puntos 1 y 2 son una columna booleana con default: riesgo cero y les sirven
+a las dos. Conviene acordarlos primero y hacerlos en una sola migración.
 
-Si el panel necesita saltarse alguno de esos controles para un caso real
-—por ejemplo, sobrecupo autorizado por jefatura— hay que verlo entre las dos
-y resolverlo con una migración nueva, no desactivando el trigger en una sola
-máquina.
+Los del buzón son los que más cambian lo que recibe el panel: hasta que se
+decidan, el portal sigue guardando el tipo dentro del texto y pidiendo sesión
+para escribir.
 
----|---|---|
-| **`cita` no tiene `fecha_cita`** | Solo guarda `id_horario`, que es una franja semanal ("Lunes 07:00"), y la fecha de creación. No hay dónde guardar qué día es la cita. | Bloquea la pantalla de agendar del portal **y** la agenda del panel |
-| **`cita.id_personal` es NOT NULL** | No se puede agendar sin asignar de antemano a un funcionario. Al agendar por el portal todavía no hay nadie asignado. | Portal al crear la cita, panel al asignar |
-| **`buzon.id_usuario` es NOT NULL** | El mensaje no puede ser anónimo ni enviarse sin sesión. | Portal (el prototipo lo promete anónimo), panel al leerlos |
-| **`notificacion` no tiene `leido`** | No hay forma de marcar una notificación como vista. | Portal al listarlas, panel al enviarlas |
+### Lo que Jazmín tiene que correr después del pull
 
-El primero es el más serio: sin `fecha_cita` no hay agenda posible en ninguno de
-los dos módulos. La migración de ejemplo en `000_ejemplo.sql.txt` muestra
-exactamente cómo agregarla sin romper lo que ya existe.
+```
+python database/migrar.py            aplica 001 a 004
+python database/cargar_catalogos.py  carga las 36 preguntas del cuestionario
+```
+
+El segundo hace falta esta vez: la migración agrega las columnas, pero las
+preguntas del formulario son datos y entran por el catálogo. Después de
+correrlo, `pregunta` tiene 49 filas (36 del cuestionario oficial, 5 de la
+Parte B del check-in y 8 de prueba que quedan inactivas).
+
+### Lo que NO necesita cambios
+
+Es fácil pedir de más, así que conviene dejarlo escrito: **última donación,
+donaciones realizadas, fecha estimada de habilitación** (RF30) e **historial de
+citas** se calculan a partir de las citas completadas y el género del donante.
+No hacen falta columnas nuevas.
 
 ---
 

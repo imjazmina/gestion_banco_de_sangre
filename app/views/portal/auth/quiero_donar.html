@@ -1,0 +1,87 @@
+{# La pantalla que abre el botón "Quiero donar".
+
+   Es el mismo formulario de /ingresar, con la misma acción y los mismos
+   nombres de campo: lo que cambia es lo que la acompaña. Quien llega por
+   este botón todavía está decidiendo, así que al costado van las razones y
+   los requisitos, y la cuenta queda como el paso siguiente, no como el
+   primero. #}
+{% extends "portal/layout.html" %}
+{% from "portal/_ui.html" import ico %}
+{% block titulo %}Quiero donar · Banco de sangre{% endblock %}
+
+{% block contenido %}
+<section class="hero decor-circles">
+  <div class="wrap hero-grid" style="padding:56px 0; align-items:start;">
+
+    <div>
+      <div class="auth-head" style="text-align:left; margin-bottom:20px;">
+        <div class="mark-lg" style="margin:0 0 16px;">{{ ico('drop') }}</div>
+        <h1>Quiero donar</h1>
+        <p class="sub" style="margin-top:6px;">
+          Entrá a tu cuenta para elegir el día y el horario de tu donación.
+        </p>
+      </div>
+
+      <div class="card" style="max-width:420px;">
+        <form method="post" action="{{ url_for('auth.ingresar', donar=1) }}">
+          <div class="field">
+            <label for="correo">Correo electrónico</label>
+            <input type="email" id="correo" name="correo" value="{{ correo }}"
+                   placeholder="tu@correo.com" required autofocus>
+          </div>
+          <div class="field">
+            <label for="contrasena">Contraseña</label>
+            <input type="password" id="contrasena" name="contrasena" required>
+            <div class="hint" style="text-align:right;">
+              <a class="muted-link" href="{{ url_for('auth.recuperar') }}">¿Olvidaste tu contraseña?</a>
+            </div>
+          </div>
+          <button class="btn btn-primary btn-block" type="submit">Iniciar sesión</button>
+        </form>
+      </div>
+
+      <p class="auth-foot" style="text-align:left; max-width:420px;">
+        ¿No tenés cuenta? <a href="{{ url_for('auth.registro') }}">Creá una cuenta</a>
+      </p>
+    </div>
+
+    <div>
+      <div class="pulse-wrap">
+        <svg class="pulse-svg" viewBox="0 0 400 64" fill="none" aria-hidden="true">
+          <polyline points="0,32 60,32 80,10 100,54 120,32 180,32 200,14 215,50 230,32 400,32"
+                    stroke="#C81E1E" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <div class="stat-strip">
+          <div class="stat-cell">
+            <div class="num">{{ solicitudes_activas }}</div>
+            <div class="txt">{{ 'persona espera' if solicitudes_activas == 1 else 'personas esperan' }} un donante</div>
+          </div>
+          <div class="stat-cell"><div class="num">3</div><div class="txt">personas puede ayudar una donación</div></div>
+          <div class="stat-cell"><div class="num">15</div><div class="txt">minutos dura la extracción</div></div>
+        </div>
+      </div>
+
+      <div class="card card-hover" style="margin-top:20px;">
+        <h2 style="margin-bottom:14px;">¿Podés donar hoy?</h2>
+        <ul class="req-list">
+          <li class="req-yes">{{ ico('check') }} Tenés entre 18 y 65 años</li>
+          <li class="req-yes">{{ ico('check') }} Pesás 50 kg o más</li>
+          <li class="req-yes">{{ ico('check') }} Dormiste bien y te sentís en buen estado de salud</li>
+        </ul>
+        <div class="divider"></div>
+        <a class="muted-link link-arrow" href="{{ url_for('informacion.ver') }}">Ver todos los requisitos {{ ico('chevronRight') }}</a>
+      </div>
+
+      <div class="card" style="margin-top:20px; background:var(--hero); border-color:#F3D9D9;">
+        <p style="font-size:15px; color:var(--ink);">
+          «Donar sangre toma apenas unos minutos, pero puede cambiar por completo
+          el día de otra persona.»
+        </p>
+        <p class="meta" style="margin-top:10px;">— Equipo de enfermería, Banco de sangre HRL</p>
+      </div>
+    </div>
+
+  </div>
+</section>
+{% endblock %}
