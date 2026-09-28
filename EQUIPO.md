@@ -1,6 +1,4 @@
-# Cómo trabajamos las dos
-
-Documento de acuerdo entre **Johana** (portal del donante) y **Jazmín** (panel de administración).
+# Cómo trabajamos 
 
 La idea de fondo: **no nos conectamos por código, nos conectamos por la base de
 datos.** Cuando el portal registra un usuario, escribe en la tabla `usuario`.

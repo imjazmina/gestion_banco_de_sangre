@@ -17,8 +17,7 @@ from pathlib import Path
 
 from flask import Blueprint
 
-# Los módulos del sistema. portal lo desarrolla Johana, admin lo desarrolla
-# Jazmín. Cada una trabaja solo dentro de su carpeta.
+
 MODULOS = ("portal", "admin")
 
 
