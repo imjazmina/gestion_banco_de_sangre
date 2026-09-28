@@ -22,7 +22,7 @@ from app.models import db              # noqa: E402
 
 ESPERADO = {
     "rol": 4, "tipo_sangre": 8, "compatibilidad_abo_rh": 27,
-    "tipo_medicion": 5, "diferimiento": 12, "pregunta": 49,
+    "tipo_medicion": 5, "diferimiento": 12, "pregunta": 41,
     "horario_disponible": 88, "contenido_portal": 3,
 }
 

@@ -35,8 +35,8 @@
       </div>
     </div>
 
-    {# El cuestionario también llega por correo unas horas antes, pero tiene
-       que poder responderse desde acá sin esperar ese correo. #}
+    {# El cuestionario se habilita el día de la cita: pregunta por el estado
+       de salud de hoy, así que una respuesta de hace días no sirve. #}
     <div class="card" style="margin-top:20px;">
       <div class="flex-between" style="margin-bottom:8px;">
         <h2>Cuestionario previo</h2>
@@ -46,23 +46,30 @@
         </span>
         {% endif %}
       </div>
-      {% if cuestionario.completo %}
+
       <p class="sub" style="margin-bottom:16px;">
-        Ya lo respondiste. El personal lo va a repasar con vos antes de la extracción.
+        Antes de tu cita, completa un breve cuestionario de salud en tres pasos.
+        También recibirás un recordatorio por correo unas horas antes, para que
+        puedas responderlo con anticipación y agilizar el proceso.
       </p>
+
+      {% if cuestionario.completo %}
       <a class="btn btn-ghost btn-sm" href="{{ url_for('cuestionario.ver', id_cita=cita.id_cita) }}">
         {{ ico('fileText') }} Ver mis respuestas
       </a>
-      {% else %}
-      <p class="sub" style="margin-bottom:16px;">
-        Son 36 preguntas cortas sobre tu salud, en tres pasos. Te llega también
-        por correo unas horas antes de tu cita, pero podés dejarlo listo ahora
-        y ganar tiempo en el mostrador.
-      </p>
+      {% elif cuestionario.habilitado %}
       <a class="btn btn-primary btn-sm" href="{{ url_for('cuestionario.responder', id_cita=cita.id_cita) }}">
         {{ ico('fileText') }}
         {{ 'Continuar el cuestionario' if cuestionario.respondidas else 'Responder el cuestionario' }}
       </a>
+      {% else %}
+      <div class="banner info" style="margin:0;">
+        {{ ico('clock') }}
+        <p><b>Se habilita el día de tu cita</b>
+          El {{ cita.fecha_cita.strftime('%d/%m/%Y') }} vas a poder responderlo
+          desde acá o desde el enlace que te llega por correo. Pregunta por tu
+          estado de salud de ese día, por eso no se puede completar antes.</p>
+      </div>
       {% endif %}
     </div>
 

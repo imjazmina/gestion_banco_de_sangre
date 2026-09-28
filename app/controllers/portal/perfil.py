@@ -141,19 +141,30 @@ def _sumar_meses(fecha, meses):
     return date(anio, mes, dia)
 
 
-def ultima_donacion(usuario):
+def _completadas(usuario):
     """
-    La última cita que terminó en donación efectiva, o None.
+    Las citas que terminaron en donación efectiva, de la más reciente a la
+    más vieja.
 
     Se mira el estado de la cita y no la tabla extraccion porque es el estado
     lo que el personal cierra siempre; la extracción la carga después el
     laboratorio y podría no estar todavía.
+
+    El orden se hace en Python: la fecha de la cita se calcula a partir de
+    la franja, así que no es una columna por la que se pueda ordenar en SQL.
     """
-    return (Cita.query
-            .filter(Cita.id_usuario == usuario.id_usuario,
-                    Cita.estado == Cita.COMPLETADA)
-            .order_by(Cita.fecha_cita.desc())
-            .first())
+    citas = (Cita.query
+             .filter(Cita.id_usuario == usuario.id_usuario,
+                     Cita.estado == Cita.COMPLETADA)
+             .all())
+    citas = [c for c in citas if c.fecha_cita is not None]
+    return sorted(citas, key=lambda c: c.momento, reverse=True)
+
+
+def ultima_donacion(usuario):
+    """La última cita que terminó en donación efectiva, o None."""
+    completadas = _completadas(usuario)
+    return completadas[0] if completadas else None
 
 
 def total_donaciones(usuario):
@@ -208,12 +219,10 @@ def habilitacion(usuario):
 
 def historial_citas(usuario, limite=10):
     """Todas las citas del donante, la más reciente primero."""
-    return (Cita.query
-            .filter(Cita.id_usuario == usuario.id_usuario)
-            .order_by(Cita.fecha_cita.desc(),
-                      Cita.fecha_hora_creacion.desc())
-            .limit(limite)
-            .all())
+    citas = Cita.query.filter(Cita.id_usuario == usuario.id_usuario).all()
+    citas = [c for c in citas if c.fecha_cita is not None]
+    citas.sort(key=lambda c: (c.momento, c.fecha_hora_creacion), reverse=True)
+    return citas[:limite]
 
 
 def resumen(usuario):

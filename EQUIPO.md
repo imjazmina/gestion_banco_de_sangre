@@ -32,7 +32,7 @@ Todo lo que sigue apunta a eso.
 | Archivo | Por qué |
 |---|---|
 | `database/schema.sql` | Estructura de la base. Ver la sección 3. |
-| `database/migraciones/` | Los cambios de esquema. Ver la sección 3. |
+| `database/schema.sql` | El modelo acordado. No se modifica. Ver la sección 3. |
 | `app/models/` | El mapeo de las tablas. Las dos leemos las mismas. |
 | `app/controllers/sesion.py` | Login y permisos, los usan los dos módulos |
 | `app/config.py`, `app/__init__.py` | Arranque de la aplicación |
@@ -75,53 +75,45 @@ registra. Para evitarlo, el admin usa el prefijo `admin_`:
 
 ---
 
-## 3. Cambios en la base de datos (lo más delicado)
+## 3. La base de datos no se toca
 
-**El problema:** `schema.sql` solo se ejecuta cuando la base está vacía. Si
-Jazmín agrega una columna hoy y Johana hace `git pull` mañana, la base de
-Johana **no se entera nunca**. El código nuevo va a fallar con
-`column does not exist` y va a perder una tarde buscando por qué.
+`database/schema.sql` es el modelo que acordamos y **no se modifica**. Nada
+de columnas nuevas, tablas nuevas ni triggers agregados por un lado.
 
-**La solución:** cada cambio del esquema es un archivo numerado en
-`database/migraciones/`.
+Todo lo que el portal necesitaba y el esquema no daba se resolvió en el
+código, sin tocar la estructura:
 
-### Para hacer un cambio en la base
+| Lo que hacía falta | Cómo se resolvió, sin tocar el esquema |
+|---|---|
+| Saber qué día es una cita | Se deduce: la franja dice el día de la semana y `fecha_hora_creacion` dice desde cuándo contar. La cuenta está en `app/calendario.py`. |
+| Quién atiende (`cita.id_personal` es NOT NULL) | Un usuario de servicio, **«Personal de turno»** (documento `00000000`), que carga `catalogos.sql`. El panel lo reemplaza por la persona real en el mostrador. |
+| Cupo, una sola cita activa, diferimiento vigente | Lo comprueba `app/controllers/portal/agenda.py` antes de grabar, tomando un bloqueo sobre la fila de la franja. |
+| Guardar el token de recuperar contraseña | No se guarda: el enlace lleva un token firmado con la `SECRET_KEY`. Ver `app/controllers/portal/recuperacion.py`. |
+| Bloque, orden y aclaraciones del cuestionario | En `app/controllers/portal/preguntas.py`, emparejado con la tabla por el enunciado. |
+| Avisar el cuestionario sin un tipo nuevo de notificación | Usa `RECORDATORIO_CITA`, que el CHECK ya admite. |
 
-1. Crear `database/migraciones/NNN_descripcion.sql` con el número siguiente
-   libre (hay una plantilla en `000_ejemplo.sql.txt`).
-2. Aplicarlo en tu base:
-   ```
-   python database/migrar.py
-   ```
-3. Si la migración toca una tabla que ya tiene modelo, actualizar el modelo en
-   `app/models/` **en el mismo commit**. Después:
-   ```
-   python database/verificar_modelos.py
-   ```
-4. Avisarle a la otra.
+### Si algún día hace falta cambiar el esquema
 
-### Reglas de las migraciones
+Se habla entre las dos **antes** de escribir una línea, y se cambia
+`schema.sql`. Después, las dos corren:
 
-- **Una migración ya subida no se edita nunca.** Si salió mal, se corrige con
-  una migración nueva. Editarla dejaría las dos bases en estados distintos sin
-  que se note.
-- Tiene que poder aplicarse sobre una base **con datos**. Nada de `DROP TABLE`
-  de tablas con información.
-- Una columna `NOT NULL` nueva sobre una tabla con filas necesita `DEFAULT`, o
-  el `ALTER` falla.
-- `schema.sql` se actualiza también, para que quien clone el repo de cero
-  obtenga la estructura final. Pero **la migración es lo que manda** para las
-  bases que ya existen.
+```
+python database/reconstruir.py
+```
+
+Eso borra la base y la vuelve a crear con la estructura y los catálogos.
+**Se pierden los datos de prueba**, así que conviene hacerlo el mismo día
+las dos y volver a crear las cuentas desde el portal.
 
 ### Al hacer git pull, siempre
 
 ```
 git pull
-python database/migrar.py
+python database/verificar_modelos.py
 ```
 
-Si te olvidás, la aplicación te avisa al arrancar:
-`ATENCIÓN: hay N migración/es sin aplicar en tu base`.
+Si `verificar_modelos.py` se queja de una columna o una tabla, es que el
+`schema.sql` cambió y tu base quedó vieja: corré `reconstruir.py`.
 
 ---
 
@@ -153,7 +145,7 @@ git commit -m "Agregar formulario de agendamiento"
 ```
 
 El mensaje dice **qué cambió**, no "avance" ni "cambios". Si el commit toca la
-base, que se note: `"Agregar fecha_cita a cita (migración 001)"`.
+base, que se note: `"Cambiar schema.sql: agregar X a la tabla Y"`.
 
 ### Traer lo nuevo de main
 
@@ -164,7 +156,7 @@ git checkout main
 git pull
 git checkout johana/mi-rama
 git merge main
-python database/migrar.py
+python database/verificar_modelos.py
 ```
 
 Esto es lo que evita el "se me pisó todo": si traés los cambios de la otra
@@ -190,55 +182,45 @@ las marcas `<<<<<<<` y `>>>>>>>`, y se commitea. Si el archivo es de las dos
 
 ---
 
-## 5. Lo que hay que decidir entre las dos
+## 5. Decisiones del modelo que conviene tener a mano
 
-Estos son todos los cambios de esquema que pidió el portal. Los de arriba ya
-están hechos y versionados; los de abajo tocan al panel, así que la decisión
-es de las dos.
+Ninguna de estas necesita cambiar la base. Están acá porque son las
+preguntas que van a aparecer cuando alguien lea el código o el tribunal
+pregunte.
 
-### Ya aplicado
+### La agenda llega hasta 7 días
 
-| Migración | Qué cambia | Por qué |
-|---|---|---|
-| **001** | Agrega `cita.fecha_cita` y un trigger que exige que la fecha caiga en el día de semana de su franja. | La tabla no guardaba el día del turno, solo la franja semanal. Sin eso no hay agenda posible ni en el portal ni en el panel. |
-| **002** | `cita.id_personal` pasa a nullable. Suma controles de cupo por franja y fecha, una sola cita activa por donante, y bloqueo con diferimiento vigente o fecha pasada. | Al reservar por el portal todavía no hay personal asignado, y como quien agenda ya no es alguien del banco mirando la agenda, las reglas las tiene que hacer cumplir la base. |
-| **003** | Tabla nueva `recuperacion_contrasena`. | El "¿Olvidaste tu contraseña?" necesita guardar un token temporal. **No toca ninguna tabla existente y nadie más la usa**, pero igual hay que correr `migrar.py` o la pantalla falla. |
-| **004** | `pregunta` gana `seccion`, `orden`, `alerta_si`, `pide_detalle`, `etiqueta_detalle`, `nota` y `activa`. El CHECK de `notificacion.tipo` acepta además `CUESTIONARIO_PREVIO`. | El cuestionario oficial del banco son 36 preguntas en tres bloques y numeradas; sin dónde guardar el bloque y el número, la pantalla las muestra en cualquier orden. `alerta_si` dice cuál de las dos respuestas mira el personal, porque no siempre es el "sí". **Todo suma: ninguna columna cambia de tipo y el CHECK se amplía, no se achica.** Las preguntas de prueba que había quedan marcadas `activa = false`, no se borran. |
+`horario_disponible` es un catálogo de franjas semanales: «Lunes, 07:00 a
+07:30». Una cita apunta a una franja y se toma para **la próxima vez que
+esa franja ocurre**. Por eso la agenda ofrece siete días: al octavo, dos
+lunes distintos apuntarían a la misma franja y no habría cómo distinguirlos.
 
-### Lo que falta decidir entre las dos
+Reprogramar actualiza `fecha_hora_creacion`, porque es lo que ancla el
+cálculo: es la fecha de alta de *esa* reserva.
 
-| # | Cambio | Por qué hace falta | A quién afecta |
-|---|---|---|---|
-| 1 | `correo.verificado boolean NOT NULL DEFAULT false` | **RN17** pide que el donante inicie sesión solo con correo verificado. Hoy no hay dónde guardar ese estado, así que la regla no se puede cumplir. | Portal: registro y login. Panel: ver quién confirmó. |
-| 2 | `notificacion.leido boolean NOT NULL DEFAULT false` | Sin esto no se puede marcar una notificación como vista ni mostrar el aviso en la campana. | Portal: listarlas. Panel: saber si el donante vio el recordatorio. |
-| 3 | `buzon.id_usuario` a nullable | El prototipo promete que el mensaje es anónimo, y hoy la columna es NOT NULL. | Panel: tiene que tolerar mensajes sin remitente. |
-| 4 | `buzon.tipo varchar(20)` con CHECK | No hay columna para Sugerencia / Comentario / Reclamo. Hoy el tipo va al principio del texto (`[Sugerencia] ...`), que funciona pero impide filtrar y contar. | Panel: leer y clasificar. |
+### El cupo se cuenta sobre las citas activas
 
-Los puntos 1 y 2 son una columna booleana con default: riesgo cero y les sirven
-a las dos. Conviene acordarlos primero y hacerlos en una sola migración.
+`cupo_atencion` es el máximo de citas **Pendiente o Confirmada** de esa
+franja. Cuando el personal cierra una cita (Completada, Ausente, No apto),
+su lugar queda libre para la semana siguiente. Es lo que hace que un
+catálogo de franjas semanales alcance sin guardar fechas.
 
-Los del buzón son los que más cambian lo que recibe el panel: hasta que se
-decidan, el portal sigue guardando el tipo dentro del texto y pidiendo sesión
-para escribir.
+### Las reglas las hace cumplir la aplicación
 
-### Lo que Jazmín tiene que correr después del pull
+Sin triggers, quien escribe directo en la base puede saltear el cupo o la
+regla de una sola cita activa. El portal las respeta; el panel tiene que
+respetarlas también. Las tres están en `agenda.py`, cada una en su función,
+para que se puedan leer y copiar.
 
-```
-python database/migrar.py            aplica 001 a 004
-python database/cargar_catalogos.py  carga las 36 preguntas del cuestionario
-```
+Al grabar una cita se toma un `SELECT ... FOR UPDATE` sobre la fila de la
+franja: así dos personas que reservan en el mismo segundo no pasan las dos.
 
-El segundo hace falta esta vez: la migración agrega las columnas, pero las
-preguntas del formulario son datos y entran por el catálogo. Después de
-correrlo, `pregunta` tiene 49 filas (36 del cuestionario oficial, 5 de la
-Parte B del check-in y 8 de prueba que quedan inactivas).
+### Lo que se calcula y no se guarda
 
-### Lo que NO necesita cambios
-
-Es fácil pedir de más, así que conviene dejarlo escrito: **última donación,
-donaciones realizadas, fecha estimada de habilitación** (RF30) e **historial de
-citas** se calculan a partir de las citas completadas y el género del donante.
-No hacen falta columnas nuevas.
+**Última donación, donaciones realizadas, fecha estimada de habilitación**
+(RF30) e **historial de citas** salen de las citas completadas y del género
+del donante. **El día de la cita** sale de la franja. Ninguna necesita
+columnas.
 
 ---
 
@@ -249,7 +231,7 @@ En PowerShell:
 ```powershell
 cd C:\Users\johan\gestion_banco_de_sangre; .\venv\Scripts\Activate.ps1
 git pull
-python database/migrar.py
+python database/verificar_modelos.py
 python run.py
 ```
 
@@ -270,8 +252,8 @@ arranca. Conviene agregar las excepciones:
 *.sql
 !database/schema.sql
 !database/catalogos.sql
-!database/migraciones/*.sql
+
 ```
 
-Sin la tercera línea, **las migraciones tampoco se suben** y todo el mecanismo
-de la sección 3 no sirve de nada.
+Sin esas dos líneas, **el esquema y los catálogos no se suben** y quien
+clone el proyecto no puede levantarlo: la base se queda vacía.

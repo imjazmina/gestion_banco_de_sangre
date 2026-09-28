@@ -4,6 +4,7 @@ recorrido de la unidad hasta que se asigna o se descarta.
 """
 from datetime import datetime
 
+from app import calendario
 from app.models import db
 
 
@@ -38,9 +39,10 @@ class Cita(db.Model):
     """
     Turno de donación.
 
-    fecha_cita es el día concreto; id_horario es la franja semanal
-    ('Lunes 07:00'). Las dos tienen que coincidir en el día de la semana, y
-    el trigger trg_cita_fecha_coincide_franja lo hace cumplir (migración 001).
+    No guarda el día: lo calcula. `id_horario` apunta a la franja del
+    catálogo («Lunes 07:00») y `fecha_hora_creacion` dice cuándo se reservó;
+    la cita es para la próxima vez que esa franja ocurre después de la
+    reserva. La cuenta la hace `fecha_cita`, más abajo.
     """
     __tablename__ = "cita"
 
@@ -50,12 +52,14 @@ class Cita(db.Model):
         db.Integer, db.ForeignKey("usuario.id_usuario"), nullable=False)
     id_solicitud = db.Column(
         db.Integer, db.ForeignKey("solicitud.id_solicitud"))
-    # Nullable desde la migración 002: al reservar por el portal todavía no
-    # hay nadie asignado. El banco lo completa al organizar el día.
-    id_personal = db.Column(db.Integer, db.ForeignKey("usuario.id_usuario"))
+    # NOT NULL en el esquema: toda cita nombra a quien atiende. Al reservar
+    # por el portal todavía no se sabe quién va a ser, así que queda el
+    # usuario de servicio «Personal de turno» y el panel lo reemplaza por la
+    # persona real en el mostrador.
+    id_personal = db.Column(
+        db.Integer, db.ForeignKey("usuario.id_usuario"), nullable=False)
     id_horario = db.Column(
         db.Integer, db.ForeignKey("horario_disponible.id_horario"), nullable=False)
-    fecha_cita = db.Column(db.Date, nullable=False)
     fecha_hora_creacion = db.Column(
         db.DateTime, nullable=False, default=datetime.now)
     estado = db.Column(db.String(20), nullable=False, default="Pendiente")
@@ -65,6 +69,36 @@ class Cita(db.Model):
     personal = db.relationship("Usuario", foreign_keys=[id_personal])
     horario = db.relationship("HorarioDisponible", lazy="joined")
     solicitud = db.relationship("Solicitud")
+
+    @property
+    def fecha_cita(self):
+        """
+        El día concreto de la cita.
+
+        No es una columna: sale de la franja y de cuándo se reservó (ver
+        app/calendario.py). Por eso no se puede filtrar ni ordenar por este
+        campo en una consulta SQL; las consultas traen las citas por estado
+        y por usuario, y el orden por fecha se hace en Python.
+        """
+        if self.horario is None:
+            return None
+        return calendario.proxima_fecha(self.horario.dia_semana,
+                                        self.horario.hora_inicio,
+                                        self.fecha_hora_creacion)
+
+    @property
+    def momento(self):
+        """Fecha y hora de inicio juntas."""
+        fecha = self.fecha_cita
+        if fecha is None:
+            return None
+        return calendario.momento(fecha, self.horario.hora_inicio)
+
+    @property
+    def paso(self):
+        """¿La hora de la cita ya pasó?"""
+        instante = self.momento
+        return instante is not None and instante < datetime.now()
 
     ALTRUISTA = "Donacion altruista"
     REPOSICION = "Reposicion"

@@ -54,15 +54,14 @@ def main():
                             f"{tabla}.{nombre}: es NOT NULL en la base y nullable en el modelo")
 
         # 3. ¿Alguna tabla quedó sin modelo?
-        # migracion_aplicada es la bitácora del propio sistema de migraciones,
-        # no parte del modelo de datos: no le corresponde tener una clase.
-        SIN_MODELO = {"migracion_aplicada"}
+        # Tablas de la base que a propósito no tienen modelo.
+        SIN_MODELO = set()
         for tabla in sorted(tablas_reales - modelos.keys() - SIN_MODELO):
             problemas.append(f"{tabla}: la tabla existe y no tiene modelo")
 
         # 4. Los catálogos tienen que estar cargados.
         esperado = {"rol": 4, "tipo_sangre": 8, "compatibilidad_abo_rh": 27,
-                    "tipo_medicion": 5, "diferimiento": 12, "pregunta": 49,
+                    "tipo_medicion": 5, "diferimiento": 12, "pregunta": 41,
                     "horario_disponible": 88, "contenido_portal": 3}
         vacios = []
         for tabla, cuantos in esperado.items():

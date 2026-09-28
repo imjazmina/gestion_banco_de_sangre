@@ -113,27 +113,6 @@ class Telefono(db.Model):
     usuario = db.relationship("Usuario", back_populates="telefonos")
 
 
-class RecuperacionContrasena(db.Model):
-    """
-    Pedido de recuperación de contraseña (migración 003).
-
-    Guarda la huella del token, no el token. El enlace que recibe la persona
-    es lo único que permite restablecer, y no queda escrito en ninguna parte
-    del sistema.
-    """
-    __tablename__ = "recuperacion_contrasena"
-
-    id_recuperacion = db.Column(db.Integer, primary_key=True)
-    id_usuario = db.Column(
-        db.Integer, db.ForeignKey("usuario.id_usuario"), nullable=False)
-    token_hash = db.Column(db.String(64), nullable=False, unique=True)
-    fecha_creacion = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    fecha_expiracion = db.Column(db.DateTime, nullable=False)
-    fecha_uso = db.Column(db.DateTime)
-
-    usuario = db.relationship("Usuario", lazy="joined")
-
-
 class Correo(db.Model):
     __tablename__ = "correo"
 

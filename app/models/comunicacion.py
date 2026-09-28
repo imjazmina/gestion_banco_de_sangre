@@ -25,10 +25,10 @@ class Notificacion(db.Model):
     fecha_envio = db.Column(db.DateTime, nullable=False, default=datetime.now)
 
     CONFIRMACION_CITA = "CONFIRMACION_CITA"
+    # El portal lo usa para el correo con el cuestionario previo: que
+    # exista sobre una cita significa que ya se le envió, y así no se
+    # manda dos veces.
     RECORDATORIO_CITA = "RECORDATORIO_CITA"
-    # Agregado por la migración 004: el correo con el cuestionario
-    # previo. Guardarlo sirve además para no mandarlo dos veces.
-    CUESTIONARIO_PREVIO = "CUESTIONARIO_PREVIO"
     HABILITACION = "HABILITACION"
     AGRADECIMIENTO = "AGRADECIMIENTO"
     ASIGNACION_DONANTE = "ASIGNACION_DONANTE"

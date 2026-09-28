@@ -27,10 +27,12 @@ def ver():
 def _estado_cuestionario(cita):
     """Cuánto del cuestionario previo lleva respondido esta cita."""
     if cita is None:
-        return {"respondidas": 0, "total": 0, "completo": False}
+        return {"respondidas": 0, "total": 0,
+                "completo": False, "habilitado": False}
     respondidas, total = cuestionario.avance(cita)
     return {"respondidas": respondidas, "total": total,
-            "completo": total > 0 and respondidas >= total}
+            "completo": total > 0 and respondidas >= total,
+            "habilitado": cuestionario.habilitado(cita)}
 
 
 @mi_cita_bp.get("/reprogramar")
@@ -43,7 +45,7 @@ def reprogramar():
         return redirect(url_for("mi_cita.ver"))
 
     fecha = agenda.parsear_fecha(request.args.get("fecha"))
-    dias = agenda.calendario(fecha)
+    dias = agenda.dias(fecha)
     franjas = agenda.franjas_de(fecha) if fecha else []
     sin_horarios = bool(fecha) and not any(f["libres"] > 0 for f in franjas)
     horario = agenda.franja_elegida(fecha, request.args.get("horario", type=int))
@@ -72,7 +74,7 @@ def reprogramar_confirmar():
 
     try:
         agenda.reprogramar(cita, fecha, id_horario)
-    except SQLAlchemyError as e:
+    except (agenda.ErrorAgenda, SQLAlchemyError) as e:
         db.session.rollback()
         flash(agenda.mensaje_de_error(e), "error")
         return redirect(url_for("mi_cita.reprogramar", fecha=fecha.isoformat()))
@@ -92,7 +94,7 @@ def cancelar():
 
     try:
         agenda.cancelar(cita)
-    except SQLAlchemyError as e:
+    except (agenda.ErrorAgenda, SQLAlchemyError) as e:
         db.session.rollback()
         flash(agenda.mensaje_de_error(e), "error")
         return redirect(url_for("mi_cita.ver"))

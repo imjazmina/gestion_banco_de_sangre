@@ -133,7 +133,7 @@ def recuperar():
 
 @auth_bp.route("/restablecer/<token>", methods=["GET", "POST"])
 def restablecer(token):
-    if recuperacion.pedido_vigente(token) is None:
+    if recuperacion.usuario_del_token(token) is None:
         return render_template("portal/auth/enlace_vencido.html"), 410
 
     if request.method == "POST":

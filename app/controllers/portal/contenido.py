@@ -116,15 +116,3 @@ def fecha_larga(d, con_dia=True):
 def hora_corta(h):
     """time -> '07:30'."""
     return h.strftime("%H:%M") if h else ""
-
-
-def abierto_ahora():
-    """Lunes a viernes 07:00-15:00, sábados 07:00-11:00."""
-    from datetime import datetime
-    ahora = datetime.now()
-    dia, minutos = ahora.weekday(), ahora.hour * 60 + ahora.minute
-    if dia == 6:
-        return False
-    if dia == 5:
-        return 7 * 60 <= minutos < 11 * 60
-    return 7 * 60 <= minutos < 15 * 60

@@ -31,7 +31,7 @@ def agendar():
     diferimiento = agenda.diferimiento_vigente(usuario)
 
     fecha = agenda.parsear_fecha(request.args.get("fecha"))
-    dias = agenda.calendario(fecha)
+    dias = agenda.dias(fecha)
 
     franjas = agenda.franjas_de(fecha) if fecha else []
     sin_horarios = bool(fecha) and not any(f["libres"] > 0 for f in franjas)
@@ -111,7 +111,7 @@ def confirmar():
 
     try:
         cita = agenda.crear(usuario, fecha, id_horario, tipo, id_solicitud)
-    except SQLAlchemyError as e:
+    except (agenda.ErrorAgenda, SQLAlchemyError) as e:
         db.session.rollback()
         flash(agenda.mensaje_de_error(e), "error")
         return redirect(url_for("donar.agendar", fecha=fecha.isoformat(),

@@ -18,7 +18,6 @@ db = SQLAlchemy()
 # las clases.
 from app.models.usuarios import (      # noqa: E402
     Rol, Usuario, UsuarioRol, PerfilPersonal, Telefono, Correo,
-    RecuperacionContrasena,
 )
 from app.models.catalogos import (     # noqa: E402
     TipoSangre, CompatibilidadAboRh, TipoMedicion, Pregunta,
@@ -36,7 +35,6 @@ from app.models.comunicacion import (  # noqa: E402
 __all__ = [
     "db",
     "Rol", "Usuario", "UsuarioRol", "PerfilPersonal", "Telefono", "Correo",
-    "RecuperacionContrasena",
     "TipoSangre", "CompatibilidadAboRh", "TipoMedicion", "Pregunta",
     "Diferimiento", "HorarioDisponible", "ContenidoPortal",
     "Solicitud", "Cita", "Cuestionario", "Medicion", "RegistroDiferimiento",

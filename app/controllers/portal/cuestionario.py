@@ -6,32 +6,68 @@ van en tres pasos, uno por bloque del formulario original. Cada paso se
 guarda al pasar al siguiente, de modo que si se corta la conexión o se
 cierra el navegador no hay que empezar de nuevo.
 
+La tabla `pregunta` guarda el enunciado y poco más; el bloque, el número y
+la aclaración que piden algunas viven en preguntas.py y se emparejan por el
+enunciado. Acá se juntan las dos mitades en un solo objeto para que las
+pantallas no tengan que saber de dónde sale cada dato.
+
 Lo que el portal NO hace: decidir. Una respuesta marcada no rechaza al
 donante ni cancela la cita. El personal de salud lee el cuestionario y
 decide en el momento, que es como tiene que ser.
 """
-from datetime import datetime
+from collections import namedtuple
+from datetime import date, datetime
 
+from app.controllers.portal import preguntas as catalogo
 from app.models import Cita, Cuestionario, Pregunta, db
 
-# Los tres bloques, en el orden del formulario del banco de sangre.
-SECCIONES = ["En la actualidad",
-             "Antecedentes personales",
-             "En los ultimos 12 meses"]
+SECCIONES = catalogo.SECCIONES
 
 SI = "Si"
 NO = "No"
 LARGO_DETALLE = 180
 
+# Una pregunta lista para mostrar: la fila de la base más los datos de
+# formulario que el esquema no guarda.
+Item = namedtuple(
+    "Item", "id_pregunta orden seccion enunciado nota pide_detalle "
+            "etiqueta_detalle alerta_si")
+
+
+def _items():
+    """
+    Las preguntas del donante, ya emparejadas y en orden.
+
+    Una fila de la base sin entrada en el catálogo queda afuera: es una
+    pregunta vieja o de prueba, y mostrarla sin bloque ni número la pondría
+    en cualquier lado del formulario.
+    """
+    filas = Pregunta.query.filter(
+        Pregunta.parte == Pregunta.PARTE_DONANTE).all()
+
+    items = []
+    for fila in filas:
+        datos = catalogo.datos_de(fila.enunciado)
+        if datos is None:
+            continue
+        items.append(Item(
+            id_pregunta=fila.id_pregunta,
+            orden=datos.orden,
+            seccion=datos.seccion,
+            enunciado=fila.enunciado,
+            nota=datos.nota,
+            pide_detalle=datos.detalle is not None,
+            etiqueta_detalle=datos.detalle,
+            alerta_si=datos.alerta))
+    return sorted(items, key=lambda i: i.orden)
+
 
 def preguntas(seccion=None):
-    """Las preguntas vigentes del cuestionario del donante, en orden."""
-    consulta = (Pregunta.query
-                .filter(Pregunta.parte == Pregunta.PARTE_DONANTE,
-                        Pregunta.activa.is_(True)))
-    if seccion is not None:
-        consulta = consulta.filter(Pregunta.seccion == seccion)
-    return consulta.order_by(Pregunta.orden).all()
+    """Las preguntas del cuestionario del donante, o las de un bloque."""
+    items = _items()
+    if seccion is None:
+        return items
+    return [i for i in items if i.seccion == seccion]
 
 
 def respuestas(cita):
@@ -58,11 +94,10 @@ def guardar_seccion(cita, usuario, seccion, formulario):
     Vuelve a escribir las que ya estaban: si alguien corrige una respuesta y
     reenvía el paso, gana la última. Lo garantiza uq_cuestionario_cita_pregunta.
     """
-    delcuestionario = preguntas(seccion)
     errores = []
     cambios = []
 
-    for pregunta in delcuestionario:
+    for pregunta in preguntas(seccion):
         clave = f"p{pregunta.id_pregunta}"
         respuesta = (formulario.get(clave) or "").strip()
         if respuesta not in (SI, NO):
@@ -114,11 +149,10 @@ def avance(cita):
 
 def resumen(cita):
     """
-    Las respuestas de la cita, ordenadas, con las marcadas al principio de
-    la lista de atención.
+    Las respuestas de la cita, ordenadas, con las marcadas identificadas.
 
-    `atencion` son las que coinciden con alerta_si. No es un veredicto: es
-    lo que el personal mira primero.
+    `atencion` son las que coinciden con la respuesta que el personal tiene
+    que revisar. No es un veredicto: es lo que mira primero.
     """
     ya = respuestas(cita)
     filas, atencion = [], []
@@ -134,15 +168,51 @@ def resumen(cita):
     return filas, atencion
 
 
+def habilitado(cita):
+    """
+    ¿Se puede responder el cuestionario de esta cita ahora?
+
+    Solo el mismo día. El cuestionario pregunta por el estado de salud de
+    hoy —si durmió bien, si tomó alcohol, si está con fiebre—, así que una
+    respuesta de hace tres días no dice nada sobre el donante que se
+    presenta. Por eso se habilita recién el día de la cita, que es cuando el
+    correo con el enlace también llega.
+    """
+    if cita is None or cita.estado not in Cita.ACTIVAS:
+        return False
+    return cita.fecha_cita == date.today()
+
+
+def motivo_no_habilitado(cita):
+    """Qué decirle a la persona cuando todavía no puede responderlo."""
+    if cita is None or cita.estado not in Cita.ACTIVAS:
+        return "No encontramos esa cita entre las tuyas."
+    if cita.fecha_cita > date.today():
+        return (f"El cuestionario se habilita el día de tu cita, el "
+                f"{cita.fecha_cita.strftime('%d/%m/%Y')}. Te va a llegar el "
+                f"enlace por correo unas horas antes.")
+    return ("El día de esa cita ya pasó y el cuestionario quedó cerrado. "
+            "Si necesitás ayuda, comunicate con el banco de sangre.")
+
+
 def cita_del_donante(id_cita, usuario):
     """
-    La cita, solo si es de esta persona y todavía tiene sentido responderla.
+    La cita, solo si es de esta persona y hoy se puede responder.
 
-    Devuelve None si no existe, si es de otro donante o si ya se cerró: un
-    cuestionario de una cita cancelada o completada no se toca más.
+    Devuelve None si no existe, si es de otro donante, si ya se cerró o si
+    todavía no es el día.
     """
     cita = Cita.query.filter_by(id_cita=id_cita,
                                 id_usuario=usuario.id_usuario).first()
-    if cita is None or cita.estado not in Cita.ACTIVAS:
-        return None
-    return cita
+    return cita if habilitado(cita) else None
+
+
+def cita_para_avisar(id_cita, usuario):
+    """
+    La cita del donante sin la restricción del día.
+
+    La usan las pantallas que solo necesitan explicar por qué todavía no se
+    puede responder, no dejar responder.
+    """
+    return Cita.query.filter_by(id_cita=id_cita,
+                                id_usuario=usuario.id_usuario).first()

@@ -15,7 +15,6 @@ def index():
         return render_template(
             "portal/home.html",
             usuario=None,
-            abierto=contenido.abierto_ahora(),
             faqs=contenido.FAQS[:5],
             solicitudes_activas=ctrl.solicitudes_activas())
 

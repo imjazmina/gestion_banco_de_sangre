@@ -14,7 +14,8 @@ def responder(id_cita):
     usuario = usuario_actual()
     cita = ctrl.cita_del_donante(id_cita, usuario)
     if cita is None:
-        flash("No encontramos esa cita entre las tuyas.", "error")
+        flash(ctrl.motivo_no_habilitado(
+            ctrl.cita_para_avisar(id_cita, usuario)), "info")
         return redirect(url_for("mi_cita.ver"))
 
     # Sin ?seccion= se entra por donde quedó: así el enlace del correo lleva
@@ -38,7 +39,8 @@ def guardar(id_cita):
     usuario = usuario_actual()
     cita = ctrl.cita_del_donante(id_cita, usuario)
     if cita is None:
-        flash("No encontramos esa cita entre las tuyas.", "error")
+        flash(ctrl.motivo_no_habilitado(
+            ctrl.cita_para_avisar(id_cita, usuario)), "info")
         return redirect(url_for("mi_cita.ver"))
 
     seccion = request.form.get("seccion")
@@ -69,7 +71,8 @@ def ver(id_cita):
     usuario = usuario_actual()
     cita = ctrl.cita_del_donante(id_cita, usuario)
     if cita is None:
-        flash("No encontramos esa cita entre las tuyas.", "error")
+        flash(ctrl.motivo_no_habilitado(
+            ctrl.cita_para_avisar(id_cita, usuario)), "info")
         return redirect(url_for("mi_cita.ver"))
     return render_template("portal/cuestionario/listo.html",
                            cita=cita, **_resumen(cita))

@@ -23,7 +23,7 @@ HORAS_ANTES = 3
 
 def _momento(cita):
     """Fecha y hora exactas en que empieza la cita."""
-    return datetime.combine(cita.fecha_cita, cita.horario.hora_inicio)
+    return cita.momento
 
 
 def pendientes_de_cuestionario(ahora=None):
@@ -41,34 +41,34 @@ def pendientes_de_cuestionario(ahora=None):
     ahora = ahora or datetime.now()
     limite = ahora + timedelta(hours=HORAS_ANTES)
 
+    # RECORDATORIO_CITA es el tipo que el esquema ya tiene para esto. Se usa
+    # solo para este aviso, así que su presencia sobre una cita significa
+    # "ya se le mandó el cuestionario" y evita mandarlo dos veces.
     ya_avisadas = {
         n.id_cita for n in Notificacion.query
-        .filter(Notificacion.tipo == Notificacion.CUESTIONARIO_PREVIO,
+        .filter(Notificacion.tipo == Notificacion.RECORDATORIO_CITA,
                 Notificacion.id_cita.isnot(None)).all()
     }
 
-    candidatas = (Cita.query
-                  .filter(Cita.estado.in_(Cita.ACTIVAS),
-                          Cita.fecha_cita >= ahora.date(),
-                          Cita.fecha_cita <= limite.date())
-                  .order_by(Cita.fecha_cita, Cita.id_cita)
-                  .all())
+    # La consulta filtra solo por estado: el día de la cita se calcula a
+    # partir de la franja, así que no se puede acotar por fecha en SQL. Las
+    # citas activas son pocas —como mucho una por donante— así que se
+    # traen y se filtran acá.
+    candidatas = Cita.query.filter(Cita.estado.in_(Cita.ACTIVAS)).all()
 
-    return [c for c in candidatas
-            if c.id_cita not in ya_avisadas
-            and ahora <= _momento(c) <= limite]
+    pendientes = [c for c in candidatas
+                  if c.id_cita not in ya_avisadas
+                  and c.momento is not None
+                  and ahora <= c.momento <= limite]
+    return sorted(pendientes, key=lambda c: c.momento)
 
 
 def proximas_citas(limite=10, ahora=None):
     """Las citas activas que todavía no pasaron, la más cercana primero."""
     ahora = ahora or datetime.now()
-    return [c for c in (Cita.query
-                        .filter(Cita.estado.in_(Cita.ACTIVAS),
-                                Cita.fecha_cita >= ahora.date())
-                        .order_by(Cita.fecha_cita)
-                        .limit(limite * 3)
-                        .all())
-            if _momento(c) >= ahora][:limite]
+    proximas = [c for c in Cita.query.filter(Cita.estado.in_(Cita.ACTIVAS)).all()
+                if c.momento is not None and c.momento >= ahora]
+    return sorted(proximas, key=lambda c: c.momento)[:limite]
 
 
 def enviar_cuestionario(cita, url_base):
@@ -100,7 +100,7 @@ def enviar_cuestionario(cita, url_base):
     db.session.add(Notificacion(
         id_usuario=cita.id_usuario,
         id_cita=cita.id_cita,
-        tipo=Notificacion.CUESTIONARIO_PREVIO,
+        tipo=Notificacion.RECORDATORIO_CITA,
         mensaje=(f"Te enviamos a tu correo el cuestionario previo para tu cita "
                  f"de hoy a las {hora}. Respondelo antes de venir."),
         fecha_envio=datetime.now()))
