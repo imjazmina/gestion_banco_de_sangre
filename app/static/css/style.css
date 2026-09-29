@@ -14,11 +14,10 @@ body {
     color: #1f2a37;
 }
 
+/* .estado ahora va dentro de .tarjeta, que ya pone el fondo y el borde.
+   Si mantuviera los suyos quedaría una tarjeta dentro de otra. */
 .estado {
-    background: #ffffff;
-    border: 1px solid #d0d7de;
-    border-radius: 8px;
-    padding: 2rem 2.5rem;
+    padding: 1rem 0;
     text-align: center;
 }
 
@@ -31,3 +30,228 @@ body {
     margin: 0.4rem 0;
     font-size: 1rem;
 }
+
+/* ------------------------------------------------------------------
+   Formularios y navegación.
+
+   Sigue la misma paleta mínima de arriba (#f4f6f8, #1f2a37, #d0d7de) a
+   propósito: no introduce un sistema de diseño, solo lo necesario para que
+   las pantallas se puedan usar y probar. Cuando el equipo defina el diseño
+   definitivo, se reemplaza este bloque sin tocar rutas ni controladores.
+   ------------------------------------------------------------------ */
+
+body {
+    /* Antes centraba vertical; con formularios largos hay que poder scrollear. */
+    align-items: flex-start;
+    padding: 2rem 1rem;
+}
+
+.tarjeta {
+    background: #ffffff;
+    border: 1px solid #d0d7de;
+    border-radius: 8px;
+    padding: 1.5rem 2rem 2rem;
+    width: 100%;
+    max-width: 520px;
+}
+
+.tarjeta > h1 {
+    font-size: 1.4rem;
+    margin-bottom: 0.25rem;
+}
+
+.subtitulo {
+    color: #5b6672;
+    font-size: 0.9rem;
+    margin-bottom: 1.25rem;
+}
+
+.menu {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    flex-wrap: wrap;
+    padding-bottom: 1rem;
+    margin-bottom: 1.25rem;
+    border-bottom: 1px solid #e6eaee;
+    font-size: 0.9rem;
+}
+
+.menu a { color: #1f2a37; }
+.menu a:hover { text-decoration: underline; }
+.menu-usuario { margin-left: auto; color: #5b6672; }
+
+.formulario { display: flex; flex-direction: column; gap: 0.9rem; }
+
+.fila { display: flex; gap: 0.9rem; flex-wrap: wrap; }
+.fila .campo { flex: 1; min-width: 180px; }
+
+.campo { display: flex; flex-direction: column; gap: 0.3rem; }
+.campo > span { font-size: 0.85rem; font-weight: bold; }
+.campo small { color: #5b6672; font-size: 0.78rem; }
+
+.campo input,
+.campo select {
+    font: inherit;
+    padding: 0.55rem 0.65rem;
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    background: #ffffff;
+    color: inherit;
+    width: 100%;
+}
+
+.campo input:focus,
+.campo select:focus {
+    outline: 2px solid #1f6feb;
+    outline-offset: 1px;
+    border-color: #1f6feb;
+}
+
+.check {
+    display: flex;
+    gap: 0.55rem;
+    align-items: flex-start;
+    font-size: 0.85rem;
+    line-height: 1.4;
+}
+
+.check input { margin-top: 0.2rem; flex-shrink: 0; }
+
+.boton {
+    font: inherit;
+    font-weight: bold;
+    padding: 0.65rem 1rem;
+    border: none;
+    border-radius: 6px;
+    background: #1f2a37;
+    color: #ffffff;
+    cursor: pointer;
+    /* 44px de alto mínimo: es lo que hace falta para tocar cómodo en celular. */
+    min-height: 44px;
+}
+
+.boton:hover { background: #111a24; }
+
+.aviso {
+    padding: 0.65rem 0.8rem;
+    border-radius: 6px;
+    margin-bottom: 0.75rem;
+    font-size: 0.88rem;
+    border: 1px solid;
+}
+
+.aviso-error { background: #fdecec; border-color: #f3c3c3; color: #8a1c1c; }
+.aviso-ok    { background: #e9f7f0; border-color: #bce5d3; color: #11694a; }
+.aviso-info  { background: #eef4fe; border-color: #d5e4fc; color: #17427e; }
+
+.pie {
+    margin-top: 1.25rem;
+    font-size: 0.88rem;
+    color: #5b6672;
+}
+
+.pie a { color: #1f6feb; }
+
+.aviso ul { margin: 0.35rem 0 0 1.1rem; }
+.aviso li { margin: 0.15rem 0; }
+
+/* ---------- listas, datos y acciones ---------- */
+
+.acciones {
+    display: flex;
+    gap: 0.6rem;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 1rem;
+}
+
+.acciones .boton { text-decoration: none; display: inline-flex;
+                   align-items: center; justify-content: center; }
+
+.boton-secundario {
+    background: #ffffff;
+    color: #1f2a37;
+    border: 1px solid #d0d7de;
+}
+.boton-secundario:hover { background: #f4f6f8; }
+
+.boton-peligro { background: #8a1c1c; }
+.boton-peligro:hover { background: #6d1515; }
+
+.boton-chico { min-height: 34px; padding: 0.35rem 0.8rem; font-size: 0.85rem; }
+
+.datos { display: grid; grid-template-columns: 11rem 1fr; gap: 0.5rem 1rem; }
+.datos dt { font-size: 0.85rem; font-weight: bold; color: #5b6672; }
+.datos dd { font-size: 0.95rem; }
+.datos dd small { display: block; color: #5b6672; font-size: 0.78rem; }
+@media (max-width: 520px) {
+    .datos { grid-template-columns: 1fr; gap: 0.15rem; }
+    .datos dd { margin-bottom: 0.5rem; }
+}
+
+.seccion {
+    font-size: 1.05rem;
+    margin: 1.75rem 0 0.75rem;
+    padding-top: 1.25rem;
+    border-top: 1px solid #e6eaee;
+}
+
+.lista-tarjetas { list-style: none; display: flex; flex-direction: column; gap: 0.75rem; }
+
+.item {
+    border: 1px solid #d0d7de;
+    border-radius: 6px;
+    padding: 0.85rem 1rem;
+}
+
+.item-cabecera { display: flex; gap: 0.6rem; align-items: center; flex-wrap: wrap; }
+.item-datos { font-size: 0.85rem; color: #5b6672; margin-top: 0.35rem; }
+.item-nota { font-size: 0.82rem; color: #8a5a1c; margin-top: 0.35rem; }
+.item form { margin-top: 0.6rem; }
+
+.grupo {
+    display: inline-block;
+    min-width: 2.5rem;
+    text-align: center;
+    padding: 0.15rem 0.45rem;
+    border-radius: 4px;
+    background: #fdecec;
+    color: #8a1c1c;
+    font-weight: bold;
+    font-size: 0.85rem;
+}
+
+.estado {
+    margin-left: auto;
+    font-size: 0.75rem;
+    font-weight: bold;
+    padding: 0.15rem 0.5rem;
+    border-radius: 10px;
+    background: #eef1f4;
+    color: #5b6672;
+}
+.estado-publicada { background: #e9f7f0; color: #11694a; }
+.estado-revocada  { background: #fdecec; color: #8a1c1c; }
+
+.lista { margin: 0.5rem 0 0.75rem 1.1rem; font-size: 0.9rem; }
+.lista li { margin: 0.2rem 0; }
+
+.vacio {
+    padding: 1.5rem;
+    text-align: center;
+    color: #5b6672;
+    border: 1px dashed #d0d7de;
+    border-radius: 6px;
+    font-size: 0.9rem;
+}
+
+.zona-peligro {
+    margin-top: 1.75rem;
+    padding: 1rem;
+    border: 1px solid #f3c3c3;
+    border-radius: 6px;
+    background: #fffafa;
+}
+.zona-peligro h2 { font-size: 1rem; margin-bottom: 0.4rem; }
+.zona-peligro p  { font-size: 0.87rem; color: #5b6672; line-height: 1.45; }

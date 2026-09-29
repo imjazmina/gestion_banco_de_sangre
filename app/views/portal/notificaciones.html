@@ -1,0 +1,38 @@
+{% extends "portal/layout.html" %}
+{% from "portal/_ui.html" import ico %}
+{% set activo = 'notificaciones' %}
+{% block titulo %}Notificaciones · Banco de sangre{% endblock %}
+
+{% block contenido %}
+<section class="block" style="padding-top:32px;">
+  <div class="wrap center-narrow">
+    <div class="section-head">
+      <h1>Notificaciones</h1>
+      <p class="sub" style="margin-top:4px;">Recordatorios y novedades de tu cuenta.</p>
+    </div>
+
+    {% if avisos %}
+    <div class="card">
+      {% for a in avisos %}
+        {% set e = estilos.get(a.tipo, ('bell', '#F3F4F6', '#6B7280')) %}
+        <div class="notif-row">
+          <div class="notif-ico" style="background:{{ e[1] }}; color:{{ e[2] }};">{{ ico(e[0]) }}</div>
+          <div class="notif-body">
+            <b>{{ titulos.get(a.tipo, 'Notificación') }}</b>
+            <p>{{ a.mensaje }}</p>
+            <p class="meta">{{ a.fecha_envio.strftime('%d/%m/%Y · %H:%M') }}</p>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">
+      <div class="ico">{{ ico('bell') }}</div>
+      <h3>No tenés notificaciones</h3>
+      <p>Acá vas a ver los recordatorios de tus citas y las novedades del banco de sangre.</p>
+      <a class="btn btn-donate btn-sm" href="{{ url_for('solicitudes.listar') }}">Ver solicitudes</a>
+    </div>
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,10 @@
+Acá van las fotos del portal.
+
+Las plantillas las buscan por nombre con la macro foto(). Si el archivo no
+está, la etiqueta se quita sola y queda la ilustración de fondo: no se ve
+una imagen rota.
+
+  donacion.jpg    foto del hero, en el home público
+
+Podés agregar más y referenciarlas desde las plantillas con:
+  {{ foto('mi-imagen.jpg', 'Descripción para lectores de pantalla') }}

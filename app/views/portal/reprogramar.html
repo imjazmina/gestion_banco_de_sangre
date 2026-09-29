@@ -1,0 +1,47 @@
+{% extends "portal/layout.html" %}
+{% from "portal/_ui.html" import ico %}
+{% from "portal/_agenda.html" import tira_fechas, grilla_horarios %}
+{% set activo = 'mi-cita' %}
+{% block titulo %}Reprogramar cita · Banco de sangre{% endblock %}
+
+{% block contenido %}
+<section class="block" style="padding-top:32px;">
+  <div class="wrap center-narrow">
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('mi_cita.ver') }}" style="margin-bottom:14px;">{{ ico('arrowLeft') }} Volver a mi cita</a>
+
+    <div class="section-head">
+      <h1>Reprogramar cita</h1>
+      <p class="sub" style="margin-top:4px;">Elegí una nueva fecha y horario. El tipo de donación no cambia.</p>
+    </div>
+
+    <div class="banner info">
+      {{ ico('calendar') }}
+      <p><b>Tu cita actual</b>{{ cita.fecha_cita.strftime('%d/%m/%Y') }} a las {{ cita.horario.hora_inicio.strftime('%H:%M') }} · {{ etiqueta_tipo(cita.tipo_cita) }}</p>
+    </div>
+
+    <form method="post" action="{{ url_for('mi_cita.reprogramar') }}">
+      <div class="card">
+        {{ tira_fechas(dias, 'mi_cita.reprogramar') }}
+
+        {% if fecha %}
+        <h2 style="margin:20px 0 14px;">Elegí un horario</h2>
+        {{ grilla_horarios(franjas, sin_horarios, fecha, horario, 'mi_cita.reprogramar') }}
+        {% endif %}
+
+        {% if horario %}
+        <input type="hidden" name="fecha"   value="{{ fecha.isoformat() }}">
+        <input type="hidden" name="horario" value="{{ horario.id_horario }}">
+        <div class="divider"></div>
+        <table class="data" style="width:100%; margin-bottom:16px;">
+          <tbody>
+            <tr><td style="color:var(--ink2);">Nueva fecha</td><td style="text-align:right; font-weight:600;">{{ fecha.strftime('%d/%m/%Y') }}</td></tr>
+            <tr><td style="color:var(--ink2);">Nuevo horario</td><td style="text-align:right; font-weight:600;">{{ horario.hora_inicio.strftime('%H:%M') }} a {{ horario.hora_fin.strftime('%H:%M') }}</td></tr>
+          </tbody>
+        </table>
+        <button class="btn btn-donate btn-block" type="submit">Confirmar nueva fecha</button>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</section>
+{% endblock %}

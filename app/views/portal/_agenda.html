@@ -1,0 +1,48 @@
+{# Tira de fechas y grilla de horarios. Las usan Donar y Reprogramar.
+
+   Cada chip y cada horario es un enlace: el paso elegido viaja en la URL,
+   así el botón "atrás" funciona y no hace falta JavaScript para el estado. #}
+{% from "portal/_ui.html" import ico %}
+
+{% macro tira_fechas(dias, endpoint, extra={}) -%}
+<div class="date-scroll">
+  {%- for d in dias -%}
+    {%- if d.cerrado -%}
+      <div class="date-chip full" aria-disabled="true" title="Sin cupo disponible">
+        <div class="dow">{{ d.dow }}</div><div class="dnum">{{ d.dia }}</div>
+      </div>
+    {%- else -%}
+      <a class="date-chip available {{ 'selected' if d.seleccionado }}"
+         href="{{ url_for(endpoint, fecha=d.iso, **extra) }}"
+         aria-label="{{ d.fecha.strftime('%d/%m/%Y') }}, {{ d.libres }} lugares libres">
+        <div class="dow">{{ d.dow }}</div><div class="dnum">{{ d.dia }}</div>
+      </a>
+    {%- endif -%}
+  {%- endfor -%}
+</div>
+<p class="meta" style="margin-top:10px;">Disponible de lunes a sábado. Los días grises no tienen cupo.</p>
+{%- endmacro %}
+
+
+{% macro grilla_horarios(franjas, sin_horarios, fecha, seleccionado, endpoint, extra={}) -%}
+{%- if sin_horarios -%}
+<div class="empty">
+  <div class="ico">{{ ico('clock') }}</div>
+  <h3>No hay horarios disponibles</h3>
+  <p>Ese día ya no tiene lugares libres. Probá con otra fecha.</p>
+</div>
+{%- else -%}
+<div class="slot-grid">
+  {%- for f in franjas -%}
+    {%- if f.libres > 0 -%}
+      <a class="slot-btn {{ 'selected' if seleccionado and seleccionado.id_horario == f.id_horario }}"
+         href="{{ url_for(endpoint, fecha=fecha.isoformat(), horario=f.id_horario, **extra) }}"
+         title="{{ f.libres }} de {{ f.cupo }} lugares libres">{{ f.hora_inicio.strftime('%H:%M') }}</a>
+    {%- else -%}
+      <span class="slot-btn disabled" aria-disabled="true"
+            title="Sin cupo">{{ f.hora_inicio.strftime('%H:%M') }}</span>
+    {%- endif -%}
+  {%- endfor -%}
+</div>
+{%- endif -%}
+{%- endmacro %}

@@ -1,0 +1,43 @@
+{% import "correos/_base.html" as correo %}
+{% call correo.marco(titulo='Tu donación es hoy a las ' ~ hora) %}
+  <p style="margin:0 0 14px; font-size:15px; line-height:1.55;">
+    Hola {{ nombre }}. Te esperamos hoy a las <b>{{ hora }}</b> en el Banco de
+    sangre del Hospital Regional de Luque.
+  </p>
+
+  <p style="margin:0 0 6px; font-size:15px; line-height:1.55;">
+    Antes de venir, respondé el cuestionario de salud. Son 36 preguntas
+    cortas y te lleva unos minutos desde el celular.
+  </p>
+
+  {{ correo.boton(enlace, 'Responder el cuestionario') }}
+
+  <p style="margin:0 0 18px; font-size:14px; color:#5B5B77; line-height:1.55;">
+    Responder con sinceridad no te descalifica: le permite al personal
+    cuidarte a vos y a quien reciba tu sangre. Si algo de lo que respondas
+    necesita conversarse, lo hablan con vos en el mostrador.
+  </p>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+         style="background:#FFF7F7; border:1px solid #F3DADA; border-radius:6px; margin-bottom:18px;">
+    <tr><td style="padding:16px 18px;">
+      <p style="margin:0 0 8px; font-size:14px; font-weight:600; color:#120C61;">Para que te tomen sin demoras</p>
+      <p style="margin:0; font-size:14px; color:#3B3B54; line-height:1.7;">
+        · Traé tu documento de identidad<br>
+        · Comé algo liviano antes de venir, no vengas en ayunas<br>
+        · Tomá bastante agua<br>
+        · Evitá el alcohol en las 12 horas previas
+      </p>
+    </td></tr>
+  </table>
+
+  <p style="margin:0 0 14px; font-size:14px; color:#5B5B77; line-height:1.55;">
+    ¿No podés venir? Reprogramá o cancelá tu cita desde
+    <a href="{{ enlace_cita }}" style="color:#120C61; font-weight:600;">Mi cita</a>,
+    así el turno queda libre para otra persona.
+  </p>
+
+  <p style="margin:0; font-size:12.5px; color:#8A8AA3; line-height:1.5; word-break:break-all;">
+    ¿No funciona el botón? Copiá esta dirección en tu navegador:<br>{{ enlace }}
+  </p>
+{% endcall %}

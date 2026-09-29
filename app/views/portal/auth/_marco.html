@@ -1,0 +1,30 @@
+{# Marco común de las pantallas de acceso: fondo decorado, tarjeta centrada
+   y la tira de apoyos al pie. Está en un solo lugar para que las cinco
+   pantallas (ingresar, registro, recuperar, enviado, restablecer) no se
+   vayan separando con el tiempo.
+
+   Uso:
+       {% import "portal/auth/_marco.html" as marco %}
+       {% call marco.pantalla(ancho='520px') %}
+         ... contenido ...
+       {% endcall %}
+#}
+{% from "portal/_ui.html" import ico %}
+
+{% macro pantalla(ancho='440px', apoyos=true) -%}
+<div class="auth-shell">
+  <div class="auth-grid"></div>
+  <div class="auth-stack">
+    <div class="auth-card" style="max-width:{{ ancho }};">
+      {{ caller() }}
+    </div>
+    {% if apoyos %}
+    <div class="auth-trust">
+      <span>{{ ico('shield') }} Proceso seguro y supervisado</span>
+      <span>{{ ico('calendar') }} Agenda 100% online</span>
+      <span>{{ ico('fileText') }} Datos protegidos por la Ley N.º 1682/01</span>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{%- endmacro %}

@@ -1,0 +1,84 @@
+{% extends "portal/layout.html" %}
+{% from "portal/_ui.html" import ico %}
+{% set activo = 'mi-cita' %}
+{% block titulo %}Cuestionario previo · Banco de sangre{% endblock %}
+
+{% block contenido %}
+<section class="block" style="padding-top:24px;">
+  <div class="wrap center-narrow">
+
+    <div class="section-head" style="margin-bottom:14px;">
+      <h1>Cuestionario previo</h1>
+      <p class="sub">
+        Para tu cita del {{ cita.fecha_cita.strftime('%d/%m/%Y') }} a las
+        {{ cita.horario.hora_inicio.strftime('%H:%M') }}. Respondé con
+        sinceridad: esto no te descalifica, ayuda al personal a cuidarte a
+        vos y a quien reciba tu sangre.
+      </p>
+    </div>
+
+    <div class="q-progress">
+      <div class="q-progress-bar"><span style="width:{{ (respondidas / total * 100) | round }}%;"></span></div>
+      <div class="q-progress-txt">
+        Paso {{ paso }} de {{ pasos }} · {{ respondidas }} de {{ total }} preguntas respondidas
+      </div>
+    </div>
+
+    <h2 class="q-seccion">{{ seccion }}</h2>
+
+    <form method="post" action="{{ url_for('cuestionario.guardar', id_cita=cita.id_cita) }}">
+      <input type="hidden" name="seccion" value="{{ seccion }}">
+
+      {% for p in preguntas %}
+        {# El valor a mostrar: lo que se acaba de escribir si el paso volvió
+           con errores, y si no lo que ya estaba guardado. #}
+        {% set guardado = guardadas.get(p.id_pregunta) %}
+        {% set previo = guardado.valor.split(' — ')[0] if guardado else '' %}
+        {% set elegido = (formulario.get('p' ~ p.id_pregunta) if formulario else '') or previo %}
+        {% set detalle_previo = (guardado.valor.split(' — ')[1]
+                                 if guardado and ' — ' in guardado.valor else '') %}
+        {% set detalle = (formulario.get('p' ~ p.id_pregunta ~ '_detalle')
+                          if formulario else '') or detalle_previo %}
+
+        <fieldset class="q-item">
+          <legend><span class="q-num">{{ p.orden }}</span> {{ p.enunciado }}</legend>
+          {% if p.nota %}<p class="q-nota">{{ p.nota }}</p>{% endif %}
+
+          <div class="q-choice">
+            <input type="radio" id="p{{ p.id_pregunta }}_si" name="p{{ p.id_pregunta }}"
+                   value="Si" {{ 'checked' if elegido == 'Si' }} required>
+            <label for="p{{ p.id_pregunta }}_si">Sí</label>
+
+            <input type="radio" id="p{{ p.id_pregunta }}_no" name="p{{ p.id_pregunta }}"
+                   value="No" {{ 'checked' if elegido == 'No' }}>
+            <label for="p{{ p.id_pregunta }}_no">No</label>
+          </div>
+
+          {% if p.pide_detalle %}
+          <input class="q-detalle" type="text" name="p{{ p.id_pregunta }}_detalle"
+                 value="{{ detalle }}" maxlength="180"
+                 placeholder="{{ p.etiqueta_detalle }} (opcional)">
+          {% endif %}
+        </fieldset>
+      {% endfor %}
+
+      <div class="q-acciones">
+        {% if paso > 1 %}
+        <a class="btn btn-ghost" href="{{ url_for('cuestionario.responder', id_cita=cita.id_cita,
+                                                  seccion=SECCIONES[paso - 2]) }}">
+          {{ ico('arrowLeft') }} Anterior
+        </a>
+        {% endif %}
+        <button class="btn btn-primary" type="submit">
+          {{ 'Guardar y continuar' if paso < pasos else 'Enviar cuestionario' }}
+        </button>
+      </div>
+      <p class="hint" style="text-align:center; margin-top:12px;">
+        Lo que respondas en este paso se guarda al continuar. Podés cerrar y
+        seguir después desde «Mi cita».
+      </p>
+    </form>
+
+  </div>
+</section>
+{% endblock %}

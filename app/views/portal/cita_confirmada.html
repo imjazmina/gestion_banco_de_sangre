@@ -1,0 +1,46 @@
+{% extends "portal/layout.html" %}
+{% from "portal/_ui.html" import ico %}
+{% set activo = 'mi-cita' %}
+{% block titulo %}Cita confirmada · Banco de sangre{% endblock %}
+
+{% block contenido %}
+<section class="block" style="padding-top:48px;">
+  <div class="wrap center-narrow">
+    <div class="card" style="text-align:center; padding:40px 28px;">
+      <div class="ico" style="background:#E7F6EF; color:var(--ok); margin:0 auto 18px; width:56px; height:56px;">{{ ico('check') }}</div>
+      <h1 style="margin-bottom:8px;">Cita confirmada</h1>
+      <p class="sub" style="margin-bottom:24px;">Tu cita fue registrada. Te esperamos.</p>
+
+      <div class="card" style="text-align:left; margin-bottom:20px;">
+        <table class="data" style="width:100%;">
+          <tbody>
+            <tr><td style="color:var(--ink2);">Fecha</td><td style="text-align:right; font-weight:600;">{{ cita.fecha_cita.strftime('%d/%m/%Y') }}</td></tr>
+            <tr><td style="color:var(--ink2);">Horario</td><td style="text-align:right; font-weight:600;">{{ cita.horario.hora_inicio.strftime('%H:%M') }} a {{ cita.horario.hora_fin.strftime('%H:%M') }}</td></tr>
+            <tr><td style="color:var(--ink2);">Estado</td><td style="text-align:right;"><span class="badge badge-conf"><span class="badge-dot"></span>{{ cita.estado }}</span></td></tr>
+            <tr><td style="color:var(--ink2);">Tipo</td><td style="text-align:right; font-weight:600;">{{ etiqueta }}</td></tr>
+            {% if cita.solicitud %}
+            <tr><td style="color:var(--ink2);">Donás para</td><td style="text-align:right; font-weight:600;">{{ cita.solicitud.solicitante.nombre_completo }}</td></tr>
+            {% endif %}
+            <tr><td style="color:var(--ink2);">Lugar</td><td style="text-align:right; font-weight:600;">Banco de sangre, Hospital Regional de Luque</td></tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="banner info" style="text-align:left;">
+        {{ ico('bell') }}
+        <p><b>Recordatorio</b>Vas a recibir un aviso antes de tu cita. Podés verlo en Notificaciones.</p>
+      </div>
+
+      <ul class="req-list" style="margin:16px 0 24px; text-align:left;">
+        <li class="req-yes">{{ ico('check') }} Desayuná liviano y llegá hidratada</li>
+        <li class="req-yes">{{ ico('check') }} Si necesitás cancelar, hacelo con anticipación desde Mi cita</li>
+      </ul>
+
+      <div style="display:flex; gap:12px; justify-content:center; flex-wrap:wrap;">
+        <a class="btn btn-secondary" href="{{ url_for('mi_cita.ver') }}">Ver mi cita</a>
+        <a class="btn btn-primary" href="{{ url_for('main.index') }}">Ir al inicio</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endblock %}

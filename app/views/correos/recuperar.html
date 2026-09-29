@@ -1,0 +1,21 @@
+{% import "correos/_base.html" as correo %}
+{% call correo.marco(titulo='Restablecé tu contraseña') %}
+  <p style="margin:0 0 14px; font-size:15px; line-height:1.55;">
+    Hola {{ nombre }}, pediste volver a entrar al portal de donantes.
+    Tocá el botón y elegí una contraseña nueva.
+  </p>
+
+  {{ correo.boton(enlace, 'Elegir contraseña nueva') }}
+
+  <p style="margin:0 0 14px; font-size:14px; color:#5B5B77; line-height:1.55;">
+    El enlace vence en {{ horas }} horas y sirve una sola vez.
+    Si pedís otro, este deja de funcionar.
+  </p>
+  <p style="margin:0 0 14px; font-size:14px; color:#5B5B77; line-height:1.55;">
+    <b>Si no fuiste vos</b>, no hace falta que hagas nada: tu contraseña
+    actual sigue siendo la misma mientras no uses este enlace.
+  </p>
+  <p style="margin:0; font-size:12.5px; color:#8A8AA3; line-height:1.5; word-break:break-all;">
+    ¿No funciona el botón? Copiá esta dirección en tu navegador:<br>{{ enlace }}
+  </p>
+{% endcall %}

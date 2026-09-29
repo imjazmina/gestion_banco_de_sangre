@@ -1,0 +1,23 @@
+{% extends "portal/layout.html" %}
+{% from "portal/_ui.html" import ico %}
+{% import "portal/auth/_marco.html" as marco %}
+{% block titulo %}El enlace ya no sirve · Banco de sangre{% endblock %}
+
+{% block contenido %}
+{% call marco.pantalla() %}
+  <div class="card" style="text-align:center; padding:36px 28px;">
+    <div class="ico" style="background:#FDECEC; color:var(--danger); margin:0 auto 16px; width:52px; height:52px; border-radius:14px; display:flex; align-items:center; justify-content:center;">
+      {{ ico('clock') }}
+    </div>
+    <h1 style="font-size:19px; margin-bottom:8px;">Este enlace ya no sirve</h1>
+    <p class="sub" style="margin-bottom:22px;">
+      Puede que haya vencido, que ya lo hayas usado o que hayas pedido uno más
+      nuevo. Pedí otro y te llega uno fresco.
+    </p>
+    <a class="btn btn-primary btn-block" href="{{ url_for('auth.recuperar') }}">Pedir un enlace nuevo</a>
+    <p class="auth-foot" style="margin-bottom:0;">
+      <a href="{{ url_for('auth.ingresar') }}">Volver a iniciar sesión</a>
+    </p>
+  </div>
+{% endcall %}
+{% endblock %}

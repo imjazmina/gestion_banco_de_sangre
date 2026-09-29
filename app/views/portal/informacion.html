@@ -1,0 +1,110 @@
+{% extends "portal/layout.html" %}
+{% from "portal/_ui.html" import ico, foto %}
+{% from "portal/_ilustraciones.html" import ilu_sala, ilu_paso %}
+{% set activo = 'informacion' %}
+{% block titulo %}Información · Banco de sangre{% endblock %}
+
+{% block contenido %}
+<section class="block" style="padding-top:40px;">
+  <div class="wrap reveal">
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('main.index') }}" style="margin-bottom:20px;">{{ ico('arrowLeft') }} Volver</a>
+    <div class="section-head">
+      <h1 class="display" style="font-size:26px;">Información</h1>
+      <p class="sub" style="margin-top:6px;">Cómo funciona el portal, qué implica donar sangre y respuestas a las dudas más comunes.</p>
+    </div>
+
+    <div class="info-banner">
+      <div class="info-banner-figure">{{ ilu_sala() }}{{ foto('donacion14.jpg', 'Sala de donación del Banco de Sangre del Hospital Regional de Luque') }}</div>
+      <div class="info-banner-cap">{{ ico('drop') }} Así es la sala de donación: personal de enfermería acompañando en cada puesto, material estéril de un solo uso y una zona de recuperación al final.</div>
+    </div>
+
+    <div class="card" style="margin-bottom:40px;">
+      <h2 style="margin-bottom:16px;">Cómo funciona el portal</h2>
+      <div class="steps">
+        <div class="step" data-n="01"><div class="idx">01</div><h3>Creá tu cuenta</h3><p>Te registrás con tu documento, datos de contacto y verificás tu correo.</p></div>
+        <div class="step" data-n="02"><div class="idx">02</div><h3>Agendá tu cita</h3><p>Elegís una fecha y horario disponible y el tipo de donación.</p></div>
+        <div class="step" data-n="03"><div class="idx">03</div><h3>Recibí recordatorios</h3><p>El portal te avisa por notificación antes de tu cita.</p></div>
+        <div class="step" data-n="04"><div class="idx">04</div><h3>Donás en el banco</h3><p>Te presentás con tu documento y completás el cuestionario de salud.</p></div>
+        <div class="step" data-n="05"><div class="idx">05</div><h3>Seguí tu historial</h3><p>Desde tu perfil consultás tus donaciones pasadas y tu próxima fecha habilitada.</p></div>
+      </div>
+    </div>
+
+    <div class="section-head"><h2>Beneficios de donar sangre</h2></div>
+    <div class="grid-3" style="margin-bottom:40px;">
+      <div class="card card-hover">
+        <div class="action-card" style="border:none; padding:0;">
+          <div class="ico" style="background:#E6F4F3; color:var(--teal-ink);">{{ ico('activity') }}</div>
+          <h3 style="font-size:16px;">Chequeo de salud gratuito</h3>
+          <p>Antes de donar se te mide presión arterial, pulso y hemoglobina, lo que funciona como un pequeño control de salud sin costo.</p>
+        </div>
+      </div>
+      <div class="card card-hover">
+        <div class="action-card" style="border:none; padding:0;">
+          <div class="ico" style="background:#E6F4F3; color:var(--teal-ink);">{{ ico('users') }}</div>
+          <h3 style="font-size:16px;">Impacto social directo</h3>
+          <p>Una sola donación puede dividirse en distintos componentes y ayudar hasta a 3 personas diferentes.</p>
+        </div>
+      </div>
+      <div class="card card-hover">
+        <div class="action-card" style="border:none; padding:0;">
+          <div class="ico" style="background:#E6F4F3; color:var(--teal-ink);">{{ ico('shield') }}</div>
+          <h3 style="font-size:16px;">Riesgo mínimo para vos</h3>
+          <p>El volumen extraído es reemplazado por tu cuerpo en pocas semanas y el proceso completo es supervisado por personal de enfermería.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-head">
+      <h2>Donaciones</h2>
+      <p class="sub" style="margin-top:6px;">Cómo es una donación de principio a fin, en el Banco de Sangre del Hospital Regional de Luque.</p>
+    </div>
+    <div class="don-grid">
+      {% for d in donaciones %}
+      <div class="don-card">
+        <div class="don-figure">{{ ilu_paso(d.k) }}{{ foto(d.img, d.alt) }}</div>
+        <div class="don-body">
+          <div class="don-step">{{ d.paso }}</div>
+          <h3>{{ d.titulo }}</h3>
+          <p>{{ d.cuerpo }}</p>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="section-head"><h2>Qué necesitás saber antes de donar</h2></div>
+    <div class="grid-3" style="margin-bottom:40px;">
+      <div class="card card-hover">
+        <div class="action-card" style="border:none; padding:0;">
+          <div class="ico" style="background:var(--hero); color:var(--blood-ink);">{{ ico('idCard') }}</div>
+          <h3 style="font-size:16px;">Documentación necesaria</h3>
+          <p>Solo necesitás tu documento de identidad vigente. Si venís por reposición, es útil tener el nombre del paciente a mano.</p>
+        </div>
+      </div>
+      <div class="card card-hover">
+        <div class="action-card" style="border:none; padding:0;">
+          <div class="ico" style="background:var(--hero); color:var(--blood-ink);">{{ ico('shield') }}</div>
+          <h3 style="font-size:16px;">Es un proceso seguro y controlado</h3>
+          <p>Todo el material utilizado es estéril y de un solo uso. El personal de enfermería supervisa cada etapa, desde el ingreso hasta la recuperación.</p>
+        </div>
+      </div>
+      <div class="card card-hover">
+        <div class="action-card" style="border:none; padding:0;">
+          <div class="ico" style="background:var(--hero); color:var(--blood-ink);">{{ ico('fileText') }}</div>
+          <h3 style="font-size:16px;">Qué preguntará el cuestionario de salud</h3>
+          <p>Antes de donar, se realizan preguntas breves sobre viajes recientes, medicación, y estado de salud general para garantizar tu seguridad y la del receptor.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="section-head"><h2>Preguntas frecuentes</h2></div>
+    <div class="card" style="padding:8px 24px;">
+      {% for f in faqs %}
+      <div class="faq-item">
+        <button class="faq-q" type="button">{{ f.pregunta }} {{ ico('chevronDown') }}</button>
+        <div class="faq-a"><p>{{ f.respuesta }}</p></div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+{% endblock %}

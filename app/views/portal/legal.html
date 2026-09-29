@@ -1,0 +1,25 @@
+{% extends "portal/layout.html" %}
+{% from "portal/_ui.html" import ico %}
+{% block titulo %}{{ titulo }} · Banco de sangre{% endblock %}
+{% block contenido %}
+<section class="block" style="padding-top:40px;">
+  <div class="wrap center-narrow">
+    <a class="btn btn-ghost btn-sm" href="{{ request.referrer or url_for('main.index') }}" style="margin-bottom:20px;">{{ ico('arrowLeft') }} Volver</a>
+    <div class="section-head">
+      <h1 class="display" style="font-size:26px;">{{ titulo }}</h1>
+      <p class="sub" style="margin-top:6px;">Banco de sangre, Hospital Regional de Luque.</p>
+    </div>
+    <div class="card">
+      {% for s in secciones %}
+      <div class="legal-section">
+        <h2>{{ s.titulo }}</h2>
+        {% for parrafo in s.cuerpo.split('\n\n') %}<p>{{ parrafo }}</p>{% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    <div style="text-align:center; margin-top:24px;">
+      <a class="muted-link link-arrow" href="{{ url_for('legal.' ~ otra_url) }}">{{ otra_texto }} {{ ico('chevronRight') }}</a>
+    </div>
+  </div>
+</section>
+{% endblock %}

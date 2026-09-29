@@ -1,10 +1,10 @@
-from flask import Flask
+from flask import Flask, has_request_context
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
 
 from app.config import Config
 from app.models import db
-from app.routes import main_bp
+from app.routes import registrar as registrar_blueprints
 
 
 def create_app(config_class=Config):
@@ -18,8 +18,22 @@ def create_app(config_class=Config):
     _validar_configuracion(app)
 
     db.init_app(app)
-    app.register_blueprint(main_bp)
+    registrar_blueprints(app)
     _registrar_errores(app)
+
+    from app.controllers.sesion import usuario_actual
+
+    @app.context_processor
+    def inyectar_usuario():
+        """
+        Deja `usuario` disponible en todas las plantillas.
+
+        La comprobación no sobra: las plantillas de los correos se dibujan
+        desde `enviar_avisos.py`, donde no hay ningún pedido en curso y
+        `session` no existe. Sin esto, el envío automático se cae con
+        "Working outside of request context".
+        """
+        return {"usuario": usuario_actual() if has_request_context() else None}
 
     with app.app_context():
         _inicializar_base_de_datos(app)

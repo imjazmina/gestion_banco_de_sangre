@@ -1,0 +1,30 @@
+{% extends "portal/layout.html" %}
+{% from "portal/_ui.html" import ico %}
+{% import "portal/auth/_marco.html" as marco %}
+{% block titulo %}Recuperar contraseña · Banco de sangre{% endblock %}
+
+{% block contenido %}
+{% call marco.pantalla() %}
+  <div class="auth-head">
+    <div class="mark-lg">{{ ico('mail') }}</div>
+    <h1>Recuperar contraseña</h1>
+    <p class="sub" style="margin-top:6px;">Te enviamos un enlace para volver a entrar.</p>
+  </div>
+
+  <div class="card">
+    <form method="post">
+      <div class="field">
+        <label for="correo">Correo electrónico</label>
+        <input type="email" id="correo" name="correo" value="{{ correo }}"
+               placeholder="tu@correo.com" required autofocus>
+        <div class="hint">El mismo con el que creaste tu cuenta.</div>
+      </div>
+      <button class="btn btn-primary btn-block" type="submit">Enviar enlace</button>
+    </form>
+  </div>
+
+  <p class="auth-foot">
+    <a href="{{ url_for('auth.ingresar') }}">{{ ico('arrowLeft') }} Volver a iniciar sesión</a>
+  </p>
+{% endcall %}
+{% endblock %}

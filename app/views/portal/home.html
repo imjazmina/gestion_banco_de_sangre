@@ -1,0 +1,163 @@
+{% extends "portal/layout.html" %}
+{% from "portal/_ui.html" import ico, foto %}
+{% from "portal/_ilustraciones.html" import ilu_donacion %}
+{% set activo = 'home' %}
+
+{% block contenido %}
+<section class="hero decor-circles">
+  <div class="wrap hero-grid">
+    <div>
+      <div class="hero-eyebrow">{{ ico('drop') }} Hospital Regional de Luque</div>
+      <h1 class="display">Una donación tuya puede ser la diferencia para alguien hoy</h1>
+      <p class="lead">Agendá tu cita de donación en minutos. Un solo lugar para todo el proceso, con horarios claros y recordatorios.</p>
+      <div class="hero-ctas">
+        {% if usuario %}
+        <a class="btn btn-donate" href="{{ url_for('solicitudes.listar') }}">{{ ico('drop') }} Ver solicitudes</a>
+        {% else %}
+        <a class="btn btn-donate" href="{{ url_for('auth.ingresar', donar=1) }}">{{ ico('drop') }} Quiero donar</a>
+        {% endif %}
+        <a class="btn btn-secondary" href="{{ url_for('informacion.ver') }}">{{ ico('info') }} Informarme</a>
+      </div>
+    </div>
+    <div class="hero-visual">
+      {# La ilustración va primero y la foto encima: las dos están posicionadas
+         en el mismo lugar, así que la que se dibuja al final es la que se ve.
+         Si la foto no existe, el onerror la quita y queda la ilustración. #}
+      <div class="hero-figure">{{ ilu_donacion() }}{{ foto('donacion.jpg', 'Persona donando sangre en el Banco de Sangre del Hospital Regional de Luque') }}</div>
+      <div class="hero-figure-cap">{{ ico('drop') }} Donar toma unos minutos y el equipo te acompaña en todo el proceso.</div>
+      <div class="hero-visual-stats">
+        <div class="stat-strip">
+          <div class="stat-cell">
+            <div class="num">{{ solicitudes_activas }}</div>
+            <div class="txt">{{ 'persona espera' if solicitudes_activas == 1 else 'personas esperan' }} un donante</div>
+          </div>
+          <div class="stat-cell"><div class="num">3</div><div class="txt">pacientes puede ayudar una donación</div></div>
+          <div class="stat-cell"><div class="num">15</div><div class="txt">minutos dura la extracción</div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" style="padding-bottom:0;">
+  <div class="wrap reveal">
+    <div class="trust-grid">
+      <div class="trust-item">
+        <div class="trust-ico" style="background:#E6F4F3; color:var(--teal-ink);">{{ ico('shield') }}</div>
+        <div><h3>Proceso seguro y supervisado</h3><p>Material estéril de un solo uso y personal de enfermería en cada etapa.</p></div>
+      </div>
+      <div class="trust-item">
+        <div class="trust-ico" style="background:var(--hero); color:var(--blood-ink);">{{ ico('calendar') }}</div>
+        <div><h3>Agenda 100% online</h3><p>Elegís fecha, horario y tipo de donación sin filas ni llamadas.</p></div>
+      </div>
+      <div class="trust-item">
+        <div class="trust-ico" style="background:#EAF1FE; color:var(--info);">{{ ico('bell') }}</div>
+        <div><h3>Recordatorios automáticos</h3><p>Te avisamos antes de tu cita para que no se te pase.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="wrap reveal">
+    <div class="section-head">
+      <h2>Cómo es el proceso de donar</h2>
+      <p class="sub">Cinco pasos, de principio a fin.</p>
+    </div>
+    <div class="steps">
+      <div class="step" data-n="01"><div class="idx">01</div><h3>Creá tu cuenta</h3><p>Registrate con tu documento y tus datos de contacto.</p></div>
+      <div class="step" data-n="02"><div class="idx">02</div><h3>Agendá tu cita</h3><p>Elegí fecha, horario y el tipo de donación.</p></div>
+      <div class="step" data-n="03"><div class="idx">03</div><h3>Cuestionario de salud</h3><p>Respondé unas preguntas breves antes de donar.</p></div>
+      <div class="step" data-n="04"><div class="idx">04</div><h3>Donación</h3><p>La extracción toma entre 10 y 15 minutos.</p></div>
+      <div class="step" data-n="05"><div class="idx">05</div><h3>Recuperación</h3><p>Un refrigerio y unos minutos de descanso antes de irte.</p></div>
+    </div>
+  </div>
+</section>
+
+<section class="block" style="background:var(--surface); border-top:1px solid var(--line); border-bottom:1px solid var(--line);">
+  <div class="wrap reveal">
+    <div class="section-head" style="margin-bottom:24px;">
+      <h2>¿Podés donar?</h2>
+      <p class="sub">Revisá rápido si cumplís las condiciones antes de agendar.</p>
+    </div>
+    <div class="grid-2">
+      <div class="req-panel">
+        <h2 style="margin-bottom:16px;">Podés donar si...</h2>
+        <ul class="req-list">
+          <li class="req-yes">{{ ico('check') }} Tenés entre 18 y 65 años</li>
+          <li class="req-yes">{{ ico('check') }} Pesás 50 kg o más</li>
+          <li class="req-yes">{{ ico('check') }} Dormiste al menos 6 horas la noche anterior</li>
+          <li class="req-yes">{{ ico('check') }} Te sentís en buen estado de salud general</li>
+          <li class="req-yes">{{ ico('check') }} Presentás documento de identidad vigente</li>
+        </ul>
+      </div>
+      <div class="req-panel danger">
+        <h2 style="margin-bottom:16px;">No podés donar si...</h2>
+        <ul class="req-list">
+          <li class="req-no">{{ ico('x') }} Tuviste fiebre o infección en los últimos días</li>
+          <li class="req-no">{{ ico('x') }} Estás embarazada o en período de lactancia</li>
+          <li class="req-no">{{ ico('x') }} Donaste hace menos de 3 meses (hombres) o 4 meses (mujeres)</li>
+          <li class="req-no">{{ ico('x') }} Te realizaste un tatuaje o piercing reciente</li>
+          <li class="req-no">{{ ico('x') }} Consumiste alcohol en las últimas 12 horas</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block">
+  <div class="wrap reveal">
+    <div class="grid-2">
+      <div class="card card-hover">
+        <h2 style="margin-bottom:14px;">{{ ico('clock') }} Horarios de atención</h2>
+        <table class="data" style="width:100%;">
+          <tbody>
+            <tr><td>Lunes a viernes</td><td style="text-align:right; font-weight:600;">07:00 – 15:00</td></tr>
+            <tr><td>Sábados</td><td style="text-align:right; font-weight:600;">07:00 – 11:00</td></tr>
+            <tr><td>Domingos y feriados</td><td style="text-align:right; color:var(--ink2);">Cerrado</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card card-hover" style="background:var(--hero); border-color:#F3D9D9;">
+        <h2 style="margin-bottom:10px;">{{ ico('mapPin') }} ¿Dónde estamos?</h2>
+        <p class="sub" style="margin-bottom:16px;">Atendemos en el Hospital Regional de Luque. Traé tu documento de identidad el día de tu cita, no necesitás nada más.</p>
+        <a class="btn btn-secondary" href="{{ url_for('auth.ingresar', donar=1) if not usuario else url_for('donar.agendar') }}">
+          {{ 'Agendar mi cita' if not usuario else 'Agendar donación' }} {{ ico('chevronRight') }}
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="block" id="preguntas">
+  <div class="wrap center-narrow reveal">
+    <div class="section-head section-head-center"><h2>Preguntas frecuentes</h2></div>
+    <div class="card" style="padding:8px 24px;">
+      {% for f in faqs %}
+      <div class="faq-item">
+        <button class="faq-q" type="button">{{ f.pregunta }} {{ ico('chevronDown') }}</button>
+        <div class="faq-a"><p>{{ f.respuesta }}</p></div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+{% if not usuario %}
+<section class="block" style="padding-top:0;">
+  <div class="wrap reveal">
+    <div class="card decor-circles-light" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:24px; background:var(--navy); border:none; padding:36px;">
+      <div style="max-width:480px;">
+        <div class="eyebrow-badge" style="background:rgba(255,255,255,.08); border-color:rgba(255,255,255,.18); color:#fff;"><span class="eyebrow-dot"></span>Se agendan citas todos los días</div>
+        <h2 style="color:#fff; margin-bottom:8px; font-size:20px;">¿Listo/a para donar?</h2>
+        <p style="color:#C9CBEF; font-size:14.5px;">Creá tu cuenta y agendá tu primera cita en menos de 5 minutos. Elegís vos la fecha, el horario y el tipo de donación.</p>
+      </div>
+      <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        <a class="btn btn-donate" href="{{ url_for('auth.registro') }}">Crear cuenta {{ ico('chevronRight') }}</a>
+        <a class="btn btn-ghost" style="color:#fff;" href="{{ url_for('auth.ingresar') }}">Ya tengo cuenta</a>
+      </div>
+    </div>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

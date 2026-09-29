@@ -1,0 +1,319 @@
+{# Ilustraciones de reemplazo. Se muestran cuando no hay foto cargada. #}
+
+{% macro ilu_donacion() -%}
+<svg viewBox="0 0 640 400" role="img" aria-label="Ilustración de una persona donando sangre acompañada por personal de enfermería" xmlns="http://www.w3.org/2000/svg">
+    <rect width="640" height="400" fill="#FDF0F0"/>
+
+    <!-- fondo -->
+    <circle cx="548" cy="92" r="70" fill="#F7DEDE"/>
+    <path d="M548 66s16 19 16 29a16 16 0 0 1-32 0c0-10 16-29 16-29z" fill="#F2CFCF"/>
+    <rect x="56" y="54" width="132" height="96" rx="10" fill="#F7DEDE"/>
+    <path d="M74 78h58M74 98h84M74 118h64" stroke="#EDC6C6" stroke-width="7" stroke-linecap="round"/>
+    <path d="M0 306h640v94H0z" fill="#F8E6E6"/>
+    <path d="M0 306h640" stroke="#EED4D4" stroke-width="3"/>
+
+    <!-- ===== personal de enfermería ===== -->
+    <g>
+      <rect x="92" y="312" width="26" height="54" rx="12" fill="#0D0947"/>
+      <rect x="126" y="312" width="26" height="54" rx="12" fill="#0D0947"/>
+      <rect x="84" y="356" width="40" height="14" rx="7" fill="#171063"/>
+      <rect x="120" y="356" width="40" height="14" rx="7" fill="#171063"/>
+      <rect x="80" y="204" width="80" height="118" rx="28" fill="#120C61"/>
+      <path d="M80 250c12 7 26 11 41 11 14 0 27-3 39-9v46a28 28 0 0 1-28 28h-24a28 28 0 0 1-28-28z" fill="#2A2199" opacity=".45"/>
+      <rect x="152" y="224" width="23" height="78" rx="11" fill="#120C61"/>
+      <circle cx="120" cy="174" r="27" fill="#DCA57C"/>
+      <path d="M120 147a27 27 0 0 1 26 20c-13 5-27 6-39 3-4-1-7-4-8-7a27 27 0 0 1 21-16z" fill="#241F35"/>
+      <circle cx="132" cy="176" r="2.6" fill="#3A3247"/>
+      <path d="M104 214h32v10h-32z" fill="#F4F6F9"/>
+    </g>
+
+    <!-- ===== sillón de donación ===== -->
+    <path d="M168 300 L182 168 Q184 156 196 156 L228 158 Q240 159 239 171 L232 300 Z" fill="#171063"/>
+    <path d="M178 294 L190 176 Q191 167 200 167 L224 169 Q232 170 231 179 L225 294 Z" fill="#2A2199" opacity=".55"/>
+    <rect x="206" y="284" width="212" height="32" rx="12" fill="#171063"/>
+    <rect x="214" y="290" width="196" height="14" rx="7" fill="#2A2199" opacity=".6"/>
+    <rect x="232" y="316" width="20" height="42" rx="7" fill="#120C61"/>
+    <rect x="374" y="316" width="20" height="42" rx="7" fill="#120C61"/>
+    <rect x="216" y="352" width="196" height="14" rx="7" fill="#171063"/>
+
+    <!-- ===== donante ===== -->
+    <!-- piernas -->
+    <rect x="250" y="272" width="146" height="38" rx="19" fill="#41547A"/>
+    <rect x="376" y="292" width="36" height="62" rx="16" fill="#41547A"/>
+    <rect x="368" y="348" width="60" height="18" rx="9" fill="#25324A"/>
+    <!-- torso inclinado -->
+    <g transform="rotate(-13 250 235)">
+      <rect x="210" y="174" width="88" height="126" rx="35" fill="#0F766E"/>
+      <path d="M210 236a88 126 0 0 0 88 0v29a35 35 0 0 1-35 35h-18a35 35 0 0 1-35-35z" fill="#14958B" opacity=".5"/>
+    </g>
+    <!-- cuello y cabeza -->
+    <path d="M224 166h30v20h-30z" fill="#DCA57C"/>
+    <circle cx="236" cy="147" r="31" fill="#E8B58C"/>
+    <path d="M236 116a31 31 0 0 1 30 23c-15 6-31 6-45 2-5-2-8-5-9-9a31 31 0 0 1 24-16z" fill="#2E2A3F"/>
+    <path d="M212 133c-7 11-6 24 2 33-10-2-15-12-14-22 1-6 6-10 12-11z" fill="#2E2A3F"/>
+    <circle cx="251" cy="149" r="2.8" fill="#3A3247"/>
+    <path d="M257 161c-4 3-10 4-14 2" stroke="#C98C66" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+
+    <!-- apoyabrazos -->
+    <rect x="262" y="252" width="172" height="18" rx="9" fill="#0F766E"/>
+    <rect x="262" y="252" width="172" height="8" rx="4" fill="#14958B"/>
+
+    <!-- brazo extendido -->
+    <path d="M276 206c9-6 21-3 26 6l14 24-30 6z" fill="#0F766E"/>
+    <rect x="306" y="226" width="116" height="28" rx="14" fill="#E8B58C"/>
+    <path d="M320 226h94a14 14 0 0 1 8 3H312a14 14 0 0 1 8-3z" fill="#F0C6A3"/>
+    <circle cx="426" cy="240" r="16" fill="#E8B58C"/>
+    <path d="M426 224a16 16 0 0 1 13 7l-9 6z" fill="#F0C6A3"/>
+    <!-- apósito y punto de punción -->
+    <rect x="348" y="220" width="30" height="20" rx="6" fill="#F8FAFC" stroke="#D8DEE6" stroke-width="2"/>
+    <circle cx="363" cy="230" r="3.6" fill="#C81E1E"/>
+
+    <!-- ===== tubuladura ===== -->
+    <path d="M363 244c6 50 42 72 82 64 26-5 42-24 47-44"
+          stroke="#C81E1E" stroke-width="5.5" fill="none" stroke-linecap="round"/>
+    <path d="M363 244c6 50 42 72 82 64 26-5 42-24 47-44"
+          stroke="#E86A6A" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+
+    <!-- ===== bolsa de recolección sobre mesa ===== -->
+    <rect x="452" y="344" width="14" height="22" rx="5" fill="#B4BEC9"/>
+    <rect x="530" y="344" width="14" height="22" rx="5" fill="#B4BEC9"/>
+    <rect x="436" y="330" width="124" height="16" rx="8" fill="#C9D1DB"/>
+    <rect x="436" y="330" width="124" height="7" rx="3.5" fill="#E1E7EE"/>
+    <rect x="488" y="246" width="18" height="14" rx="4" fill="#D3DAE3"/>
+    <rect x="462" y="258" width="70" height="72" rx="14" fill="#F4F7FA" stroke="#D3DAE3" stroke-width="2.5"/>
+    <path d="M464 290h66v26a14 14 0 0 1-14 14h-38a14 14 0 0 1-14-14z" fill="#C81E1E"/>
+    <path d="M464 290h66v9h-66z" fill="#E04A4A"/>
+    <path d="M474 268h28M474 278h18" stroke="#CDD6E0" stroke-width="4.5" stroke-linecap="round"/>
+  </svg>
+{%- endmacro %}
+
+{% macro ilu_sala() -%}
+<svg viewBox="0 0 1200 340" role="img" aria-label="Ilustración de la sala de donación: personal de enfermería, una persona donando y un puesto libre" xmlns="http://www.w3.org/2000/svg">
+    <rect width="1200" height="340" fill="#FDF0F0"/>
+
+    <!-- pared -->
+    <rect x="86" y="44" width="212" height="126" rx="9" fill="#F7DEDE" stroke="#EFC9C9" stroke-width="3"/>
+    <path d="M192 44v126M86 107h212" stroke="#EFC9C9" stroke-width="3"/>
+    <rect x="884" y="52" width="152" height="98" rx="9" fill="#F7DEDE"/>
+    <path d="M902 76h58M902 96h108M902 116h82" stroke="#EDC6C6" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="1104" cy="90" r="30" fill="#FFFFFF" stroke="#EFC9C9" stroke-width="3"/>
+    <path d="M1104 72v20l13 8" stroke="#C0A3A3" stroke-width="4" stroke-linecap="round" fill="none"/>
+    <!-- piso -->
+    <path d="M0 262h1200v78H0z" fill="#F8E6E6"/>
+    <path d="M0 262h1200" stroke="#EED4D4" stroke-width="3"/>
+
+    <!-- ===== enfermería ===== -->
+    <g>
+      <rect x="314" y="244" width="23" height="50" rx="11" fill="#0D0947"/>
+      <rect x="345" y="244" width="23" height="50" rx="11" fill="#0D0947"/>
+      <rect x="304" y="288" width="40" height="13" rx="6" fill="#171063"/>
+      <rect x="340" y="288" width="40" height="13" rx="6" fill="#171063"/>
+      <rect x="304" y="150" width="74" height="104" rx="26" fill="#120C61"/>
+      <path d="M304 192c11 6 24 9 37 9s26-3 37-9v36a26 26 0 0 1-26 26h-22a26 26 0 0 1-26-26z" fill="#2A2199" opacity=".45"/>
+      <rect x="326" y="150" width="30" height="11" fill="#F4F6F9"/>
+      <rect x="370" y="168" width="21" height="72" rx="10" fill="#120C61"/>
+      <circle cx="341" cy="124" r="25" fill="#DCA57C"/>
+      <path d="M341 99a25 25 0 0 1 24 18c-12 5-25 6-36 3-4-1-6-4-7-6a25 25 0 0 1 19-15z" fill="#241F35"/>
+      <circle cx="352" cy="126" r="2.4" fill="#3A3247"/>
+      <rect x="374" y="212" width="28" height="36" rx="5" fill="#F4F6F9" stroke="#D3DAE3" stroke-width="2.5"/>
+      <path d="M381 222h14M381 231h10" stroke="#CBD4DE" stroke-width="3.5" stroke-linecap="round"/>
+    </g>
+
+    <!-- ===== puesto en uso: sillón + donante ===== -->
+    <path d="M470 258 L480 166 Q481 157 490 157 L514 159 Q523 160 522 169 L516 258 Z" fill="#171063"/>
+    <rect x="500" y="236" width="172" height="26" rx="11" fill="#171063"/>
+    <rect x="506" y="241" width="160" height="11" rx="5" fill="#2A2199" opacity=".55"/>
+    <rect x="520" y="262" width="17" height="34" rx="6" fill="#120C61"/>
+    <rect x="640" y="262" width="17" height="34" rx="6" fill="#120C61"/>
+    <rect x="508" y="292" width="158" height="12" rx="6" fill="#171063"/>
+    <!-- piernas -->
+    <rect x="536" y="226" width="116" height="30" rx="15" fill="#41547A"/>
+    <rect x="636" y="242" width="28" height="48" rx="13" fill="#41547A"/>
+    <rect x="630" y="286" width="48" height="14" rx="7" fill="#25324A"/>
+    <!-- torso -->
+    <g transform="rotate(-13 540 200)">
+      <rect x="512" y="156" width="70" height="100" rx="28" fill="#0F766E"/>
+      <path d="M512 206a70 100 0 0 0 70 0v22a28 28 0 0 1-28 28h-14a28 28 0 0 1-28-28z" fill="#14958B" opacity=".5"/>
+    </g>
+    <path d="M523 150h24v16h-24z" fill="#DCA57C"/>
+    <circle cx="533" cy="134" r="25" fill="#E8B58C"/>
+    <path d="M533 109a25 25 0 0 1 24 18c-12 5-25 5-36 2-4-1-6-4-7-7a25 25 0 0 1 19-13z" fill="#2E2A3F"/>
+    <circle cx="545" cy="136" r="2.4" fill="#3A3247"/>
+    <!-- apoyabrazos y brazo -->
+    <rect x="548" y="206" width="140" height="15" rx="7" fill="#0F766E"/>
+    <rect x="548" y="206" width="140" height="7" rx="3.5" fill="#14958B"/>
+    <path d="M556 176c7-5 17-2 21 5l11 19-24 5z" fill="#0F766E"/>
+    <rect x="578" y="186" width="96" height="23" rx="11" fill="#E8B58C"/>
+    <path d="M589 186h78a11 11 0 0 1 6 2h-90a11 11 0 0 1 6-2z" fill="#F0C6A3"/>
+    <circle cx="678" cy="197" r="13" fill="#E8B58C"/>
+    <rect x="612" y="181" width="25" height="16" rx="5" fill="#F8FAFC" stroke="#D8DEE6" stroke-width="2"/>
+    <circle cx="624" cy="189" r="3" fill="#C81E1E"/>
+    <!-- tubuladura y bolsa -->
+    <path d="M624 200c5 40 34 58 66 52 21-4 34-19 38-35" stroke="#C81E1E" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+    <path d="M624 200c5 40 34 58 66 52 21-4 34-19 38-35" stroke="#E86A6A" stroke-width="1.5" fill="none" stroke-linecap="round"/>
+    <rect x="706" y="296" width="12" height="18" rx="4" fill="#B4BEC9"/>
+    <rect x="768" y="296" width="12" height="18" rx="4" fill="#B4BEC9"/>
+    <rect x="694" y="284" width="100" height="14" rx="7" fill="#C9D1DB"/>
+    <rect x="694" y="284" width="100" height="6" rx="3" fill="#E1E7EE"/>
+    <rect x="732" y="212" width="15" height="12" rx="4" fill="#D3DAE3"/>
+    <rect x="712" y="222" width="56" height="62" rx="12" fill="#F4F7FA" stroke="#D3DAE3" stroke-width="2.5"/>
+    <path d="M714 248h52v22a12 12 0 0 1-12 12h-28a12 12 0 0 1-12-12z" fill="#C81E1E"/>
+    <path d="M714 248h52v8h-52z" fill="#E04A4A"/>
+
+    <!-- ===== puesto libre ===== -->
+    <g opacity=".85">
+      <path d="M884 258 L894 176 Q895 167 904 167 L926 169 Q935 170 934 179 L928 258 Z" fill="#221A82"/>
+      <rect x="912" y="236" width="164" height="26" rx="11" fill="#221A82"/>
+      <rect x="918" y="241" width="152" height="11" rx="5" fill="#3A30B5" opacity=".5"/>
+      <rect x="930" y="262" width="17" height="34" rx="6" fill="#1B1470"/>
+      <rect x="1044" y="262" width="17" height="34" rx="6" fill="#1B1470"/>
+      <rect x="918" y="292" width="152" height="12" rx="6" fill="#221A82"/>
+      <rect x="952" y="212" width="130" height="15" rx="7" fill="#14958B"/>
+      <rect x="952" y="212" width="130" height="7" rx="3.5" fill="#1BB3A6"/>
+      <rect x="1104" y="206" width="10" height="92" rx="5" fill="#C9D1DB"/>
+      <rect x="1082" y="294" width="54" height="11" rx="5" fill="#B4BEC9"/>
+      <path d="M1098 206h22" stroke="#C9D1DB" stroke-width="8" stroke-linecap="round"/>
+    </g>
+  </svg>
+{%- endmacro %}
+
+{% macro ilu_antes() -%}
+<svg viewBox="0 0 400 300" role="img" aria-label="Ilustración: registro y control previo a la donación" xmlns="http://www.w3.org/2000/svg">
+      <rect width="400" height="300" fill="#FDF0F0"/>
+    <circle cx="336" cy="62" r="42" fill="#F7DEDE"/>
+    <path d="M0 236h400v64H0z" fill="#F8E6E6"/><path d="M0 236h400" stroke="#EED4D4" stroke-width="3"/>
+      <rect x="150" y="196" width="22" height="48" rx="10" fill="#25324A"/>
+      <rect x="180" y="196" width="22" height="48" rx="10" fill="#25324A"/>
+      <rect x="142" y="238" width="36" height="12" rx="6" fill="#1F2937"/>
+      <rect x="176" y="238" width="36" height="12" rx="6" fill="#1F2937"/>
+      <rect x="144" y="110" width="64" height="94" rx="24" fill="#0F766E"/>
+      <path d="M144 156a64 94 0 0 0 64 0v24a24 24 0 0 1-24 24h-16a24 24 0 0 1-24-24z" fill="#14958B" opacity=".5"/>
+      <circle cx="176" cy="86" r="23" fill="#E8B58C"/>
+      <path d="M176 63a23 23 0 0 1 22 16c-11 5-23 5-33 2-3-1-5-3-6-6a23 23 0 0 1 17-12z" fill="#2E2A3F"/>
+      <circle cx="187" cy="88" r="2.4" fill="#3A3247"/>
+      <rect x="204" y="132" width="19" height="62" rx="9" fill="#0F766E"/>
+      <rect x="216" y="150" width="46" height="58" rx="6" fill="#F4F7FA" stroke="#D3DAE3" stroke-width="3"/>
+      <rect x="228" y="143" width="22" height="10" rx="3" fill="#C9D1DB"/>
+      <path d="M226 168h26M226 180h18M226 192h22" stroke="#CDD6E0" stroke-width="5" stroke-linecap="round"/>
+      <circle cx="336" cy="62" r="17" fill="#FFFFFF"/>
+      <path d="M336 50s8 9 8 14a8 8 0 0 1-16 0c0-5 8-14 8-14z" fill="#C81E1E"/>
+    </svg>
+{%- endmacro %}
+
+{% macro ilu_durante() -%}
+<svg viewBox="0 0 400 300" role="img" aria-label="Ilustración: persona donando sangre en el sillón" xmlns="http://www.w3.org/2000/svg">
+    <rect width="400" height="300" fill="#FDF0F0"/>
+    <circle cx="336" cy="62" r="42" fill="#F7DEDE"/>
+    <path d="M0 236h400v64H0z" fill="#F8E6E6"/><path d="M0 236h400" stroke="#EED4D4" stroke-width="3"/>
+    <path d="M78 232 L86 152 Q87 144 95 144 L116 146 Q124 147 123 155 L118 232 Z" fill="#171063"/>
+    <rect x="104" y="212" width="150" height="24" rx="10" fill="#171063"/>
+    <rect x="110" y="217" width="138" height="10" rx="5" fill="#2A2199" opacity=".55"/>
+    <rect x="122" y="236" width="15" height="30" rx="6" fill="#120C61"/>
+    <rect x="228" y="236" width="15" height="30" rx="6" fill="#120C61"/>
+    <rect x="112" y="262" width="138" height="11" rx="5" fill="#171063"/>
+    <rect x="136" y="204" width="102" height="26" rx="13" fill="#41547A"/>
+    <rect x="224" y="218" width="25" height="42" rx="12" fill="#41547A"/>
+    <rect x="218" y="256" width="44" height="13" rx="6" fill="#25324A"/>
+    <g transform="rotate(-13 140 180)">
+      <rect x="114" y="140" width="62" height="88" rx="24" fill="#0F766E"/>
+      <path d="M114 184a62 88 0 0 0 62 0v20a24 24 0 0 1-24 24h-14a24 24 0 0 1-24-24z" fill="#14958B" opacity=".5"/>
+    </g>
+    <path d="M124 136h22v14h-22z" fill="#DCA57C"/>
+    <circle cx="133" cy="120" r="23" fill="#E8B58C"/>
+    <path d="M133 97a23 23 0 0 1 22 16c-11 5-23 5-33 2-3-1-5-3-6-6a23 23 0 0 1 17-12z" fill="#2E2A3F"/>
+    <circle cx="144" cy="122" r="2.4" fill="#3A3247"/>
+    <rect x="148" y="184" width="124" height="14" rx="7" fill="#0F766E"/>
+    <rect x="148" y="184" width="124" height="7" rx="3.5" fill="#14958B"/>
+    <path d="M154 158c6-4 15-2 19 5l10 17-21 4z" fill="#0F766E"/>
+    <rect x="174" y="166" width="86" height="21" rx="10" fill="#E8B58C"/>
+    <circle cx="264" cy="176" r="12" fill="#E8B58C"/>
+    <rect x="204" y="162" width="23" height="15" rx="5" fill="#F8FAFC" stroke="#D8DEE6" stroke-width="2"/>
+    <circle cx="215" cy="169" r="2.8" fill="#C81E1E"/>
+    <path d="M215 180c4 36 30 52 59 47 19-4 30-17 34-31" stroke="#C81E1E" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <rect x="292" y="266" width="11" height="16" rx="4" fill="#B4BEC9"/>
+    <rect x="344" y="266" width="11" height="16" rx="4" fill="#B4BEC9"/>
+    <rect x="282" y="254" width="84" height="13" rx="6" fill="#C9D1DB"/>
+    <rect x="282" y="254" width="84" height="6" rx="3" fill="#E1E7EE"/>
+    <rect x="314" y="192" width="14" height="11" rx="4" fill="#D3DAE3"/>
+    <rect x="296" y="201" width="50" height="54" rx="11" fill="#F4F7FA" stroke="#D3DAE3" stroke-width="2.5"/>
+    <path d="M298 224h46v19a11 11 0 0 1-11 11h-24a11 11 0 0 1-11-11z" fill="#C81E1E"/>
+    <path d="M298 224h46v7h-46z" fill="#E04A4A"/>
+  </svg>
+{%- endmacro %}
+
+{% macro ilu_despues() -%}
+<svg viewBox="0 0 400 300" role="img" aria-label="Ilustración: recuperación con un refrigerio después de donar" xmlns="http://www.w3.org/2000/svg">
+      <rect width="400" height="300" fill="#FDF0F0"/>
+    <circle cx="336" cy="62" r="42" fill="#F7DEDE"/>
+    <path d="M0 236h400v64H0z" fill="#F8E6E6"/><path d="M0 236h400" stroke="#EED4D4" stroke-width="3"/>
+      <rect x="112" y="150" width="17" height="62" rx="7" fill="#171063"/>
+      <rect x="112" y="206" width="104" height="15" rx="7" fill="#171063"/>
+      <rect x="124" y="221" width="14" height="26" rx="5" fill="#120C61"/>
+      <rect x="192" y="221" width="14" height="26" rx="5" fill="#120C61"/>
+      <rect x="150" y="204" width="86" height="26" rx="13" fill="#41547A"/>
+      <rect x="216" y="216" width="24" height="34" rx="11" fill="#41547A"/>
+      <rect x="212" y="242" width="42" height="13" rx="6" fill="#25324A"/>
+      <rect x="132" y="118" width="62" height="92" rx="24" fill="#0F766E"/>
+      <path d="M132 164a62 92 0 0 0 62 0v22a24 24 0 0 1-24 24h-14a24 24 0 0 1-24-24z" fill="#14958B" opacity=".5"/>
+      <circle cx="163" cy="94" r="23" fill="#E8B58C"/>
+      <path d="M163 71a23 23 0 0 1 22 16c-11 5-23 5-33 2-3-1-5-3-6-6a23 23 0 0 1 17-12z" fill="#2E2A3F"/>
+      <circle cx="174" cy="96" r="2.4" fill="#3A3247"/>
+      <rect x="188" y="140" width="46" height="19" rx="9" fill="#E8B58C"/>
+      <path d="M228 128h26v22a13 13 0 0 1-13 13 13 13 0 0 1-13-13z" fill="#F4F7FA" stroke="#D3DAE3" stroke-width="3"/>
+      <path d="M230 136h22v10h-22z" fill="#D9A441"/>
+      <path d="M256 134c7 0 10 4 10 8s-3 8-10 8" stroke="#D3DAE3" stroke-width="3" fill="none"/>
+      <rect x="286" y="196" width="76" height="12" rx="6" fill="#C9D1DB"/>
+      <rect x="294" y="208" width="11" height="30" rx="4" fill="#B4BEC9"/>
+      <rect x="344" y="208" width="11" height="30" rx="4" fill="#B4BEC9"/>
+      <rect x="300" y="156" width="26" height="40" rx="5" fill="#F4F7FA" stroke="#D3DAE3" stroke-width="3"/>
+      <path d="M302 172h22v18a5 5 0 0 1-5 5h-12a5 5 0 0 1-5-5z" fill="#D9A441"/>
+      <rect x="332" y="176" width="26" height="20" rx="5" fill="#EFE2C6" stroke="#DCCBA4" stroke-width="2.5"/>
+    </svg>
+{%- endmacro %}
+
+{% macro ilu_durante_recortada() -%}
+<svg preserveAspectRatio="xMidYMid slice" viewBox="0 0 400 300" role="img" aria-label="Ilustración: persona donando sangre en el sillón" xmlns="http://www.w3.org/2000/svg">
+    <rect width="400" height="300" fill="#FDF0F0"/>
+    <circle cx="336" cy="62" r="42" fill="#F7DEDE"/>
+    <path d="M0 236h400v64H0z" fill="#F8E6E6"/><path d="M0 236h400" stroke="#EED4D4" stroke-width="3"/>
+    <path d="M78 232 L86 152 Q87 144 95 144 L116 146 Q124 147 123 155 L118 232 Z" fill="#171063"/>
+    <rect x="104" y="212" width="150" height="24" rx="10" fill="#171063"/>
+    <rect x="110" y="217" width="138" height="10" rx="5" fill="#2A2199" opacity=".55"/>
+    <rect x="122" y="236" width="15" height="30" rx="6" fill="#120C61"/>
+    <rect x="228" y="236" width="15" height="30" rx="6" fill="#120C61"/>
+    <rect x="112" y="262" width="138" height="11" rx="5" fill="#171063"/>
+    <rect x="136" y="204" width="102" height="26" rx="13" fill="#41547A"/>
+    <rect x="224" y="218" width="25" height="42" rx="12" fill="#41547A"/>
+    <rect x="218" y="256" width="44" height="13" rx="6" fill="#25324A"/>
+    <g transform="rotate(-13 140 180)">
+      <rect x="114" y="140" width="62" height="88" rx="24" fill="#0F766E"/>
+      <path d="M114 184a62 88 0 0 0 62 0v20a24 24 0 0 1-24 24h-14a24 24 0 0 1-24-24z" fill="#14958B" opacity=".5"/>
+    </g>
+    <path d="M124 136h22v14h-22z" fill="#DCA57C"/>
+    <circle cx="133" cy="120" r="23" fill="#E8B58C"/>
+    <path d="M133 97a23 23 0 0 1 22 16c-11 5-23 5-33 2-3-1-5-3-6-6a23 23 0 0 1 17-12z" fill="#2E2A3F"/>
+    <circle cx="144" cy="122" r="2.4" fill="#3A3247"/>
+    <rect x="148" y="184" width="124" height="14" rx="7" fill="#0F766E"/>
+    <rect x="148" y="184" width="124" height="7" rx="3.5" fill="#14958B"/>
+    <path d="M154 158c6-4 15-2 19 5l10 17-21 4z" fill="#0F766E"/>
+    <rect x="174" y="166" width="86" height="21" rx="10" fill="#E8B58C"/>
+    <circle cx="264" cy="176" r="12" fill="#E8B58C"/>
+    <rect x="204" y="162" width="23" height="15" rx="5" fill="#F8FAFC" stroke="#D8DEE6" stroke-width="2"/>
+    <circle cx="215" cy="169" r="2.8" fill="#C81E1E"/>
+    <path d="M215 180c4 36 30 52 59 47 19-4 30-17 34-31" stroke="#C81E1E" stroke-width="4" fill="none" stroke-linecap="round"/>
+    <rect x="292" y="266" width="11" height="16" rx="4" fill="#B4BEC9"/>
+    <rect x="344" y="266" width="11" height="16" rx="4" fill="#B4BEC9"/>
+    <rect x="282" y="254" width="84" height="13" rx="6" fill="#C9D1DB"/>
+    <rect x="282" y="254" width="84" height="6" rx="3" fill="#E1E7EE"/>
+    <rect x="314" y="192" width="14" height="11" rx="4" fill="#D3DAE3"/>
+    <rect x="296" y="201" width="50" height="54" rx="11" fill="#F4F7FA" stroke="#D3DAE3" stroke-width="2.5"/>
+    <path d="M298 224h46v19a11 11 0 0 1-11 11h-24a11 11 0 0 1-11-11z" fill="#C81E1E"/>
+    <path d="M298 224h46v7h-46z" fill="#E04A4A"/>
+  </svg>
+{%- endmacro %}
+
+{% macro ilu_paso(k) -%}
+  {% if k == 'antes' %}{{ ilu_antes() }}
+  {% elif k == 'despues' %}{{ ilu_despues() }}
+  {% else %}{{ ilu_durante() }}{% endif %}
+{%- endmacro %}
