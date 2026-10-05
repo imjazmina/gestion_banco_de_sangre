@@ -21,7 +21,7 @@ from sqlalchemy import func, text
 
 from app import calendario
 from app.models import (db, Cita, HorarioDisponible, Notificacion,
-                        RegistroDiferimiento, Usuario)
+                        RegistroDiferimiento, Solicitud, Usuario)
 
 # Documento del usuario de servicio «Personal de turno». `cita.id_personal`
 # es NOT NULL y al reservar todavía no se sabe quién va a atender, así que
@@ -196,6 +196,14 @@ def franja_elegida(fecha, id_horario, ahora=None):
                  if f["id_horario"] == id_horario and f["libres"] > 0), None)
 
 
+def _solicitud_abierta(usuario):
+    """RN23: no se agenda una donación si el usuario tiene una solicitud abierta."""
+    return (Solicitud.query
+            .filter_by(id_solicitante=usuario.id_usuario,
+                       estado=Solicitud.PUBLICADA)
+            .first())
+
+
 def personal_de_turno():
     """
     El usuario de servicio que queda como responsable al reservar.
@@ -226,6 +234,8 @@ def crear(usuario, fecha, id_horario, tipo, id_solicitud=None):
     if diferimiento_vigente(usuario):
         raise ErrorAgenda("No podés agendar mientras tengas una condición "
                           "registrada por el personal de salud.")
+    if _solicitud_abierta(usuario):
+        raise ErrorAgenda("No podés agendar mientras tengas una solicitud abierta.")
     if cita_vigente(usuario):
         raise ErrorAgenda("Ya tenés una cita agendada. "
                           "Gestionala antes de crear otra.")
