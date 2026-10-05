@@ -1,10 +1,9 @@
 """
 Descubrimiento automático de blueprints.
 
-Cada módulo dentro de routes/portal/ y routes/admin/ que defina un Blueprint
-se registra solo. Nadie tiene que editar este archivo para agregar una
-pantalla, y por lo tanto nadie se pisa con la otra en el mismo archivo: cada
-pantalla nueva es un archivo nuevo en la carpeta de su módulo.
+Cada módulo dentro de routes/portal/, routes/licenciado/ y
+routes/jefatura/ que defina un Blueprint se registra solo. No hay módulo
+admin: el alta de usuarios internos (RF37) quedó fuera del prototipo.
 
 Para agregar una pantalla:
     1. Crear app/routes/<modulo>/mi_pantalla.py
@@ -18,7 +17,7 @@ from pathlib import Path
 from flask import Blueprint
 
 
-MODULOS = ("portal", "admin")
+MODULOS = ("portal", "licenciado", "jefatura")
 
 
 def _blueprints_de(paquete):
