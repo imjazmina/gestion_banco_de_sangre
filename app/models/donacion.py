@@ -289,6 +289,7 @@ class CitacionConsejeria(db.Model):
     id_resultado = db.Column(
         db.Integer, db.ForeignKey("resultado_laboratorio.id_resultado"),
         nullable=False, unique=True)
+    horario = db.relationship("HorarioDisponible", lazy="joined")
     fecha_hora = db.Column(db.DateTime)
     estado = db.Column(db.String(20), nullable=False, default="Pendiente")
     observaciones = db.Column(db.Text)
