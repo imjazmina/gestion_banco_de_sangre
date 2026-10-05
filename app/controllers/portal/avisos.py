@@ -47,7 +47,8 @@ def pendientes_de_cuestionario(ahora=None):
     ya_avisadas = {
         n.id_cita for n in Notificacion.query
         .filter(Notificacion.tipo == Notificacion.RECORDATORIO_CITA,
-                Notificacion.id_cita.isnot(None)).all()
+                Notificacion.id_cita.isnot(None),
+                Notificacion.mensaje.ilike("%cuestionario%")).all()
     }
 
     # La consulta filtra solo por estado: el día de la cita se calcula a
@@ -109,13 +110,81 @@ def enviar_cuestionario(cita, url_base):
     return True, ("enviado por correo" if salio else "escrito en la consola")
 
 
+def pendientes_de_recordatorio(ahora=None):
+    """Citas activas que empiezan dentro de un día y todavía no tienen recordatorio."""
+    ahora = ahora or datetime.now()
+    limite = ahora + timedelta(hours=24)
+    ya = {
+        n.id_cita for n in Notificacion.query
+        .filter(Notificacion.tipo == Notificacion.RECORDATORIO_CITA,
+                Notificacion.mensaje.ilike("Recordatorio:%")).all()
+    }
+    candidatas = Cita.query.filter(Cita.estado.in_(Cita.ACTIVAS)).all()
+    return [c for c in candidatas
+            if c.id_cita not in ya and c.momento is not None
+            and ahora <= c.momento <= limite]
+
+
+def enviar_recordatorio(cita):
+    hora = cita.horario.hora_inicio.strftime("%H:%M")
+    db.session.add(Notificacion(
+        id_usuario=cita.id_usuario,
+        id_cita=cita.id_cita,
+        tipo=Notificacion.RECORDATORIO_CITA,
+        mensaje=(f"Recordatorio: tenés una cita de donación "
+                 f"el {cita.fecha_cita.strftime('%d/%m/%Y')} a las {hora}."),
+        fecha_envio=datetime.now()))
+    db.session.commit()
+
+
+def pendientes_de_habilitacion(ahora=None):
+    """
+    Donantes cuyo diferimiento temporal ya venció, o cuyo intervalo desde
+    la última extracción ya se cumplió, y todavía no recibieron el aviso.
+    El texto no incluye la causa.
+    """
+    from app.controllers.portal.perfil import habilitacion
+    from app.models import RegistroDiferimiento, Usuario
+
+    ahora = ahora or datetime.now()
+    hoy = ahora.date()
+    ya = {n.id_usuario for n in Notificacion.query
+          .filter(Notificacion.tipo == Notificacion.HABILITACION,
+                  Notificacion.fecha_envio >= datetime.combine(hoy, datetime.min.time()))
+          .all()}
+    por_diferimiento = {
+        r.id_donante for r in RegistroDiferimiento.query
+        .filter(RegistroDiferimiento.fecha_fin == hoy).all()
+    }
+    listos = []
+    for usuario in Usuario.query.filter_by(estado=True, cuenta_suprimida=False).all():
+        if usuario.id_usuario in ya:
+            continue
+        if usuario.id_usuario in por_diferimiento:
+            listos.append(usuario)
+            continue
+        dato = habilitacion(usuario)
+        if dato["motivo"] == "intervalo" and dato["apto"] and dato["fecha"] == hoy:
+            listos.append(usuario)
+    return listos
+
+
+def enviar_habilitacion(usuario):
+    db.session.add(Notificacion(
+        id_usuario=usuario.id_usuario,
+        tipo=Notificacion.HABILITACION,
+        mensaje=("Ya podés consultar al banco de sangre para una nueva donación. "
+                 "La fecha es orientativa: la aptitud la confirma el personal."),
+        fecha_envio=datetime.now()))
+    db.session.commit()
+
+
 def correr(url_base, ahora=None):
     """Manda todos los avisos que correspondan. Devuelve las líneas del informe."""
+    lineas = []
     citas = pendientes_de_cuestionario(ahora)
     if not citas:
-        return ["No hay avisos para enviar en este momento."]
-
-    lineas = []
+        lineas.append("No hay cuestionarios para avisar en este momento.")
     for cita in citas:
         if ctrl_cuestionario.completo(cita):
             lineas.append(f"  cita {cita.id_cita}: ya tiene el cuestionario "
@@ -125,4 +194,11 @@ def correr(url_base, ahora=None):
         estado = "ok" if enviado else "FALLÓ"
         lineas.append(f"  cita {cita.id_cita} ({cita.donante.nombre_completo}, "
                       f"{cita.horario.hora_inicio.strftime('%H:%M')}): {estado} — {detalle}")
+
+    for cita in pendientes_de_recordatorio(ahora):
+        enviar_recordatorio(cita)
+        lineas.append(f"  recordatorio cita {cita.id_cita}")
+    for usuario in pendientes_de_habilitacion(ahora):
+        enviar_habilitacion(usuario)
+        lineas.append(f"  habilitación usuario {usuario.id_usuario}")
     return lineas
