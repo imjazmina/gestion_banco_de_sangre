@@ -1,0 +1,238 @@
+{% extends "comun/layout.html" %}
+{% from "comun/_ui.html" import crumb, btn %}
+
+{% block titulo %}Informes{% endblock %}
+
+{% macro caja(titulo, extra='') %}
+<div class="card chart {{ extra }}">
+  <h4>{{ titulo }}</h4>
+  <div class="chart-body">{{ caller() }}</div>
+</div>
+{% endmacro %}
+
+{% macro dona(gradiente, partes, centro='') %}
+<div class="donut-wrap">
+  <div class="donut" style="background:{{ gradiente }}">
+    <div class="donut-hole">{% if centro %}{{ centro }}{% endif %}</div>
+  </div>
+  <ul>
+    {% for p in partes %}
+    <li>
+      <i class="dot" style="background:{{ p.color }}"></i>
+      <span class="truncate">{{ p.label }}</span>
+      <b>{{ p.n }}</b>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endmacro %}
+
+{% macro columnas(filas, pocas=false) %}
+<div class="vbars{% if pocas %} few{% endif %}">
+  {% for r in filas %}
+  <div class="col">
+    <b>{{ r.n }}</b>
+    <i style="height:{{ r.alto }}%;background:{{ r.color }};{% if r.n > 0 %}min-height:2px;{% endif %}"></i>
+    <span class="truncate">{{ r.label }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro barras(filas, color, peligro=false, pct=false) %}
+<div class="hbars{% if filas|length > 6 %} tall{% endif %}">
+  {% for r in filas %}
+  <div class="hbar-row{% if pct %} pct{% endif %}">
+    <span class="truncate">{{ r.label }}</span>
+    <div class="track"><i style="width:{{ r.ancho }}%;background:{{ color }};"></i></div>
+    <b class="{% if peligro %}num-danger{% endif %}">{{ r.parte ~ '%' if pct else r.n }}</b>
+  </div>
+  {% endfor %}
+</div>
+{% endmacro %}
+
+{% macro reparto(partes) %}
+<div class="splitbar">
+  <div class="splitbar-track">
+    {% for p in partes %}
+    <i style="width:{{ p.parte }}%;background:{{ p.color }}" title="{{ p.label }}: {{ p.n }}"></i>
+    {% endfor %}
+  </div>
+  <div class="splitbar-leyenda">
+    {% for p in partes %}
+    <div>
+      <b style="color:{{ p.color }}">{{ p.n }}</b>
+      <span>{{ p.label }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endmacro %}
+
+{% macro linea(serie) %}
+<div class="line-chart">
+  <div class="line-y">
+    {% for m in serie.marcas %}
+    <span style="top:{{ m.y }}%">{{ m.n }}</span>
+    {% endfor %}
+  </div>
+  <div class="line-plot">
+    <svg viewBox="0 0 100 100" preserveAspectRatio="none">
+      {% for m in serie.marcas %}
+      <line x1="0" x2="100" y1="{{ m.y }}" y2="{{ m.y }}" stroke="#E5E7EB" stroke-width="1" vector-effect="non-scaling-stroke"/>
+      {% endfor %}
+      <polyline fill="none" stroke="#0F766E" stroke-width="2" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke" points="{{ serie.trazo }}"/>
+    </svg>
+    {% for p in serie.puntos %}
+    <span class="line-dot" style="left:{{ p.x }}%;top:{{ p.y }}%" title="{{ p.label }}: {{ p.n }}"></span>
+    {% endfor %}
+  </div>
+  <span></span>
+  <div class="line-x">
+    {% for p in serie.puntos %}<span>{{ p.label }}</span>{% endfor %}
+  </div>
+</div>
+{% endmacro %}
+
+{% block contenido %}
+<div class="page tight">
+  {{ crumb(url_for(volver_url), volver, 'Informes') }}
+  <div class="section-head">
+    <h1>Informes</h1>
+  </div>
+
+  <form method="get" class="card periodo" id="periodo-informe">
+    {% if tab %}<input type="hidden" name="tab" value="{{ tab }}">{% endif %}
+    <div class="field">
+      <label for="desde">Desde</label>
+      <input class="control" type="date" id="desde" name="desde" value="{{ datos.desde.isoformat() }}" required>
+    </div>
+    <div class="field">
+      <label for="hasta">Hasta</label>
+      <input class="control" type="date" id="hasta" name="hasta" value="{{ datos.hasta.isoformat() }}" required>
+    </div>
+    <button class="btn btn-primary btn-sm" type="submit">Consultar período</button>
+  </form>
+  {% if datos.error %}
+  <p class="inf-error">{{ datos.error }}</p>
+  {% endif %}
+  <p class="inf-pendiente" id="periodo-pendiente" hidden>
+    Hay un período sin aplicar. Los informes siguen mostrando {{ datos.periodo }}.
+  </p>
+
+  <nav class="tabs" aria-label="Informes">
+    {% for p in datos.pestanas %}
+    <a class="tab{% if tab == p.id %} active{% endif %}"
+       href="{{ url_for(request.endpoint, tab=p.id, desde=datos.desde.isoformat(), hasta=datos.hasta.isoformat()) }}">{{ p.nombre }}</a>
+    {% endfor %}
+  </nav>
+
+  <div class="informes-box">
+    <div class="informe-layout">
+      <div class="informe-body">
+
+        {% if tab == 'donaciones' %}
+        <div class="inf-grid donaciones">
+          <div class="card kpi span-2">
+            <b style="color:#0F766E">{{ datos.donaciones_n }}</b>
+            <span>Donaciones</span>
+          </div>
+          {% call caja('Colectas por tipo de donación', 'span-4') %}
+            {{ dona(datos.colectas_grad, datos.colectas) }}
+          {% endcall %}
+          {% call caja('Donantes por género', 'span-6') %}
+            {{ reparto(datos.generos) }}
+          {% endcall %}
+          {% call caja('Evolución de colectas por período', 'span-7') %}
+            {{ linea(datos.linea) }}
+          {% endcall %}
+          {% call caja('Donantes por rango de edad', 'span-5') %}
+            {{ columnas(datos.edades) }}
+          {% endcall %}
+        </div>
+
+        {% elif tab == 'diferimientos' %}
+        <div class="inf-grid diferimientos">
+          {% call caja('Proporción de personas diferidas', 'span-3') %}
+            {{ dona(datos.proporcion_grad, datos.proporcion, datos.proporcion_centro) }}
+          {% endcall %}
+          {% call caja('Diferimientos por motivo', 'span-6 lg-last') %}
+            {{ barras(datos.motivos, '#D97706') }}
+          {% endcall %}
+          {% call caja('Temporales vs. permanentes', 'span-3') %}
+            {{ columnas(datos.clasificacion, true) }}
+          {% endcall %}
+        </div>
+
+        {% elif tab == 'serologia' %}
+        <div class="inf-grid serologia">
+          <div class="card kpi span-3"><b style="color:#120C61">{{ datos.procesados }}</b><span>Volúmenes procesados</span></div>
+          <div class="card kpi span-3"><b style="color:#B91C1C">{{ datos.reactivos }}</b><span>Reactivos</span></div>
+          <div class="card kpi span-3"><b style="color:#059669">{{ datos.no_reactivos }}</b><span>No reactivos</span></div>
+          <div class="card kpi span-3"><b style="color:#D97706">{{ datos.investigacion }}</b><span>En investigación</span></div>
+          {% call caja('Detalle de resultados serológicos', 'span-12') %}
+            {{ barras(datos.serologia, '#D97706', true) }}
+          {% endcall %}
+        </div>
+
+        {% elif tab == 'hemovigilancia' %}
+        <div class="inf-grid hemo">
+          <div class="card kpi span-2"><b style="color:#120C61">{{ datos.extracciones }}</b><span>Extracciones</span></div>
+          <div class="card kpi span-2"><b style="color:#D97706">{{ datos.eventos }}</b><span>Eventos adversos</span></div>
+          {% call caja('Eventos por momento', 'span-4') %}
+            {{ columnas(datos.momentos, true) }}
+          {% endcall %}
+          {% call caja('Eventos por severidad', 'span-4') %}
+            {{ dona(datos.severidad_grad, datos.severidad) }}
+          {% endcall %}
+          {% call caja('Eventos adversos', 'span-12') %}
+            {{ barras(datos.tipos_evento, '#120C61') }}
+          {% endcall %}
+        </div>
+
+        {% elif tab == 'stock' %}
+        <div class="inf-grid stock">
+          <div class="stock-kpis">
+            <div class="card kpi"><b style="color:#0F766E">{{ datos.volumen }}</b><span>Volumen disponible</span></div>
+            <div class="card kpi"><b style="color:#D97706">{{ datos.por_vencer }}</b><span>Próximos a vencer</span></div>
+            <div class="card kpi"><b style="color:#120C61">{{ datos.atendidas }}</b><span>Solicitudes atendidas</span></div>
+            <div class="card kpi"><b style="color:#2563EB">{{ datos.pendientes }}</b><span>Solicitudes pendientes</span></div>
+          </div>
+          {% call caja('Estado de solicitudes', 'stock-donut') %}
+            {{ dona(datos.solicitudes_grad, datos.solicitudes, datos.solicitudes_centro) }}
+          {% endcall %}
+          {% call caja('Volumen por grupo sanguíneo', 'stock-grupos') %}
+            {{ barras(datos.stock, '#120C61', false, true) }}
+          {% endcall %}
+          {% call caja('Evolución del volumen', 'stock-evo') %}
+            {{ columnas(datos.volumen_mes) }}
+          {% endcall %}
+        </div>
+        {% endif %}
+
+      </div>
+      <div class="informe-actions">
+        {{ btn('Exportar informe', 'secondary', 'sm', url_for(exportar_url, tab=tab, desde=datos.desde.isoformat(), hasta=datos.hasta.isoformat()), 'download') }}
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  var form = document.getElementById("periodo-informe");
+  var aviso = document.getElementById("periodo-pendiente");
+  if (!form || !aviso) return;
+  var desde0 = form.desde.value;
+  var hasta0 = form.hasta.value;
+  function revisar() {
+    var cambio = form.desde.value !== desde0 || form.hasta.value !== hasta0;
+    aviso.hidden = !cambio;
+  }
+  form.desde.addEventListener("input", revisar);
+  form.hasta.addEventListener("input", revisar);
+})();
+</script>
+{% endblock %}

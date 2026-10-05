@@ -1,0 +1,28 @@
+{% extends "comun/layout.html" %}
+{% from "comun/_ui.html" import crumb %}
+
+{% block titulo %}Preselección{% endblock %}
+
+{% block contenido %}
+<div class="page">
+  {{ crumb(url_for('licenciado_inicio.inicio'), 'Inicio', 'Preselección') }}
+  <div class="section-head">
+    <h1>Donantes potencialmente compatibles</h1>
+    <p class="muted">Es una preselección por ABO/Rh. No se envía un aviso: el catálogo de notificaciones no tiene un tipo para esto. La compatibilidad definitiva no sale de esta lista.</p>
+  </div>
+  {% for solicitud, personas in grupos %}
+  <div class="card card-pad mb-4">
+    <h2>Solicitud {{ solicitud.id_solicitud }} · {{ solicitud.tipo_sangre.etiqueta }} · {{ solicitud.unidades_asignadas }}/{{ solicitud.unidades_requeridas }}</h2>
+    <ul>
+      {% for p in personas %}
+      <li><a href="{{ url_for('licenciado_ficha.ver', donor_id=p.id_usuario) }}">{{ p.nombre_completo }}</a> · {{ p.tipo_sangre.etiqueta }}</li>
+      {% else %}
+      <li class="muted">Nadie con grupo cargado es compatible, o todavía no hay tipificaciones.</li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% else %}
+  <p class="muted">No hay solicitudes publicadas.</p>
+  {% endfor %}
+</div>
+{% endblock %}

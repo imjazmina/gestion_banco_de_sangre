@@ -1,0 +1,58 @@
+{% extends "comun/layout.html" %}
+{% from "comun/_ui.html" import crumb, alerta %}
+
+{% block titulo %}Signos vitales{% endblock %}
+
+{% block contenido %}
+<div class="page">
+  {{ crumb(url_for('licenciado_ficha.ver', donor_id=cita.id_usuario, cita=cita.id_cita), 'Ficha', 'Signos') }}
+  <div class="section-head">
+    <h1>Signos vitales · {{ cita.donante.nombre_completo }}</h1>
+    <p class="muted">El personal carga el valor. Si es apto lo calcula la base, no esta pantalla.</p>
+  </div>
+
+  {% if mediciones %}
+  <div class="card card-pad mb-4">
+    <ul>
+      {% for m in mediciones %}
+      <li>{{ m.tipo.nombre }}: {{ m.valor }} {{ m.tipo.unidad }} — {{ 'apto' if m.apto else 'no apto' }}</li>
+      {% endfor %}
+    </ul>
+    {% if apto %}
+    {% call alerta('ok') %}Todas las mediciones están dentro del rango. Se puede extraer.{% endcall %}
+    {% else %}
+    {% call alerta('warn') %}Hay una medición fuera de rango. No se habilita la extracción.{% endcall %}
+    {% if sugeridas %}<p>Causas de catálogo que coinciden: {{ sugeridas|join(', ') }}.</p>{% endif %}
+    {% endif %}
+  </div>
+  {% else %}
+  <form method="post" class="card card-pad">
+    {% for t in tipos %}
+    <div class="field">
+      <label>{{ t.nombre }} ({{ t.unidad }}) · {{ t.valor_minimo }} a {{ t.valor_maximo }}</label>
+      <input class="control" name="{{ t.codigo }}" inputmode="decimal" required>
+    </div>
+    {% endfor %}
+    <button class="btn btn-primary" type="submit">Registrar signos</button>
+  </form>
+  {% endif %}
+
+  <form method="post" class="card card-pad mt-4">
+    <h2 class="kicker">Diferir por medición</h2>
+    <input type="hidden" name="accion" value="diferir">
+    <div class="field">
+      <label>Causa del catálogo</label>
+      <select class="control" name="id_diferimiento" required>
+        {% for c in causas %}
+        <option value="{{ c.id_diferimiento }}">{{ c.nombre }} · {{ c.tipo }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>Institución del diagnóstico</label>
+      <input class="control" name="institucion" value="{{ institucion }}">
+    </div>
+    <button class="btn btn-ghost" type="submit">Registrar diferimiento</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "comun/layout.html" %}
+{% from "comun/_ui.html" import crumb, alerta %}
+
+{% block titulo %}Extracción{% endblock %}
+
+{% block contenido %}
+<div class="page">
+  {{ crumb(url_for('licenciado_ficha.ver', donor_id=cita.id_usuario, cita=cita.id_cita), 'Ficha', 'Extracción') }}
+  <div class="section-head">
+    <h1>Extracción · {{ cita.donante.nombre_completo }}</h1>
+  </div>
+
+  {% if unidad %}
+  <div class="card card-pad">
+    {% call alerta('ok') %}
+      Unidad <strong class="mono">{{ unidad.codigo }}</strong> · {{ unidad.estado }}.
+      Extracción <span class="mono">{{ extraccion.codigo_unico }}</span>.
+    {% endcall %}
+    <p class="mt-3">{{ extraccion.observacion }}</p>
+    {% if unidad.estado == 'En laboratorio' %}
+    <form method="post" class="mt-4">
+      <input type="hidden" name="accion" value="simular">
+      <p class="muted">El resultado es sintético. No es un análisis del laboratorio del hospital.</p>
+      <button class="btn btn-primary" type="submit">Simular resultado de laboratorio</button>
+    </form>
+    {% endif %}
+  </div>
+  {% elif not apto %}
+  {% call alerta('warn') %}No se puede extraer: faltan mediciones o alguna no es apta.{% endcall %}
+  {% else %}
+  <form method="post" class="card card-pad">
+    <div class="field">
+      <label>Observación</label>
+      <textarea class="control" name="observacion" rows="3" placeholder="Sin incidentes. Si hubo lipotimia, escribilo acá."></textarea>
+    </div>
+    <p class="faint" style="font-size:12px;">El código de la unidad lo genera el servidor. Lote, bolsa y tabuladora no se guardan: no hay columnas y el hardware está fuera de alcance.</p>
+    <button class="btn btn-primary" type="submit">Registrar extracción</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

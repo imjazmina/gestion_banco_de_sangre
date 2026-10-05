@@ -1,0 +1,49 @@
+{% extends "comun/base.html" %}
+{% from "comun/_iconos.html" import ico %}
+{% from "comun/_ui.html" import alerta %}
+
+{% block titulo %}Acceso institucional{% endblock %}
+{% block cuerpo %}login-page{% endblock %}
+
+{% block body %}
+<div class="login">
+  <aside class="login-side">
+    <div class="mid">
+      <div class="logo-mark lg">{{ ico('droplet', 40) }}</div>
+      <h1>Sistema de gestión de Donantes del Hospital Regional de Luque</h1>
+    </div>
+    <p class="foot">Sistema de gestión — acceso restringido a personal autorizado del HRL.</p>
+  </aside>
+  <div class="login-main">
+    <div class="login-card">
+      <div class="only-mobile" style="align-items:center;gap:8px;margin-bottom:24px;">
+        <div class="logo-mark sm">{{ ico('droplet', 14) }}</div>
+        <strong style="color:var(--navy);font-size:14px;">Banco de Sangre HRL</strong>
+      </div>
+      <h2>Acceso institucional</h2>
+      <p class="muted" style="margin:0 0 24px;">Ingrese con su correo y contraseña del hospital.</p>
+      {% if error %}
+        <div class="mb-4">
+          {% call alerta('danger') %}{{ error }}{% endcall %}
+        </div>
+      {% endif %}
+      <form method="post" class="gap-3" id="form-ingreso">
+        <div class="field">
+          <label>Correo institucional<span class="req">*</span></label>
+          <input class="control" type="email" name="email" value="{{ email or '' }}" placeholder="usuario@hrl.gov.py" autocomplete="username" required>
+        </div>
+        <div class="field">
+          <label>Contraseña<span class="req">*</span></label>
+          <input class="control" type="password" name="contrasena" placeholder="••••••••" autocomplete="current-password" required>
+        </div>
+        <button class="btn btn-primary btn-block" type="submit" style="margin-top:8px;">Ingresar</button>
+      </form>
+      <p class="faint" style="font-size:12px;text-align:center;margin-top:24px;">
+        Cuentas de prototipo: <span style="color:var(--navy);">lic@hrl.gov.com</span>
+        · <span style="color:var(--navy);">jef@hrl.gov.com</span>
+        · contraseña <span style="color:var(--navy);">Banco2026</span>
+      </p>
+    </div>
+  </div>
+</div>
+{% endblock %}

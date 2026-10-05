@@ -1,0 +1,49 @@
+{% extends "comun/layout.html" %}
+{% from "comun/_ui.html" import badge_cita %}
+{% from "comun/_iconos.html" import ico %}
+
+{% block titulo %}Jefatura{% endblock %}
+
+{% block contenido %}
+<div class="page" style="min-height:100%;display:flex;flex-direction:column;">
+  <section class="mb-4">
+    <h2 class="kicker">Citaciones a consejería</h2>
+    <div class="card card-pad stack-lg">
+      {% if resumen %}
+      <div>
+        <div class="bar">
+          {% for r in resumen %}
+          <div style="width:{{ r.pct }}%;background:{{ r.color }};" title="{{ r.estado }}: {{ r.n }}"></div>
+          {% endfor %}
+        </div>
+        <div class="legend">
+          {% for r in resumen %}
+          <span><i class="dot" style="background:{{ r.color }};"></i> <span class="muted" style="font-size:12px;">{{ r.estado }}</span> <strong style="font-size:12px;">{{ r.n }}</strong></span>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+      {% if proxima %}
+      <a class="next" href="{{ url_for('jefatura_revision.ver', cita_id=proxima.id) }}">
+        <div class="when"><b>{{ proxima.hora }}</b><span>Pendiente</span></div>
+        <div style="min-width:0;flex:1;">
+          <p class="truncate" style="margin:0;font-weight:600;">{{ proxima.donante }}</p>
+          <p class="muted" style="margin:2px 0 0;font-size:12px;">CI {{ proxima.ci }}</p>
+          <div class="mt-3">{{ badge_cita(proxima.estado) }}</div>
+        </div>
+        {{ ico('chevron-right', 16) }}
+      </a>
+      {% else %}
+      <p class="muted">No hay citaciones pendientes. Aparecen cuando la simulación de laboratorio marca un resultado reactivo.</p>
+      {% endif %}
+      <a class="link" href="{{ url_for('jefatura_diferimientos.lista') }}">Ver citaciones {{ ico('chevron-right', 14) }}</a>
+      <a class="link" href="{{ url_for('jefatura_buzon.lista') }}">Buzón {{ ico('chevron-right', 14) }}</a>
+    </div>
+  </section>
+  {% set colectas = previa.colectas %}
+  {% set motivos = previa.motivos %}
+  {% set stock = previa.stock %}
+  {% set informes_endpoint = 'jefatura_informes.ver' %}
+  {% include "comun/_informes_preview.html" %}
+</div>
+{% endblock %}

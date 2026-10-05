@@ -1,0 +1,47 @@
+{% extends "comun/layout.html" %}
+{% from "comun/_ui.html" import crumb %}
+
+{% block titulo %}Parte B{% endblock %}
+
+{% block contenido %}
+<div class="page">
+  {{ crumb(url_for('licenciado_ficha.ver', donor_id=cita.id_usuario, cita=cita.id_cita), 'Ficha', 'Parte B') }}
+  <div class="section-head">
+    <h1>Parte B · {{ cita.donante.nombre_completo }}</h1>
+    <p class="muted">La responde el personal en sala. Una respuesta afirmativa no cierra la cita sola.</p>
+  </div>
+  <form method="post" class="card card-pad stack-lg">
+    {% for p in preguntas %}
+    {% set hecha = respuestas.get(p.id_pregunta) %}
+    <fieldset class="field">
+      <legend>{{ p.enunciado }}</legend>
+      <label><input type="radio" name="p{{ p.id_pregunta }}" value="Si" {% if hecha and hecha.valor == 'Si' %}checked{% endif %} required> Sí</label>
+      <label><input type="radio" name="p{{ p.id_pregunta }}" value="No" {% if hecha and hecha.valor == 'No' %}checked{% endif %}> No</label>
+      {% if p.preselecciona_exclusion %}<p class="faint" style="font-size:12px;margin:4px 0 0;">Un sí sugiere revisar diferimiento. No lo aplica solo.</p>{% endif %}
+    </fieldset>
+    {% else %}
+    <p>No hay preguntas de la parte B cargadas.</p>
+    {% endfor %}
+    <button class="btn btn-primary" type="submit">Guardar parte B</button>
+  </form>
+
+  <form method="post" class="card card-pad mt-4">
+    <h2 class="kicker">Diferir desde el cuestionario</h2>
+    <input type="hidden" name="accion" value="diferir">
+    <div class="field">
+      <label>Causa del catálogo</label>
+      <select class="control" name="id_diferimiento" required>
+        {% for c in causas %}
+        <option value="{{ c.id_diferimiento }}">{{ c.nombre }} · {{ c.tipo }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="field">
+      <label>Institución del diagnóstico</label>
+      <input class="control" name="institucion" value="{{ institucion }}">
+    </div>
+    <p class="faint" style="font-size:12px;">No hay un campo de motivo libre. La causa es la del catálogo. La cita pasa a No apto.</p>
+    <button class="btn btn-ghost" type="submit">Registrar diferimiento</button>
+  </form>
+</div>
+{% endblock %}

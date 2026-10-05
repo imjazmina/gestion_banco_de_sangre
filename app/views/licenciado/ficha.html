@@ -1,0 +1,77 @@
+{% extends "comun/layout.html" %}
+{% from "comun/_ui.html" import badge_cita, crumb %}
+{% from "comun/_iconos.html" import ico %}
+
+{% block titulo %}Ficha{% endblock %}
+
+{% block contenido %}
+<div class="page">
+  {{ crumb(url_for('licenciado_agendamientos.lista'), 'Agendamientos', 'Ficha') }}
+  <div class="section-head">
+    <h1>{{ donante.nombre_completo }}</h1>
+    <p class="muted">Documento {{ donante.documento }} · {{ donante.genero }}
+      {% if donante.tipo_sangre %} · {{ donante.tipo_sangre.etiqueta }}{% else %} · sin grupo confirmado{% endif %}
+    </p>
+  </div>
+
+  {% if cita_laboratorio %}
+  <p class="mb-4"><a class="btn btn-primary btn-sm" href="{{ url_for('licenciado_extraccion.ver', cita_id=cita_laboratorio.id_cita) }}">Simular resultado de laboratorio</a></p>
+  {% endif %}
+  {% if cita_abierta %}
+  <div class="row mb-4">
+    <a class="btn btn-primary btn-sm" href="{{ url_for('licenciado_cuestionario.ver', cita_id=cita_abierta.id_cita) }}">Parte B</a>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('licenciado_evaluacion.ver', cita_id=cita_abierta.id_cita) }}">Signos</a>
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('licenciado_extraccion.ver', cita_id=cita_abierta.id_cita) }}">Extracción</a>
+  </div>
+  {% endif %}
+
+  <div class="card card-pad mb-4">
+    <h2 class="kicker">Citas</h2>
+    <ul>
+      {% for c in citas %}
+      <li>{{ c.fecha_cita or '—' }} {{ c.horario.hora_inicio.strftime('%H:%M') }} · {{ c.tipo_cita }} · {{ badge_cita(c.estado) }}</li>
+      {% else %}<li class="muted">Sin citas.</li>{% endfor %}
+    </ul>
+  </div>
+
+  <div class="card card-pad mb-4">
+    <h2 class="kicker">Diferimientos</h2>
+    <ul>
+      {% for d in diferimientos %}
+      <li>{{ d.fecha_inicio }} · {{ d.causa.nombre }} · {{ d.causa.tipo }} · {{ d.origen }} · {{ d.institucion_diagnostico }}{% if d.fecha_fin %} · fin {{ d.fecha_fin }}{% endif %}</li>
+      {% else %}<li class="muted">Sin diferimientos.</li>{% endfor %}
+    </ul>
+  </div>
+
+  <div class="card card-pad mb-4">
+    <h2 class="kicker">Cuestionario y mediciones</h2>
+    <p>{{ cuestionarios|length }} respuestas de cuestionario · {{ mediciones|length }} mediciones.</p>
+    <ul>
+      {% for m in mediciones %}
+      <li>{{ m.tipo.nombre }}: {{ m.valor }} {{ m.tipo.unidad }} · {{ 'apto' if m.apto else 'no apto' }}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="card card-pad">
+    <h2 class="kicker">Unidades y trazabilidad</h2>
+    <p class="faint" style="font-size:12px;">La serología se ve solo en esta ficha.</p>
+    {% for u in unidades %}
+    <p><strong class="mono">{{ u.codigo }}</strong> · {{ u.estado }}{% if u.tipo_sangre_id is defined %}{% endif %}</p>
+    {% else %}<p class="muted">Sin unidades.</p>{% endfor %}
+    <ul>
+      {% for t in transiciones %}
+      <li>{{ t.fecha }} · unidad {{ t.id_unidad }} · {{ t.estado_origen }} → {{ t.estado_destino }}{% if t.motivo %} · {{ t.motivo }}{% endif %}</li>
+      {% endfor %}
+    </ul>
+    {% if resultados %}
+    <h3 class="kicker">Resultados simulados</h3>
+    <ul>
+      {% for r in resultados %}
+      <li>Unidad {{ r.id_unidad }} · {{ r.resultado }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

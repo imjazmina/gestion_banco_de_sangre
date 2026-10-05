@@ -1,0 +1,54 @@
+{% extends "comun/base.html" %}
+{% from "comun/_iconos.html" import ico %}
+
+{% block cuerpo %}{% block clase_cuerpo %}{% endblock %}{% endblock %}
+
+{% block body %}
+<div class="app">
+  <header class="topbar">
+    <div class="topbar-row">
+      <div class="brand">
+        {{ ico('droplet', 18) }}
+        <span class="truncate">Banco de Sangre</span>
+      </div>
+      <div class="spacer"></div>
+      {% if operador %}
+      <div class="user-menu" id="menu-usuario">
+        <button type="button" class="avatar-btn" aria-expanded="false" aria-haspopup="menu" aria-label="Menú de usuario">
+          <span class="avatar">{{ operador.iniciales }}</span>
+          {{ ico('chevron-down', 14) }}
+        </button>
+        <div class="menu-pop hidden" role="menu">
+          <div class="menu-id">
+            <strong>{{ operador.nombre }}</strong>
+            <span>{{ operador.titulo }}</span>
+            <span class="email">{{ operador.email }}</span>
+          </div>
+          <a class="menu-out" role="menuitem" href="{{ url_for(operador.salir) }}">
+            {{ ico('logout', 14) }} Cerrar sesión
+          </a>
+        </div>
+      </div>
+      {% endif %}
+    </div>
+    <div class="stripe" aria-hidden="true"></div>
+  </header>
+  <main class="main" id="principal">
+    {% with mensajes = get_flashed_messages(with_categories=true) %}
+      {% if mensajes %}
+      <div class="page" style="padding-bottom:0;">
+        {% for categoria, texto in mensajes %}
+        <div class="alert alert-{{ 'danger' if categoria == 'error' else 'ok' if categoria == 'ok' else 'info' }}" style="margin-bottom:8px;">
+          <div>{{ texto }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% endwith %}
+    {% block contenido %}{% endblock %}
+  </main>
+</div>
+<script src="{{ url_for('static', filename='js/comun/menu.js') }}"></script>
+<script src="{{ url_for('static', filename='js/comun/ui.js') }}"></script>
+{% block scripts %}{% endblock %}
+{% endblock %}

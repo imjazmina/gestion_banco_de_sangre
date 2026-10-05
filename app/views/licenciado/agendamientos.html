@@ -1,0 +1,53 @@
+{% extends "comun/layout.html" %}
+{% from "comun/_ui.html" import badge, badge_cita, btn, crumb %}
+{% from "comun/_iconos.html" import ico %}
+
+{% block titulo %}Agendamientos{% endblock %}
+
+{% block contenido %}
+<div class="page">
+  {{ crumb(url_for('licenciado_inicio.inicio'), 'Inicio', 'Agendamientos') }}
+  <div class="section-head"><h1>Agendamientos de hoy</h1></div>
+  <div class="row mb-4">
+    {{ badge(total ~ ' Total', 'info', 'sm') }}
+    {{ badge(pendientes ~ ' Por atender', 'warn', 'sm') }}
+    {{ badge(completadas ~ ' Completadas', 'ok', 'sm') }}
+    {{ badge(ausentes ~ ' Ausentes', 'danger', 'sm') }}
+    {{ badge(no_aptos ~ ' No apto', 'danger', 'sm') }}
+  </div>
+  <div class="table-wrap">
+    <div class="table-scroll">
+      <table class="grid">
+        <thead>
+          <tr>
+            <th>Hora</th><th>Nombre completo</th><th>Documento</th><th>Tipo</th><th>Estado</th><th>Acciones</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in citas %}
+          <tr>
+            <td><span class="hora">{{ ico('calendar', 12) }} {{ c.hora }}</span></td>
+            <td><strong>{{ c.donante }}</strong></td>
+            <td><span class="mono muted" style="font-size:12px;">{{ c.ci }}</span></td>
+            <td>{{ badge(c.tipo, 'gray') }}</td>
+            <td>{{ badge_cita(c.estado) }}</td>
+            <td>
+              <div class="row">
+                {{ btn('Abrir', 'teal', 'sm', url_for('licenciado_ficha.ver', donor_id=c.donorId, cita=c.id), 'eye') }}
+                {% if c.estado in ('Pendiente', 'Confirmada') %}
+                <form method="post" action="{{ url_for('licenciado_agendamientos.ausente', cita_id=c.id) }}">
+                  <button class="btn btn-ghost btn-sm" type="submit">{{ ico('user-x', 12) }} Ausente</button>
+                </form>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% else %}
+          <tr><td colspan="6" class="muted">No hay citas para hoy.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{% endblock %}
