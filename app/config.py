@@ -26,6 +26,7 @@ class Config:
     SQLALCHEMY_TRACK_MODIFICATIONS = False
 
     SCHEMA_SQL_PATH = BASE_DIR / "database" / "schema.sql"
+    CATALOGOS_SQL_PATH = BASE_DIR / "database" / "catalogos.sql"
 
     # ------------------------------------------------------------ correo
     # Si SMTP_HOST está vacío, la aplicación igual funciona: los correos se

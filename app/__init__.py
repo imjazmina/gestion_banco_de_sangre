@@ -7,7 +7,7 @@ from app.models import db
 from app.routes import registrar as registrar_blueprints
 
 
-def create_app(config_class=Config):
+def create_app(config_class=Config, inicializar=True):
     app = Flask(
         __name__,
         template_folder="views",
@@ -35,8 +35,9 @@ def create_app(config_class=Config):
         """
         return {"usuario": usuario_actual() if has_request_context() else None}
 
-    with app.app_context():
-        _inicializar_base_de_datos(app)
+    if inicializar:
+        with app.app_context():
+            _inicializar_base_de_datos(app)
 
     return app
 
@@ -59,7 +60,11 @@ def _registrar_errores(app):
 
 
 def _inicializar_base_de_datos(app):
-    """Conecta a PostgreSQL y aplica schema.sql solo si aún no hay tablas."""
+    """Aplica schema.sql si falta la estructura y catalogos.sql en cada arranque.
+
+    catalogos.sql es idempotente (ON CONFLICT / NOT EXISTS): volver a
+    levantarlo no duplica roles, donantes ni el resto de la maqueta.
+    """
     try:
         with db.engine.connect() as connection:
             connection.execute(text("SELECT 1"))
@@ -84,16 +89,25 @@ def _inicializar_base_de_datos(app):
 
     if tablas:
         print("Estructura de la BD ya existe; no se ejecuta schema.sql")
-        return
-
-    schema_path = app.config["SCHEMA_SQL_PATH"]
-    if not schema_path.is_file():
-        raise RuntimeError(
-            f"No se encontró {schema_path}. "
-            "Ese archivo es la fuente de verdad de la estructura."
+    else:
+        _ejecutar_sql(
+            app.config["SCHEMA_SQL_PATH"],
+            "Ese archivo es la fuente de verdad de la estructura.",
         )
+        print("Estructura aplicada desde database/schema.sql")
 
-    sql = schema_path.read_text(encoding="utf-8")
+    _ejecutar_sql(
+        app.config["CATALOGOS_SQL_PATH"],
+        "Ese archivo carga los catálogos y la maqueta sin duplicar filas.",
+    )
+    print("Datos aplicados desde database/catalogos.sql")
+
+
+def _ejecutar_sql(ruta, motivo):
+    if not ruta.is_file():
+        raise RuntimeError(f"No se encontró {ruta}. {motivo}")
+
+    sql = ruta.read_text(encoding="utf-8")
     raw_connection = db.engine.raw_connection()
     try:
         raw_connection.autocommit = True
@@ -101,5 +115,3 @@ def _inicializar_base_de_datos(app):
             cursor.execute(sql)
     finally:
         raw_connection.close()
-
-    print("Estructura aplicada desde database/schema.sql")
