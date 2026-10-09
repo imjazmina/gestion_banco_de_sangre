@@ -18,19 +18,12 @@ def responder(id_cita):
             ctrl.cita_para_avisar(id_cita, usuario)), "info")
         return redirect(url_for("mi_cita.ver"))
 
-    # Sin ?seccion= se entra por donde quedó: así el enlace del correo lleva
-    # directo al punto exacto, tanto la primera vez como al retomarlo.
-    pedida = request.args.get("seccion")
-    if pedida not in ctrl.SECCIONES:
-        pendiente = ctrl.seccion_pendiente(cita)
-        if pendiente is None:
-            return render_template("portal/cuestionario/listo.html",
-                                   cita=cita, **_resumen(cita))
-        return redirect(url_for("cuestionario.responder", id_cita=id_cita,
-                                seccion=pendiente))
+    if ctrl.completo(cita):
+        return render_template("portal/cuestionario/listo.html",
+                               cita=cita, **_resumen(cita))
 
     return render_template("portal/cuestionario/responder.html",
-                           **_paso(cita, pedida))
+                           **_paso(cita))
 
 
 @cuestionario_bp.post("/<int:id_cita>")
@@ -43,25 +36,16 @@ def guardar(id_cita):
             ctrl.cita_para_avisar(id_cita, usuario)), "info")
         return redirect(url_for("mi_cita.ver"))
 
-    seccion = request.form.get("seccion")
-    if seccion not in ctrl.SECCIONES:
-        return redirect(url_for("cuestionario.responder", id_cita=id_cita))
+    try:
+        ctrl.enviar(cita, usuario, request.form)
+    except ctrl.ErrorCuestionario as exc:
+        flash(str(exc), "error")
+        return render_template(
+            "portal/cuestionario/responder.html",
+            **_paso(cita, request.form, paso=len(ctrl.SECCIONES)))
 
-    errores = ctrl.guardar_seccion(cita, usuario, seccion, request.form)
-    if errores:
-        for e in errores[:4]:
-            flash(e, "error")
-        if len(errores) > 4:
-            flash(f"…y {len(errores) - 4} más.", "error")
-        return render_template("portal/cuestionario/responder.html",
-                               **_paso(cita, seccion, request.form))
-
-    siguiente = ctrl.seccion_pendiente(cita)
-    if siguiente is None:
-        flash("Cuestionario enviado. Gracias.", "ok")
-        return redirect(url_for("cuestionario.responder", id_cita=id_cita))
-    return redirect(url_for("cuestionario.responder", id_cita=id_cita,
-                            seccion=siguiente))
+    flash("Cuestionario enviado. Tu cita quedó confirmada.", "ok")
+    return redirect(url_for("cuestionario.responder", id_cita=id_cita))
 
 
 @cuestionario_bp.get("/<int:id_cita>/respuestas")
@@ -79,24 +63,19 @@ def ver(id_cita):
 
 
 # ------------------------------------------------------------- auxiliares
-def _paso(cita, seccion, formulario=None):
-    indice = ctrl.SECCIONES.index(seccion)
-    respondidas, total = ctrl.avance(cita)
+def _paso(cita, formulario=None, paso=1):
+    items = ctrl.preguntas()
     return {
         "cita": cita,
-        "seccion": seccion,
         "SECCIONES": ctrl.SECCIONES,
-        "paso": indice + 1,
+        "paso": paso,
         "pasos": len(ctrl.SECCIONES),
-        "preguntas": ctrl.preguntas(seccion),
-        "guardadas": ctrl.respuestas(cita),
+        "preguntas": items,
         "formulario": formulario,
-        "respondidas": respondidas,
-        "total": total,
+        "total": len(items),
     }
 
 
 def _resumen(cita):
     filas, atencion = ctrl.resumen(cita)
-    return {"filas": filas, "atencion": atencion,
-            "SECCIONES_LISTA": ctrl.SECCIONES}
+    return {"filas": filas, "atencion": atencion}

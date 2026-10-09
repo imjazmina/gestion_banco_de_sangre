@@ -31,11 +31,7 @@
     {% endif %}
 
     <div class="card" style="margin-top:18px;">
-      <div class="flex-between" style="margin-bottom:12px;">
-        <h2>Tus respuestas</h2>
-        <a class="btn btn-ghost btn-sm" href="{{ url_for('cuestionario.responder', id_cita=cita.id_cita,
-                                                         seccion=SECCIONES_LISTA[0]) }}">{{ ico('edit') }} Corregir</a>
-      </div>
+      <h2 style="margin-bottom:12px;">Tus respuestas</h2>
       <ul class="q-resumen">
         {% for p, valor, marcada in filas %}
         <li>
