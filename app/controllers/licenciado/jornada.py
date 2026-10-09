@@ -58,7 +58,7 @@ def etiqueta_tipo(tipo_cita):
 def citas_del_dia(hoy=None):
     """Citas cuya fecha calculada es hoy, salvo las canceladas."""
     hoy = hoy or date.today()
-    candidatas = Cita.query.filter(Cita.estado != Cita.CANCELADA).all()
+    candidatas = Cita.query.filter(Cita.estado != Cita.CANCELADA, Cita.estado != Cita.PENDIENTE).all()
     del_dia = [c for c in candidatas if c.fecha_cita == hoy]
     return sorted(del_dia, key=lambda c: c.horario.hora_inicio)
 

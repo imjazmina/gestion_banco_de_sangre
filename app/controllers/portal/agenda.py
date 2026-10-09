@@ -250,7 +250,7 @@ def crear(usuario, fecha, id_horario, tipo, id_solicitud=None):
                     id_personal=responsable.id_usuario,
                     id_horario=id_horario,
                     fecha_hora_creacion=datetime.now(),
-                    estado=Cita.CONFIRMADA)
+                    estado=Cita.PENDIENTE)
         db.session.add(cita)
         db.session.flush()
 
