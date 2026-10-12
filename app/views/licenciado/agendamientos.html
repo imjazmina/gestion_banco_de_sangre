@@ -7,34 +7,72 @@
 {% block contenido %}
 <div class="page">
   {{ crumb(url_for('licenciado_inicio.inicio'), 'Inicio', 'Agendamientos') }}
-  <div class="section-head"><h1>Agendamientos de hoy</h1></div>
+  <div class="section-head"><h1>Agendamientos</h1></div>
+
   <div class="row mb-4">
     {{ badge(total ~ ' Total', 'info', 'sm') }}
-    {{ badge(pendientes ~ ' Por atender', 'warn', 'sm') }}
+    {{ badge(pendientes ~ ' Pendientes', 'warn', 'sm') }}
     {{ badge(completadas ~ ' Completadas', 'ok', 'sm') }}
     {{ badge(ausentes ~ ' Ausentes', 'danger', 'sm') }}
     {{ badge(no_aptos ~ ' No apto', 'danger', 'sm') }}
   </div>
+
+  <form method="get" class="filters">
+    <span class="muted">{{ ico('filter', 14) }}</span>
+    <div class="grow-wide">
+      <select class="control" name="tipo" onchange="this.form.submit()">
+        <option value="">Todos los agendamientos</option>
+        {% for t in tipos %}
+        <option value="{{ t }}" {% if filtro_tipo == t %}selected{% endif %}>{{ t }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="grow">
+      <select class="control" name="estado" onchange="this.form.submit()">
+        <option value="">Todos los estados</option>
+        {% for e in estados %}
+        <option value="{{ e }}" {% if filtro_estado == e %}selected{% endif %}>{{ e }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    {% if filtro_tipo or filtro_estado %}
+    <a class="btn btn-ghost btn-sm" href="{{ url_for('licenciado_agendamientos.lista') }}">Limpiar</a>
+    {% endif %}
+  </form>
+
   <div class="table-wrap">
     <div class="table-scroll">
       <table class="grid">
         <thead>
           <tr>
-            <th>Hora</th><th>Nombre completo</th><th>Documento</th><th>Tipo</th><th>Estado</th><th>Acciones</th>
+            <th>Hora</th>
+            <th>Nombre completo</th>
+            <th>Cédula</th>
+            <th>Origen</th>
+            <th>Tipo</th>
+            <th>Estado</th>
+            <th>Acciones</th>
           </tr>
         </thead>
         <tbody>
           {% for c in citas %}
-          <tr>
+          <tr class="{{ 'zebra' if loop.index0 is odd }}">
             <td><span class="hora">{{ ico('calendar', 12) }} {{ c.hora }}</span></td>
-            <td><strong>{{ c.donante }}</strong></td>
-            <td><span class="mono muted" style="font-size:12px;">{{ c.ci }}</span></td>
-            <td>{{ badge(c.tipo, 'gray') }}</td>
+            <td><strong style="font-weight:500;">{{ c.donante }}</strong></td>
+            <td>
+              {% if c.ci %}<span class="mono muted" style="font-size:12px;">{{ c.ci }}</span>
+              {% else %}<span class="faint" style="font-size:12px;">—</span>{% endif %}
+            </td>
+            <td>{{ badge(c.origen, 'teal' if c.origen == 'Espontáneo' else 'gray') }}</td>
+            <td>
+              {% if c.tipoAgendamiento == 'Donación' %}{{ badge('Donación', 'gray') }}
+              {% else %}{{ badge('Extracción', 'teal') }}{% endif %}
+            </td>
             <td>{{ badge_cita(c.estado) }}</td>
             <td>
-              <div class="row">
+              <div class="row" style="flex-wrap:wrap;gap:6px;">
                 {{ btn('Abrir', 'teal', 'sm', url_for('licenciado_ficha.ver', donor_id=c.donorId, cita=c.id), 'eye') }}
-                {% if c.estado in ('Pendiente', 'Confirmada') %}
+                {% if c.estado in ('Pendiente', 'Confirmada') and c.origen == 'Agendada' %}
                 <form method="post" action="{{ url_for('licenciado_agendamientos.ausente', cita_id=c.id) }}">
                   <button class="btn btn-ghost btn-sm" type="submit">{{ ico('user-x', 12) }} Ausente</button>
                 </form>
@@ -43,7 +81,7 @@
             </td>
           </tr>
           {% else %}
-          <tr><td colspan="6" class="muted">No hay citas para hoy.</td></tr>
+          <tr><td colspan="7" class="empty">No hay atenciones con esos filtros.</td></tr>
           {% endfor %}
         </tbody>
       </table>

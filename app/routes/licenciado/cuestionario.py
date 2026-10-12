@@ -4,6 +4,7 @@ from flask import Blueprint, flash, redirect, request, url_for
 from app.controllers.comun.acceso import operador_actual, pintar, requiere
 from app.controllers.licenciado import jornada
 from app.controllers.licenciado.jornada import ErrorJornada
+from app.controllers.portal import cuestionario as parte_a
 from app.models import RegistroDiferimiento
 
 licenciado_cuestionario_bp = Blueprint(
@@ -23,9 +24,20 @@ def ver(cita_id):
     cita = _cita_o_volver(cita_id)
     if cita is None:
         return redirect(url_for("licenciado_agendamientos.lista"))
+    # Parte A: lo que el donante respondió en el portal. Solo lectura acá.
+    filas_a, atencion = parte_a.resumen(cita)
+    secciones_a = []
+    for seccion in parte_a.SECCIONES:
+        items = [(p, valor.split(" — ", 1), marcada)
+                 for p, valor, marcada in filas_a if p.seccion == seccion]
+        if items:
+            secciones_a.append((seccion, items))
     return pintar(
         "licenciado/cuestionario.html",
         cita=cita,
+        secciones_a=secciones_a,
+        atencion_a=atencion,
+        parte_a_completa=parte_a.completo(cita),
         preguntas=jornada.preguntas_parte_b(),
         respuestas=jornada.respuestas_de(cita),
         causas=jornada.catalogo_diferimientos(),

@@ -9,13 +9,29 @@ licenciado_agendamientos_bp = Blueprint(
     "licenciado_agendamientos", __name__, url_prefix="/licenciado")
 
 
+TIPOS_AGENDAMIENTO = ["Donación", "Extracción de compatibilidad"]
+ESTADOS = ["Pendiente", "Confirmada", "Completada", "Ausente", "No apto"]
+
+
 @licenciado_agendamientos_bp.get("/agendamientos")
 @requiere("lic", "licenciado_auth.ingresar")
 def lista():
-    citas = [jornada.fila(c) for c in jornada.citas_del_dia()]
+    citas = jornada.pendientes_primero(
+        [jornada.fila(c) for c in jornada.citas_del_dia()])
+    filtro_tipo = request.args.get("tipo", "")
+    filtro_estado = request.args.get("estado", "")
+    visibles = [
+        c for c in citas
+        if (not filtro_tipo or c["tipoAgendamiento"] == filtro_tipo)
+        and (not filtro_estado or c["estado"] == filtro_estado)
+    ]
     return pintar(
         "licenciado/agendamientos.html",
-        citas=citas,
+        citas=visibles,
+        tipos=TIPOS_AGENDAMIENTO,
+        estados=ESTADOS,
+        filtro_tipo=filtro_tipo,
+        filtro_estado=filtro_estado,
         total=len(citas),
         pendientes=sum(1 for c in citas if c["estado"] in ("Pendiente", "Confirmada")),
         completadas=sum(1 for c in citas if c["estado"] == "Completada"),

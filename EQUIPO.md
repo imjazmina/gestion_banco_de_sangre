@@ -1,4 +1,6 @@
-# Cómo trabajamos 
+# Cómo trabajamos
+
+El panel de personal está en `routes/licenciado/` y `routes/jefatura/`, no en `admin/`. RF37 (alta de usuarios internos) no se implementa. El resto de este archivo describe el acuerdo de trabajo original. 
 
 La idea de fondo: **no nos conectamos por código, nos conectamos por la base de
 datos.** Cuando el portal registra un usuario, escribe en la tabla `usuario`.

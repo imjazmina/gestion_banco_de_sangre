@@ -36,6 +36,7 @@ def _contexto(encontrado=None, diferimiento=None):
         previa=vista_previa(),
         encontrado=encontrado,
         diferimiento=diferimiento,
+        restriccion=jornada.restriccion_de(diferimiento),
     )
 
 

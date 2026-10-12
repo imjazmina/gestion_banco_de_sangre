@@ -63,6 +63,20 @@ def citas_del_dia(hoy=None):
     return sorted(del_dia, key=lambda c: c.horario.hora_inicio)
 
 
+HORA_ESPONTANEA = time(0, 1)
+
+
+def es_espontanea(cita):
+    """
+    `cita` no guarda el origen. La única marca que deja `abrir_espontanea`
+    es la hora de creación fija a las 00:01 del mismo día: eso no lo
+    produce ninguna reserva del portal.
+    """
+    creada = cita.fecha_hora_creacion
+    return (creada is not None and creada.time() == HORA_ESPONTANEA
+            and creada.date() == cita.fecha_cita)
+
+
 def fila(cita):
     """Datos que pinta la agenda. Los nombres siguen el valor del CHECK."""
     grupo = None
@@ -79,10 +93,15 @@ def fila(cita):
         "tipoAgendamiento": (
             "Extracción de compatibilidad"
             if cita.tipo_cita == Cita.COMPATIBILIDAD else "Donación"),
-        "origen": "Agendada",
+        "origen": "Espontáneo" if es_espontanea(cita) else "Agendada",
         "solicitudId": cita.id_solicitud or "",
         "grupo": grupo,
     }
+
+
+def pendientes_primero(filas):
+    """Las que faltan atender arriba; dentro de cada grupo, por hora."""
+    return sorted(filas, key=lambda f: (f["estado"] not in Cita.ACTIVAS, f["hora"]))
 
 
 def resumen_estados(citas, orden, colores):
@@ -372,7 +391,7 @@ def abrir_espontanea(donante, personal):
         id_usuario=donante.id_usuario,
         id_personal=personal.id_usuario,
         id_horario=elegida.id_horario,
-        fecha_hora_creacion=datetime.combine(hoy, time(0, 1)),
+        fecha_hora_creacion=datetime.combine(hoy, HORA_ESPONTANEA),
         estado=Cita.CONFIRMADA,
     )
     db.session.add(cita)
@@ -385,6 +404,51 @@ def abrir_espontanea(donante, personal):
     ))
     _commit()
     return cita
+
+
+def edad_de(donante, hoy=None):
+    hoy = hoy or date.today()
+    nacio = donante.fecha_nacimiento
+    if nacio is None:
+        return None
+    return hoy.year - nacio.year - ((hoy.month, hoy.day) < (nacio.month, nacio.day))
+
+
+def restriccion_de(registro):
+    """
+    Cómo se muestra un diferimiento vigente: `externo` si el diagnóstico es
+    de otra institución, si no el tipo del catálogo. Es solo presentación.
+    """
+    if registro is None:
+        return "ninguna"
+    if registro.institucion_diagnostico != INSTITUCION_LOCAL:
+        return "externo"
+    if registro.causa.tipo == Diferimiento.PERMANENTE:
+        return "permanente"
+    return "temporal"
+
+
+def historial(citas, diferimientos):
+    """
+    Una fila por cita cerrada, con la causa del diferimiento si esa cita
+    terminó en No apto. La institución es siempre la local: las citas se
+    atienden acá. Los diferimientos externos no tienen cita y van aparte.
+    """
+    causa_por_cita = {d.id_cita: d for d in diferimientos if d.id_cita}
+    filas = []
+    for cita in citas:
+        if cita.estado in Cita.ACTIVAS:
+            continue
+        registro = causa_por_cita.get(cita.id_cita)
+        filas.append({
+            "fecha": cita.fecha_cita,
+            "tipo": etiqueta_tipo(cita.tipo_cita),
+            "estado": cita.estado,
+            "institucion": INSTITUCION_LOCAL,
+            "causa": registro.causa.nombre if registro else None,
+        })
+    filas.sort(key=lambda f: f["fecha"] or date.min, reverse=True)
+    return filas
 
 
 def ficha(id_usuario):
@@ -402,6 +466,9 @@ def ficha(id_usuario):
                      .filter_by(id_donante=id_usuario)
                      .order_by(RegistroDiferimiento.fecha_inicio.desc())
                      .all())
+    vigente = diferimiento_vigente(donante)
+    completadas = [c for c in citas if c.estado == Cita.COMPLETADA]
+    fechas_completadas = [c.fecha_cita for c in completadas if c.fecha_cita]
     unidades = Unidad.query.filter_by(id_donante=id_usuario).all()
     transiciones = []
     resultados = []
@@ -426,9 +493,15 @@ def ficha(id_usuario):
             break
     return {
         "donante": donante,
+        "edad": edad_de(donante),
         "cita_abierta": abierta,
         "cita_laboratorio": cita_laboratorio,
         "citas": citas,
+        "historial": historial(citas, diferimientos),
+        "total_donaciones": len(completadas),
+        "ultima_donacion": max(fechas_completadas) if fechas_completadas else None,
+        "vigente": vigente,
+        "restriccion": restriccion_de(vigente),
         "diferimientos": diferimientos,
         "unidades": unidades,
         "transiciones": transiciones,
