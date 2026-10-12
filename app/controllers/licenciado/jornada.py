@@ -461,7 +461,9 @@ def ficha(id_usuario):
     citas = (Cita.query
              .filter_by(id_usuario=id_usuario)
              .order_by(Cita.fecha_hora_creacion.desc())
-             .all())
+             .filter(Cita.estado.in_([Cita.COMPLETADA, Cita.NO_APTO]))
+             .all()
+            )
     diferimientos = (RegistroDiferimiento.query
                      .filter_by(id_donante=id_usuario)
                      .order_by(RegistroDiferimiento.fecha_inicio.desc())
