@@ -1,0 +1,178 @@
+{% extends "comun/layout.html" %}
+{% from "comun/_ui.html" import badge, badge_cita, badge_tipo, crumb, alerta, btn %}
+{% from "comun/_iconos.html" import ico %}
+
+{% block titulo %}Ficha del donante{% endblock %}
+
+{% block contenido %}
+{% set es_ausente = cita_actual is not none and cita_actual.estado == 'Ausente' %}
+{% set id_cita_flujo = cita_abierta.id_cita if cita_abierta else none %}
+<div class="page">
+  {{ crumb(volver_url, volver_texto, 'Ficha del donante') }}
+
+  {% if vigente %}
+  <div class="mb-4">
+    {% if restriccion == 'externo' %}
+      {% call alerta('info', 'Diferimiento en otra institución') %}
+        {{ vigente.institucion_diagnostico }} · desde {{ vigente.fecha_inicio.strftime('%d/%m/%Y') }}. La extracción no puede realizarse; corresponde derivar a la institución de origen.
+      {% endcall %}
+    {% elif restriccion == 'permanente' %}
+      {% call alerta('danger', vigente.causa.nombre) %}
+        Diferimiento permanente · Fecha de inicio {{ vigente.fecha_inicio.strftime('%d/%m/%Y') }}. La extracción no puede realizarse.
+      {% endcall %}
+    {% else %}
+      {% call alerta('warn', vigente.causa.nombre) %}
+        Fecha de inicio {{ vigente.fecha_inicio.strftime('%d/%m/%Y') }}{% if vigente.fecha_fin %} · Fecha de fin {{ vigente.fecha_fin.strftime('%d/%m/%Y') }}{% endif %}
+      {% endcall %}
+    {% endif %}
+  </div>
+  {% endif %}
+
+  {% if es_ausente %}
+  <div class="mb-4">
+    {% call alerta('warn', 'Cita ausente') %}
+      El donante no se presentó al turno. La atención no puede continuar.
+    {% endcall %}
+  </div>
+  {% endif %}
+
+  <div class="card card-pad mb-4">
+    <div class="person" style="align-items:flex-start;gap:16px;">
+      <div class="person-ico lg">{{ ico('user', 22) }}</div>
+      <div style="min-width:0;">
+        <h1 style="margin:0;font-size:22px;font-weight:600;">{{ donante.nombre_completo }}</h1>
+        <div class="row" style="margin-top:4px;gap:12px;">
+          <span class="muted">CI {{ donante.documento }}</span>
+          {% if edad is not none %}<span style="color:var(--line);">|</span><span class="muted">{{ edad }} años</span>{% endif %}
+          {% if donante.tipo_sangre %}<span style="color:var(--line);">|</span>{{ badge(donante.tipo_sangre.etiqueta, 'navy') }}{% endif %}
+          {% if es_ausente %}{{ badge_cita('Ausente') }}{% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <div class="tabs">
+      <button type="button" class="tab active" data-tab="datos">Datos</button>
+      <button type="button" class="tab" data-tab="historial">Historial</button>
+      <button type="button" class="tab" data-tab="unidades">Unidades</button>
+    </div>
+
+    <div class="tab-panel" data-panel="datos">
+      <div class="data-grid">
+        <div>
+          <p class="data-label">Cédula de identidad</p>
+          <p class="data-value mono">{{ donante.documento }}</p>
+        </div>
+        <div>
+          <p class="data-label">Fecha de nacimiento</p>
+          <p class="data-value">{{ donante.fecha_nacimiento.strftime('%d/%m/%Y') }}</p>
+        </div>
+        <div>
+          <p class="data-label">Sexo</p>
+          <p class="data-value">{{ donante.genero }}</p>
+        </div>
+        <div>
+          <p class="data-label">Teléfono</p>
+          <p class="data-value">{{ donante.telefono_principal.numero if donante.telefono_principal else '—' }}</p>
+        </div>
+        <div>
+          <p class="data-label">Correo electrónico</p>
+          <p class="data-value">{{ donante.correo_principal.direccion if donante.correo_principal else '—' }}</p>
+        </div>
+        <div>
+          <p class="data-label">Grupo sanguíneo</p>
+          <p class="data-value">{% if donante.tipo_sangre %}{{ donante.tipo_sangre.etiqueta }}{% else %}<span class="faint">Sin confirmar por laboratorio</span>{% endif %}</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="tab-panel hidden" data-panel="historial">
+      <div class="card-pad">
+        <div class="stats">
+          <div class="num"><b>{{ total_donaciones }}</b><span>Donaciones totales</span></div>
+          {% if ultima_donacion %}
+          <div class="side">
+            <p style="margin:0;font-weight:500;">{{ ultima_donacion.strftime('%d/%m/%Y') }}</p>
+            <span>Última donación</span>
+          </div>
+          {% endif %}
+        </div>
+        {% if historial %}
+        <div class="table-scroll">
+          <table class="grid">
+            <thead>
+              <tr><th>Fecha</th><th>Tipo</th><th>Estado</th><th>Institución de origen</th><th>Diferimiento</th></tr>
+            </thead>
+            <tbody>
+              {% for h in historial %}
+              <tr class="{{ 'zebra' if loop.index0 is odd }}">
+                <td><span class="mono" style="font-size:12px;">{{ h.fecha.strftime('%d/%m/%Y') if h.fecha else '—' }}</span></td>
+                <td>{{ badge_tipo(h.tipo) }}</td>
+                <td>{{ badge_cita(h.estado) }}</td>
+                <td><span style="font-size:12px;">{{ h.institucion }}</span></td>
+                <td>{% if h.causa %}<span style="font-size:12px;">{{ h.causa }}</span>{% else %}<span class="faint" style="font-size:12px;">—</span>{% endif %}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="faint" style="text-align:center;padding:24px 0;margin:0;">Sin historial registrado.</p>
+        {% endif %}
+
+        {% set externos = diferimientos|rejectattr('id_cita')|list %}
+        {% if externos %}
+        <h3 class="kicker" style="margin-top:20px;">Diferimientos sin cita en este banco</h3>
+        <div class="stack">
+          {% for d in externos %}
+          <div class="summary">
+            <p style="margin:0;font-weight:500;">{{ d.causa.nombre }} {{ badge(d.causa.tipo, 'danger' if d.causa.tipo == 'Permanente' else 'warn') }}</p>
+            <p class="muted" style="margin:4px 0 0;font-size:12px;">{{ d.institucion_diagnostico }} · Inicio {{ d.fecha_inicio.strftime('%d/%m/%Y') }}{% if d.fecha_fin %} · Fin {{ d.fecha_fin.strftime('%d/%m/%Y') }}{% endif %}</p>
+          </div>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <div class="tab-panel hidden" data-panel="unidades">
+      <div class="card-pad stack">
+        <p class="faint" style="font-size:12px;margin:0;">La serología se ve solo en esta ficha. No se envía al portal del donante.</p>
+        {% for u in unidades %}
+        <div class="summary">
+          <div class="split">
+            <strong class="mono">{{ u.codigo }}</strong>
+            {{ badge(u.estado, {'Registrada':'gray','En laboratorio':'info','En stock':'ok','Asignada':'navy','Utilizada':'gray','Descartada':'danger','Vencida':'danger'}.get(u.estado, 'gray')) }}
+          </div>
+          {% set trans = transiciones|selectattr('id_unidad', 'equalto', u.id_unidad)|list %}
+          {% if trans %}
+          <ul style="margin:8px 0 0;padding-left:16px;font-size:12px;color:var(--ink-2);">
+            {% for t in trans %}
+            <li>{{ t.fecha.strftime('%d/%m/%Y %H:%M') }} · {{ t.estado_origen }} → {{ t.estado_destino }}{% if t.motivo %} · {{ t.motivo }}{% endif %}</li>
+            {% endfor %}
+          </ul>
+          {% endif %}
+          {% for r in resultados if r.id_unidad == u.id_unidad %}
+          <p style="margin:8px 0 0;font-size:12px;">Resultado simulado: {{ badge(r.resultado, 'danger' if r.resultado == 'Reactivo' else 'ok') }}</p>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="faint" style="text-align:center;padding:24px 0;margin:0;">Sin unidades.</p>
+        {% endfor %}
+        {% if cita_laboratorio %}
+        <div>
+          {{ btn('Simular resultado de laboratorio', 'secondary', 'sm', url_for('licenciado_extraccion.ver', cita_id=cita_laboratorio.id_cita), 'flask') }}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {% if cita_abierta and not es_ausente %}
+  <div class="row-end mt-4">
+    {{ btn('Evaluar donante', 'teal', 'md', url_for('licenciado_cuestionario.ver', cita_id=id_cita_flujo), 'activity') }}
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

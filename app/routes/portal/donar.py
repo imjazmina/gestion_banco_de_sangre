@@ -29,6 +29,7 @@ def agendar():
 
     # Con un diferimiento vigente no se agenda. Se avisa sin decir la causa.
     diferimiento = agenda.diferimiento_vigente(usuario)
+    solicitud_abierta = agenda._solicitud_abierta(usuario)
 
     fecha = agenda.parsear_fecha(request.args.get("fecha"))
     dias = agenda.dias(fecha)
@@ -66,6 +67,7 @@ def agendar():
     return render_template(
         "portal/donar.html",
         diferimiento=diferimiento,
+        solicitud_abierta=solicitud_abierta,
         dias=dias, fecha=fecha,
         franjas=franjas, sin_horarios=sin_horarios, horario=horario,
         tipos=agenda.TIPOS, tipo=tipo,
@@ -89,6 +91,9 @@ def confirmar():
     if agenda.diferimiento_vigente(usuario):
         flash("No podés agendar una cita en este momento. "
               "Comunicate con el banco de sangre.", "error")
+        return redirect(url_for("donar.agendar"))
+    if agenda._solicitud_abierta(usuario):
+        flash("No podés agendar mientras tengas una solicitud abierta.", "error")
         return redirect(url_for("donar.agendar"))
 
     fecha = agenda.parsear_fecha(request.form.get("fecha"))

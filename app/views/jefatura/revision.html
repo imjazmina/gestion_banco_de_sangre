@@ -1,0 +1,45 @@
+{% extends "comun/layout.html" %}
+{% from "comun/_ui.html" import crumb, alerta, badge_cita %}
+
+{% block titulo %}Citación{% endblock %}
+
+{% block contenido %}
+<div class="page">
+  {{ crumb(url_for('jefatura_diferimientos.lista'), 'Citaciones', 'Revisión') }}
+  <div class="section-head">
+    <h1>{{ donante.nombre_completo }}</h1>
+    <p>Documento {{ donante.documento }} · {{ badge_cita(citacion.estado) }}</p>
+  </div>
+  {% call alerta('info') %}La citación que ve el donante es genérica. El resultado no se le envía por la plataforma.{% endcall %}
+
+  {% if registro %}
+  <div class="card card-pad mt-4">
+    <p>Diferimiento: {{ registro.causa.nombre }} · {{ registro.institucion_diagnostico }}</p>
+  </div>
+  {% endif %}
+
+  {% if citacion.estado == 'Pendiente' %}
+  <form method="post" class="row mt-4">
+    <button class="btn btn-primary" name="estado" value="Realizada" type="submit">Marcar realizada</button>
+    <button class="btn btn-ghost" name="estado" value="Ausente" type="submit">Marcar ausente</button>
+  </form>
+  {% endif %}
+
+  {% if puede_derivar %}
+  <form method="post" class="card card-pad mt-4">
+    <h2 class="kicker">Derivación</h2>
+    <p class="muted">El diagnóstico no es de este banco. No hay integración con el otro establecimiento.</p>
+    <input type="hidden" name="accion" value="derivar">
+    <div class="field">
+      <label>Establecimiento de destino</label>
+      <input class="control" name="establecimiento" required>
+    </div>
+    <div class="field">
+      <label>Motivo interno</label>
+      <textarea class="control" name="motivo" rows="3"></textarea>
+    </div>
+    <button class="btn btn-primary" type="submit">Registrar derivación</button>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}

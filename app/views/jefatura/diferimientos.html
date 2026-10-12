@@ -1,0 +1,39 @@
+{% extends "comun/layout.html" %}
+{% from "comun/_ui.html" import badge, badge_cita, btn, crumb %}
+{% from "comun/_iconos.html" import ico %}
+
+{% block titulo %}Citaciones{% endblock %}
+
+{% block contenido %}
+<div class="page">
+  {{ crumb(url_for('jefatura_inicio.inicio'), 'Inicio', 'Citaciones') }}
+  <div class="section-head">
+    <h1>Citaciones a consejería</h1>
+    <p class="muted">El aviso al donante no incluye el resultado ni la causa.</p>
+  </div>
+  <div class="row mb-4">
+    {{ badge(total ~ ' Total', 'info', 'sm') }}
+    {{ badge(pendientes ~ ' Pendientes', 'warn', 'sm') }}
+    {{ badge(realizadas ~ ' Realizadas', 'ok', 'sm') }}
+    {{ badge(ausentes ~ ' Ausentes', 'danger', 'sm') }}
+  </div>
+  <div class="table-wrap">
+    <table class="grid">
+      <thead><tr><th>Hora</th><th>Nombre</th><th>Documento</th><th>Estado</th><th></th></tr></thead>
+      <tbody>
+        {% for c in citas %}
+        <tr>
+          <td>{{ c.hora }}</td>
+          <td>{{ c.donante }}</td>
+          <td class="mono">{{ c.ci }}</td>
+          <td>{{ badge_cita(c.estado) }}</td>
+          <td>{{ btn('Abrir', 'teal', 'sm', url_for('jefatura_revision.ver', cita_id=c.id), 'eye') }}</td>
+        </tr>
+        {% else %}
+        <tr><td colspan="5" class="muted">No hay citaciones.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

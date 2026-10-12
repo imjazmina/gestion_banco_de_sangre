@@ -1,0 +1,55 @@
+{% extends "comun/layout.html" %}
+{% from "comun/_ui.html" import crumb, badge, badge_solicitud, btn %}
+{% from "comun/_iconos.html" import ico %}
+
+{% block titulo %}Preselección{% endblock %}
+
+{% block contenido %}
+<div class="page">
+  {{ crumb(url_for('licenciado_inicio.inicio'), 'Inicio', 'Preselección') }}
+  <div class="section-head">
+    <div>
+      <h1>Donantes potencialmente compatibles</h1>
+      <p>Preselección por ABO/Rh. No se envía un aviso: el catálogo de notificaciones no tiene un tipo para esto. La compatibilidad definitiva no sale de esta lista.</p>
+    </div>
+  </div>
+
+  <div class="stack" style="gap:16px;">
+    {% for solicitud, personas in grupos %}
+    <div class="card">
+      <div class="split" style="padding:14px 20px;border-bottom:1px solid var(--line);">
+        <div class="row">
+          <strong>Solicitud {{ solicitud.id_solicitud }}</strong>
+          {{ badge(solicitud.tipo_sangre.etiqueta, 'navy') }}
+          {{ badge_solicitud(solicitud.estado) }}
+        </div>
+        <span class="muted" style="font-size:12px;">{{ solicitud.unidades_asignadas }}/{{ solicitud.unidades_requeridas }} unidades</span>
+      </div>
+      {% if personas %}
+      <div class="table-scroll">
+        <table class="grid">
+          <thead><tr><th>Nombre completo</th><th>Cédula</th><th>Grupo</th><th></th></tr></thead>
+          <tbody>
+            {% for p in personas %}
+            <tr class="{{ 'zebra' if loop.index0 is odd }}">
+              <td><span style="font-weight:500;">{{ p.nombre_completo }}</span></td>
+              <td><span class="mono muted" style="font-size:12px;">{{ p.documento }}</span></td>
+              <td>{{ badge(p.tipo_sangre.etiqueta, 'teal') }}</td>
+              <td style="text-align:right;">{{ btn('Ver ficha', 'ghost', 'sm', url_for('licenciado_ficha.ver', donor_id=p.id_usuario, de='inicio'), 'eye') }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% else %}
+      <p class="faint" style="margin:0;padding:24px;text-align:center;">Nadie con grupo cargado es compatible, o todavía no hay tipificaciones.</p>
+      {% endif %}
+    </div>
+    {% else %}
+    <div class="card card-pad">
+      <p class="muted" style="margin:0;">No hay solicitudes publicadas.</p>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endblock %}

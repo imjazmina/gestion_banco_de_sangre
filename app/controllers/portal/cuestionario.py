@@ -2,9 +2,11 @@
 Cuestionario previo a la donación.
 
 Son 36 preguntas: en una sola pantalla de celular no se responden, así que
-van en tres pasos, uno por bloque del formulario original. Cada paso se
-guarda al pasar al siguiente, de modo que si se corta la conexión o se
-cierra el navegador no hay que empezar de nuevo.
+la pantalla las muestra en tres pasos, uno por bloque del formulario
+original. Esos pasos solo cambian de vista. Las respuestas viven en el
+formulario hasta que la persona aprieta «Enviar cuestionario»: ahí se
+validan las 36 y se insertan juntas. Si algo falla, no queda nada escrito
+y la cita no pasa a confirmada.
 
 La tabla `pregunta` guarda el enunciado y poco más; el bloque, el número y
 la aclaración que piden algunas viven en preguntas.py y se emparejan por el
@@ -17,6 +19,8 @@ decide en el momento, que es como tiene que ser.
 """
 from collections import namedtuple
 from datetime import date, datetime
+
+from flask import current_app
 
 from app.controllers.portal import preguntas as catalogo
 from app.models import Cita, Cuestionario, Pregunta, db
@@ -76,6 +80,10 @@ def respuestas(cita):
     return {f.id_pregunta: f for f in filas}
 
 
+class ErrorCuestionario(Exception):
+    """El envío no se guardó. El texto es el que ve la persona."""
+
+
 def _valor(respuesta, detalle):
     """
     Arma el texto que se guarda.
@@ -87,59 +95,84 @@ def _valor(respuesta, detalle):
     return f"{respuesta} — {detalle}" if detalle else respuesta
 
 
-def guardar_seccion(cita, usuario, seccion, formulario):
-    """
-    Guarda las respuestas de un bloque. Devuelve la lista de errores.
+def _mensaje_faltantes(ordenes):
+    """Texto corto para la persona cuando falta alguna de las 36."""
+    if len(ordenes) == 1:
+        cuales = f"la pregunta {ordenes[0]}"
+    elif len(ordenes) <= 6:
+        previas = ", ".join(str(n) for n in ordenes[:-1])
+        cuales = f"las preguntas {previas} y {ordenes[-1]}"
+    else:
+        cuales = "varias preguntas"
+    return (f"No pudimos enviar el cuestionario. Falta responder {cuales}. "
+            f"Tus respuestas siguen en esta pantalla: completalas y volvé a enviarlo.")
 
-    Vuelve a escribir las que ya estaban: si alguien corrige una respuesta y
-    reenvía el paso, gana la última. Lo garantiza uq_cuestionario_cita_pregunta.
+
+def enviar(cita, usuario, formulario):
     """
-    errores = []
+    Valida las 36 respuestas y, si están todas, las inserta y confirma la cita.
+
+    Una sola transacción: o quedan las 36 filas y la cita en Confirmada, o
+    no queda nada. No actualiza respuestas que ya existían.
+    """
+    items = preguntas()
+    if len(items) != len(catalogo.PREGUNTAS):
+        current_app.logger.error(
+            "Cita %s: el cuestionario del donante tiene %s preguntas "
+            "emparejadas y el catálogo tiene %s",
+            cita.id_cita, len(items), len(catalogo.PREGUNTAS))
+        raise ErrorCuestionario(
+            "No pudimos enviar el cuestionario. Intentá de nuevo más tarde.")
+
+    faltan = []
     cambios = []
-
-    for pregunta in preguntas(seccion):
+    for pregunta in items:
         clave = f"p{pregunta.id_pregunta}"
         respuesta = (formulario.get(clave) or "").strip()
         if respuesta not in (SI, NO):
-            errores.append(f"Falta responder la pregunta {pregunta.orden}.")
+            faltan.append(pregunta.orden)
             continue
         cambios.append((pregunta,
                         _valor(respuesta, formulario.get(f"{clave}_detalle"))))
 
-    if errores:
-        return errores
+    if faltan:
+        current_app.logger.warning(
+            "Cita %s: cuestionario rechazado, faltan las preguntas %s",
+            cita.id_cita, faltan)
+        raise ErrorCuestionario(_mensaje_faltantes(faltan))
 
     ya = respuestas(cita)
+    if any(p.id_pregunta in ya for p in items):
+        current_app.logger.error(
+            "Cita %s: ya tiene respuestas del cuestionario del donante; "
+            "no se sobrescriben", cita.id_cita)
+        raise ErrorCuestionario(
+            "Este cuestionario ya fue enviado y no se puede modificar.")
+
     ahora = datetime.now()
     try:
         for pregunta, valor in cambios:
-            fila = ya.get(pregunta.id_pregunta)
-            if fila is None:
-                db.session.add(Cuestionario(
-                    id_cita=cita.id_cita, id_pregunta=pregunta.id_pregunta,
-                    id_donante=usuario.id_usuario, valor=valor, fecha=ahora))
-            else:
-                fila.valor = valor
-                fila.fecha = ahora
+            db.session.add(Cuestionario(
+                id_cita=cita.id_cita, id_pregunta=pregunta.id_pregunta,
+                id_donante=usuario.id_usuario, valor=valor, fecha=ahora))
+        cita.estado = Cita.CONFIRMADA
         db.session.commit()
     except Exception:
         db.session.rollback()
-        raise
-    return []
+        current_app.logger.exception(
+            "Cita %s: falló el guardado del cuestionario", cita.id_cita)
+        raise ErrorCuestionario(
+            "No pudimos enviar el cuestionario. Tus respuestas siguen en "
+            "esta pantalla: intentá de nuevo.")
 
 
 def completo(cita):
-    """¿Están respondidas las 36?"""
-    return len(respuestas(cita)) >= len(preguntas())
-
-
-def seccion_pendiente(cita):
-    """El primer bloque que le falta responder, o None si terminó."""
+    """True si las 36 preguntas del donante ya tienen fila en esta cita."""
+    items = preguntas()
+    if len(items) != len(catalogo.PREGUNTAS):
+        return False
     ya = respuestas(cita)
-    for seccion in SECCIONES:
-        if any(p.id_pregunta not in ya for p in preguntas(seccion)):
-            return seccion
-    return None
+    return all(p.id_pregunta in ya for p in items)
 
 
 def avance(cita):

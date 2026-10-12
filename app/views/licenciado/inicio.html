@@ -1,0 +1,123 @@
+{% extends "comun/layout.html" %}
+{% from "comun/_ui.html" import badge, badge_cita, alerta %}
+{% from "comun/_iconos.html" import ico %}
+
+{% block titulo %}Inicio{% endblock %}
+
+{% block contenido %}
+<div class="page" style="min-height:100%;display:flex;flex-direction:column;">
+  <div class="home-grid">
+    <div style="display:flex;flex-direction:column;min-width:0;">
+      <h2 class="kicker">Estado de la jornada</h2>
+      <div class="card card-pad stack-lg" style="flex:1;">
+        {% if resumen %}
+        <div>
+          <div class="bar">
+            {% for r in resumen if r.n > 0 %}
+            <div style="width:{{ r.pct }}%;background:{{ r.color }};" title="{{ r.estado }}: {{ r.n }}"></div>
+            {% endfor %}
+          </div>
+          <div class="legend">
+            {% for r in resumen if r.n > 0 %}
+            <span style="display:inline-flex;align-items:center;gap:6px;"><i class="dot" style="background:{{ r.color }};"></i> <span class="muted" style="font-size:12px;">{{ r.estado }}</span> <strong style="font-size:12px;">{{ r.n }}</strong></span>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        {% if proxima %}
+        <a class="next" href="{{ url_for('licenciado_ficha.ver', donor_id=proxima.donorId, cita=proxima.id, de='inicio') }}">
+          <div class="when"><b>{{ proxima.hora }}</b><span>Próxima</span></div>
+          <div style="min-width:0;flex:1;">
+            <p class="truncate" style="margin:0;font-weight:600;">{{ proxima.donante }}</p>
+            <p class="muted" style="margin:2px 0 0;font-size:12px;">CI {{ proxima.ci }}</p>
+            <div style="margin-top:8px;">{{ badge_cita(proxima.estado) }}</div>
+          </div>
+          <span style="color:var(--navy);">{{ ico('chevron-right', 16) }}</span>
+        </a>
+        {% else %}
+        <p class="muted" style="margin:0;">No hay turnos pendientes para hoy.</p>
+        {% endif %}
+
+        {% if siguientes %}
+        <div>
+          <p class="faint" style="font-size:12px;font-weight:500;letter-spacing:.04em;text-transform:uppercase;margin:0 0 4px;">A continuación</p>
+          <div class="queue">
+            {% for c in siguientes %}
+            <a class="queue-item" href="{{ url_for('licenciado_ficha.ver', donor_id=c.donorId, cita=c.id, de='inicio') }}">
+              <span class="t">{{ c.hora }}</span>
+              <span class="truncate" style="flex:1;">{{ c.donante }}</span>
+              {{ badge_cita(c.estado) }}
+            </a>
+            {% endfor %}
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="row" style="margin-top:auto;gap:16px;">
+          <a class="link" href="{{ url_for('licenciado_agendamientos.lista') }}">Ir a agendamientos {{ ico('chevron-right', 14) }}</a>
+          <a class="link" href="{{ url_for('licenciado_preseleccion.ver') }}">Preselección ABO/Rh {{ ico('chevron-right', 14) }}</a>
+        </div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;min-width:0;">
+      <h2 class="kicker">Atención sin agendamiento</h2>
+      <div class="card card-pad stack" style="flex:1;">
+        <p class="muted" style="font-size:12px;margin:0;">Donante sin cita · búsqueda por cédula. Verifica diferimiento y cupo.</p>
+        <form method="post" action="{{ url_for('licenciado_inicio.espontaneo') }}" class="search-row">
+          <input class="control" name="documento" placeholder="Cédula" value="{{ encontrado.documento if encontrado else '' }}" required>
+          <button class="btn btn-primary" type="submit">{{ ico('search', 14) }} Buscar</button>
+        </form>
+
+        {% if encontrado %}
+        <div style="padding-top:12px;border-top:1px solid var(--line);" class="stack">
+          <div class="person">
+            <div class="person-ico">{{ ico('user', 18) }}</div>
+            <div style="min-width:0;flex:1;">
+              <p class="truncate" style="margin:0;font-weight:600;">{{ encontrado.nombre_completo }}</p>
+              <p class="muted" style="margin:0;font-size:12px;">CI {{ encontrado.documento }}</p>
+            </div>
+            {% if diferimiento %}
+            <a class="btn btn-ghost btn-sm" href="{{ url_for('licenciado_ficha.ver', donor_id=encontrado.id_usuario, de='inicio') }}">Ver ficha</a>
+            {% else %}
+            <form method="post" action="{{ url_for('licenciado_inicio.espontaneo') }}">
+              <input type="hidden" name="documento" value="{{ encontrado.documento }}">
+              <input type="hidden" name="abrir" value="1">
+              <button class="btn btn-primary btn-sm" type="submit">Abrir ficha</button>
+            </form>
+            {% endif %}
+          </div>
+
+          {% if diferimiento %}
+            {% if restriccion == 'externo' %}
+              {% call alerta('info', 'Diferimiento en otra institución') %}
+                {{ diferimiento.institucion_diagnostico }}. No se abre una atención nueva.
+              {% endcall %}
+            {% elif restriccion == 'permanente' %}
+              {% call alerta('danger', diferimiento.causa.nombre) %}
+                Diferimiento permanente desde {{ diferimiento.fecha_inicio.strftime('%d/%m/%Y') }}. No se abre una atención nueva.
+              {% endcall %}
+            {% else %}
+              {% call alerta('warn', diferimiento.causa.nombre) %}
+                Fecha de inicio {{ diferimiento.fecha_inicio.strftime('%d/%m/%Y') }}{% if diferimiento.fecha_fin %} · Fecha de fin {{ diferimiento.fecha_fin.strftime('%d/%m/%Y') }}{% endif %}. No se abre una atención nueva.
+              {% endcall %}
+            {% endif %}
+          {% else %}
+            {% call alerta('ok', 'Sin diferimiento vigente') %}
+              Al abrir la ficha se le asigna la primera franja de hoy con cupo.
+            {% endcall %}
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+
+  {% set colectas = previa.colectas %}
+  {% set motivos = previa.motivos %}
+  {% set stock = previa.stock %}
+  {% set informes_endpoint = 'licenciado_informes.ver' %}
+  {% include "comun/_informes_preview.html" %}
+</div>
+{% endblock %}

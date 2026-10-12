@@ -1,0 +1,145 @@
+{% extends "comun/layout.html" %}
+{% from "comun/_ui.html" import crumb, alerta, modal, btn %}
+{% from "comun/_iconos.html" import ico %}
+
+{% block titulo %}Examen físico{% endblock %}
+
+{% block contenido %}
+<div class="page">
+  {{ crumb(url_for('licenciado_cuestionario.ver', cita_id=cita.id_cita), 'Cuestionario', 'Examen físico') }}
+  <div class="section-head">
+    <div>
+      <h1>Examen físico</h1>
+      <p>{{ cita.donante.nombre_completo }} · CI {{ cita.donante.documento }}</p>
+    </div>
+  </div>
+
+  {% if mediciones %}
+  {# Ya registrado: lo apto/no apto lo decidió la base, acá solo se muestra. #}
+  <div class="card card-pad">
+    <div class="mb-4">
+      <h3 style="margin:0;font-size:14px;font-weight:600;">Signos vitales</h3>
+      <p class="muted" style="margin:0;font-size:12px;">Valores registrados. El estado apto/no apto lo calculó el sistema contra el rango de cada medición.</p>
+    </div>
+    <div class="vital-grid">
+      {% for m in mediciones %}
+      <div class="vital{% if not m.apto %} bad{% endif %}">
+        <div class="split" style="align-items:flex-start;">
+          <div style="min-width:0;">
+            <p style="margin:0;font-weight:600;">{{ m.tipo.nombre }}</p>
+            <p class="faint" style="margin:0;font-size:12px;">Rango: {{ m.tipo.valor_minimo|float }}–{{ m.tipo.valor_maximo|float }} {{ m.tipo.unidad }}</p>
+          </div>
+          {% if m.apto %}<span class="apto">{{ ico('check-circle', 13) }} Apto</span>
+          {% else %}<span class="noapto">{{ ico('x-circle', 13) }} No apto</span>{% endif %}
+        </div>
+        <p style="margin:0;font-size:22px;font-weight:600;color:{{ 'var(--danger)' if not m.apto else 'var(--ink)' }};">{{ m.valor|float }} <span class="muted" style="font-size:12px;font-weight:400;">{{ m.tipo.unidad }}</span></p>
+      </div>
+      {% endfor %}
+    </div>
+    <div class="mt-5">
+      {% if apto %}
+        {% call alerta('ok', 'Todos los signos dentro del rango apto') %}El donante puede proceder a extracción.{% endcall %}
+      {% else %}
+        {% call alerta('warn', 'Uno o más signos fuera de rango') %}No se puede realizar la extracción. Se debe registrar el motivo de diferimiento.{% endcall %}
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="row-end mt-5">
+    {% if apto %}
+      {% if cita.estado in ('Pendiente', 'Confirmada') %}
+      {{ btn('Siguiente', 'teal', 'md', url_for('licenciado_extraccion.ver', cita_id=cita.id_cita)) }}
+      {% else %}
+      {{ btn('Volver a la ficha', 'secondary', 'md', url_for('licenciado_ficha.ver', donor_id=cita.id_usuario, cita=cita.id_cita)) }}
+      {% endif %}
+    {% elif cita.estado in ('Pendiente', 'Confirmada') %}
+      <button type="button" class="btn btn-danger" data-abrir="modal-diferir">{{ ico('alert', 14) }} Diferir</button>
+    {% else %}
+      {{ btn('Volver a la ficha', 'secondary', 'md', url_for('licenciado_ficha.ver', donor_id=cita.id_usuario, cita=cita.id_cita)) }}
+    {% endif %}
+  </div>
+
+  {% call modal('modal-diferir', 'Diferimiento — Examen físico', danger=true) %}
+  <form method="post">
+    <input type="hidden" name="accion" value="diferir">
+    <p class="muted" style="margin:0 0 16px;">El donante no continúa a extracción. Registre el diferimiento de examen físico para <strong style="color:var(--ink);">{{ cita.donante.nombre_completo }}</strong>.</p>
+    <div class="stack">
+      <div class="summary" style="border-color:var(--danger-line);background:var(--danger-bg);">
+        <p style="margin:0;font-weight:500;color:var(--danger-ink);">Motivo</p>
+        <ul style="margin:8px 0 0;padding-left:16px;">
+          {% for m in mediciones if not m.apto %}
+          <li>{{ m.tipo.nombre }}: {{ m.valor|float }} {{ m.tipo.unidad }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="field">
+        <label>Causa del catálogo <span class="req">*</span></label>
+        <select class="control" name="id_diferimiento" required>
+          {% for c in causas %}
+          <option value="{{ c.id_diferimiento }}" {% if sugeridas and c.nombre == sugeridas[0] %}selected{% endif %}>{{ c.nombre }} · {{ c.tipo }}</option>
+          {% endfor %}
+        </select>
+        {% if sugeridas %}<p class="hint">Según la medición fuera de rango: {{ sugeridas|join(', ') }}. Puede cambiarla.</p>{% endif %}
+      </div>
+      <div class="field">
+        <label>Institución del diagnóstico</label>
+        <input class="control" name="institucion" value="{{ institucion }}">
+      </div>
+    </div>
+    <div class="row-end mt-4">
+      <button type="button" class="btn btn-ghost" data-cerrar="modal-diferir">Cancelar</button>
+      <button type="submit" class="btn btn-danger">Confirmar diferimiento</button>
+    </div>
+  </form>
+  {% endcall %}
+
+  {% else %}
+  <form method="post" id="signos">
+    <div class="card card-pad">
+      <div class="mb-4">
+        <h3 style="margin:0;font-size:14px;font-weight:600;">Signos vitales</h3>
+        <p class="muted" style="margin:0;font-size:12px;">Ingrese los valores medidos. La aptitud la calcula el sistema al guardar; lo que se ve mientras escribe es orientativo.</p>
+      </div>
+      <div class="vital-grid">
+        {% for t in tipos %}
+        <div class="vital" data-vital data-min="{{ t.valor_minimo|float }}" data-max="{{ t.valor_maximo|float }}">
+          <div class="split" style="align-items:flex-start;">
+            <div style="min-width:0;">
+              <label for="v-{{ t.codigo }}" style="font-weight:600;">{{ t.nombre }}</label>
+              <p class="faint" style="margin:0;font-size:12px;">Rango: {{ t.valor_minimo|float }}–{{ t.valor_maximo|float }} {{ t.unidad }}</p>
+            </div>
+            <span class="faint" data-estado style="font-size:12px;height:20px;display:inline-flex;align-items:center;">—</span>
+          </div>
+          <input class="control" id="v-{{ t.codigo }}" name="{{ t.codigo }}" type="number" step="any" inputmode="decimal" placeholder="Ej: {{ t.valor_minimo|float }}" required>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    <div class="row-end mt-5">
+      <button type="submit" class="btn btn-teal">Registrar signos</button>
+    </div>
+  </form>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if not mediciones %}
+<script>
+  // Vista previa del rango mientras se escribe. No decide: el valor que
+  // vale es el que calcula la base al guardar.
+  document.querySelectorAll('[data-vital]').forEach(function (caja) {
+    var input = caja.querySelector('input');
+    var estado = caja.querySelector('[data-estado]');
+    var min = parseFloat(caja.dataset.min), max = parseFloat(caja.dataset.max);
+    input.addEventListener('input', function () {
+      var n = parseFloat(input.value.replace(',', '.'));
+      caja.classList.remove('bad');
+      if (isNaN(n)) { estado.className = 'faint'; estado.textContent = '—'; return; }
+      if (n >= min && n <= max) { estado.className = 'apto'; estado.textContent = 'En rango'; }
+      else { estado.className = 'noapto'; estado.textContent = 'Fuera de rango'; caja.classList.add('bad'); }
+    });
+  });
+</script>
+{% endif %}
+{% endblock %}

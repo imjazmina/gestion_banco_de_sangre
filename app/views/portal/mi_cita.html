@@ -60,7 +60,7 @@
       {% elif cuestionario.habilitado %}
       <a class="btn btn-primary btn-sm" href="{{ url_for('cuestionario.responder', id_cita=cita.id_cita) }}">
         {{ ico('fileText') }}
-        {{ 'Continuar el cuestionario' if cuestionario.respondidas else 'Responder el cuestionario' }}
+        Responder el cuestionario
       </a>
       {% else %}
       <div class="banner info" style="margin:0;">

@@ -22,6 +22,13 @@
       <p class="sub" style="margin-top:4px;">Elegí fecha, horario y tipo de donación.</p>
     </div>
 
+    {% if solicitud_abierta %}
+    <div class="card" style="border-top:3px solid var(--warn); margin-bottom:20px;">
+      <h2 style="margin-bottom:6px;">Agendamiento no disponible</h2>
+      <p class="sub">Tenés una solicitud abierta. No podés reservar una donación al mismo tiempo.</p>
+    </div>
+    {% endif %}
+
     {# ---------- diferimiento vigente: nunca se muestra la causa ---------- #}
     {% if diferimiento %}
     <div class="card" style="border-top:3px solid var(--warn); margin-bottom:20px;">
@@ -45,7 +52,7 @@
     </div>
     {% endif %}
 
-    <div class="{{ 'form-locked' if diferimiento }}" {% if diferimiento %}aria-disabled="true"{% endif %}>
+    <div class="{{ 'form-locked' if diferimiento or solicitud_abierta }}" {% if diferimiento or solicitud_abierta %}aria-disabled="true"{% endif %}>
 
       {# ---------- pasos 1 y 2 ---------- #}
       <div class="card" style="margin-bottom:20px;">

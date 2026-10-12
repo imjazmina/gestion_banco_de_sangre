@@ -1,0 +1,19 @@
+{% extends "comun/layout.html" %}
+{% from "comun/_ui.html" import crumb %}
+
+{% block titulo %}Buzón{% endblock %}
+
+{% block contenido %}
+<div class="page">
+  {{ crumb(url_for('jefatura_inicio.inicio'), 'Inicio', 'Buzón') }}
+  <div class="section-head"><h1>Buzón</h1></div>
+  {% for m in mensajes %}
+  <article class="card card-pad mb-4">
+    <p class="kicker">{{ m.fecha.strftime('%d/%m/%Y %H:%M') }} · {{ m.autor }}</p>
+    <p>{{ m.mensaje }}</p>
+  </article>
+  {% else %}
+  <p class="muted">No hay mensajes.</p>
+  {% endfor %}
+</div>
+{% endblock %}

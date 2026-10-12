@@ -27,7 +27,9 @@ CARPETA = Path(__file__).resolve().parent
 
 
 def main():
-    app = create_app()
+    # Sin inicializar: si la base está rota, catalogos.sql no debe correr
+    # antes del DROP. El esquema y los datos se aplican más abajo.
+    app = create_app(inicializar=False)
     nombre = app.config["DB_NAME"]
 
     print()

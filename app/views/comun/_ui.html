@@ -1,0 +1,69 @@
+{% from "comun/_iconos.html" import ico %}
+
+{% macro btn(texto, variant='primary', size='md', href=none, icon=none, tipo='button', extra='', disabled=false, attrs='') %}
+  {% set cls = 'btn btn-' ~ variant ~ (' btn-sm' if size == 'sm' else '') ~ (' ' ~ extra if extra else '') %}
+  {% if href %}
+    <a class="{{ cls }}" href="{{ href }}" {{ attrs|safe }}>
+      {% if icon %}{{ ico(icon, 14 if size == 'sm' else 16) }}{% endif %}{{ texto }}
+    </a>
+  {% else %}
+    <button type="{{ tipo }}" class="{{ cls }}" {% if disabled %}disabled{% endif %} {{ attrs|safe }}>
+      {% if icon %}{{ ico(icon, 14 if size == 'sm' else 16) }}{% endif %}{{ texto }}
+    </button>
+  {% endif %}
+{% endmacro %}
+
+{% macro badge(texto, variant='gray', size='md') %}
+  <span class="badge badge-{{ variant }}{% if size == 'sm' %} badge-sm{% endif %}">{{ texto }}</span>
+{% endmacro %}
+
+{% macro badge_cita(estado, size='md') %}
+  {% set mapa = {'Pendiente':'info','Confirmada':'info','Ausente':'warn','Completada':'ok','No apto':'danger','Cancelada':'gray','Realizada':'ok'} %}
+  {{ badge(estado, mapa.get(estado, 'gray'), size) }}
+{% endmacro %}
+
+{% macro badge_tipo(tipo) %}
+  {% set mapa = {'Altruista':'teal','Reposición':'navy','Solidaria':'info','Compatibilidad':'warn'} %}
+  {{ badge(tipo, mapa.get(tipo, 'gray')) }}
+{% endmacro %}
+
+{% macro badge_dif(tipo) %}
+  {{ badge(tipo, 'danger' if tipo == 'Permanente' else 'warn') }}
+{% endmacro %}
+
+{% macro badge_solicitud(estado) %}
+  {{ badge(estado, 'ok' if estado == 'Completa' else 'info') }}
+{% endmacro %}
+
+{% macro alerta(tipo, titulo=none) %}
+  <div class="alert alert-{{ tipo }}">
+    {% if tipo == 'info' %}{{ ico('info') }}
+    {% elif tipo == 'warn' %}{{ ico('alert') }}
+    {% elif tipo == 'danger' %}{{ ico('x-circle') }}
+    {% else %}{{ ico('check-circle') }}{% endif %}
+    <div>
+      {% if titulo %}<span class="titulo">{{ titulo }}</span>{% endif %}
+      <div>{{ caller() }}</div>
+    </div>
+  </div>
+{% endmacro %}
+
+{% macro crumb(volver_url, volver, aqui) %}
+  <div class="crumb">
+    {{ btn(volver, 'ghost', 'sm', volver_url, 'arrow-left') }}
+    <span class="sep">/</span>
+    <span class="here">{{ aqui }}</span>
+  </div>
+{% endmacro %}
+
+{% macro modal(id, titulo, danger=false) %}
+  <div class="modal-back hidden" id="{{ id }}" role="dialog" aria-modal="true" aria-labelledby="{{ id }}-titulo">
+    <div class="modal">
+      <div class="modal-head{% if danger %} danger{% endif %}">
+        <h3 id="{{ id }}-titulo">{{ titulo }}</h3>
+        <button type="button" class="icon-btn" data-cerrar="{{ id }}" aria-label="Cerrar">{{ ico('x', 18) }}</button>
+      </div>
+      <div class="modal-body">{{ caller() }}</div>
+    </div>
+  </div>
+{% endmacro %}

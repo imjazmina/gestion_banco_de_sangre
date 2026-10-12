@@ -18,67 +18,171 @@
     </div>
 
     <div class="q-progress">
-      <div class="q-progress-bar"><span style="width:{{ (respondidas / total * 100) | round }}%;"></span></div>
-      <div class="q-progress-txt">
-        Paso {{ paso }} de {{ pasos }} · {{ respondidas }} de {{ total }} preguntas respondidas
-      </div>
+      <div class="q-progress-bar"><span id="q-barra" style="width:{{ (paso / pasos * 100) | round }}%;"></span></div>
+      <div class="q-progress-txt" id="q-avance">Paso {{ paso }} de {{ pasos }}</div>
     </div>
 
-    <h2 class="q-seccion">{{ seccion }}</h2>
+    <form id="cuestionario" method="post"
+          action="{{ url_for('cuestionario.guardar', id_cita=cita.id_cita) }}"
+          data-paso="{{ paso }}" data-total="{{ total }}">
 
-    <form method="post" action="{{ url_for('cuestionario.guardar', id_cita=cita.id_cita) }}">
-      <input type="hidden" name="seccion" value="{{ seccion }}">
+      {% for seccion in SECCIONES %}
+      <div class="q-paso" data-paso="{{ loop.index }}" {% if loop.index != paso %}hidden{% endif %}>
+        <h2 class="q-seccion">{{ seccion }}</h2>
+        <p class="q-aviso" hidden>Respondé todas las preguntas de este paso para continuar.</p>
 
-      {% for p in preguntas %}
-        {# El valor a mostrar: lo que se acaba de escribir si el paso volvió
-           con errores, y si no lo que ya estaba guardado. #}
-        {% set guardado = guardadas.get(p.id_pregunta) %}
-        {% set previo = guardado.valor.split(' — ')[0] if guardado else '' %}
-        {% set elegido = (formulario.get('p' ~ p.id_pregunta) if formulario else '') or previo %}
-        {% set detalle_previo = (guardado.valor.split(' — ')[1]
-                                 if guardado and ' — ' in guardado.valor else '') %}
-        {% set detalle = (formulario.get('p' ~ p.id_pregunta ~ '_detalle')
-                          if formulario else '') or detalle_previo %}
+        {% for p in preguntas if p.seccion == seccion %}
+          {% set elegido = formulario.get('p' ~ p.id_pregunta, '') if formulario else '' %}
+          {% set detalle = formulario.get('p' ~ p.id_pregunta ~ '_detalle', '') if formulario else '' %}
 
-        <fieldset class="q-item">
-          <legend><span class="q-num">{{ p.orden }}</span> {{ p.enunciado }}</legend>
-          {% if p.nota %}<p class="q-nota">{{ p.nota }}</p>{% endif %}
+          <fieldset class="q-item">
+            <legend><span class="q-num">{{ p.orden }}</span> {{ p.enunciado }}</legend>
+            {% if p.nota %}<p class="q-nota">{{ p.nota }}</p>{% endif %}
 
-          <div class="q-choice">
-            <input type="radio" id="p{{ p.id_pregunta }}_si" name="p{{ p.id_pregunta }}"
-                   value="Si" {{ 'checked' if elegido == 'Si' }} required>
-            <label for="p{{ p.id_pregunta }}_si">Sí</label>
+            <div class="q-choice">
+              <input type="radio" id="p{{ p.id_pregunta }}_si" name="p{{ p.id_pregunta }}"
+                     value="Si" {{ 'checked' if elegido == 'Si' }}>
+              <label for="p{{ p.id_pregunta }}_si">Sí</label>
 
-            <input type="radio" id="p{{ p.id_pregunta }}_no" name="p{{ p.id_pregunta }}"
-                   value="No" {{ 'checked' if elegido == 'No' }}>
-            <label for="p{{ p.id_pregunta }}_no">No</label>
-          </div>
+              <input type="radio" id="p{{ p.id_pregunta }}_no" name="p{{ p.id_pregunta }}"
+                     value="No" {{ 'checked' if elegido == 'No' }}>
+              <label for="p{{ p.id_pregunta }}_no">No</label>
+            </div>
 
-          {% if p.pide_detalle %}
-          <input class="q-detalle" type="text" name="p{{ p.id_pregunta }}_detalle"
-                 value="{{ detalle }}" maxlength="180"
-                 placeholder="{{ p.etiqueta_detalle }} (opcional)">
+            {% if p.pide_detalle %}
+            <input class="q-detalle" type="text" name="p{{ p.id_pregunta }}_detalle"
+                   value="{{ detalle }}" maxlength="180"
+                   placeholder="{{ p.etiqueta_detalle }} (opcional)">
+            {% endif %}
+          </fieldset>
+        {% endfor %}
+
+        <div class="q-acciones">
+          {% if loop.index > 1 %}
+          <button class="btn btn-ghost" type="button" data-ir="{{ loop.index - 1 }}">
+            {{ ico('arrowLeft') }} Atrás
+          </button>
           {% endif %}
-        </fieldset>
+          {% if loop.index < pasos %}
+          <button class="btn btn-primary" type="button" data-ir="{{ loop.index + 1 }}">
+            Siguiente
+          </button>
+          {% else %}
+          <button class="btn btn-primary" type="submit">Enviar cuestionario</button>
+          {% endif %}
+        </div>
+      </div>
       {% endfor %}
 
-      <div class="q-acciones">
-        {% if paso > 1 %}
-        <a class="btn btn-ghost" href="{{ url_for('cuestionario.responder', id_cita=cita.id_cita,
-                                                  seccion=SECCIONES[paso - 2]) }}">
-          {{ ico('arrowLeft') }} Anterior
-        </a>
-        {% endif %}
-        <button class="btn btn-primary" type="submit">
-          {{ 'Guardar y continuar' if paso < pasos else 'Enviar cuestionario' }}
-        </button>
-      </div>
       <p class="hint" style="text-align:center; margin-top:12px;">
-        Lo que respondas en este paso se guarda al continuar. Podés cerrar y
-        seguir después desde «Mi cita».
+        Las respuestas se envían recién al final. Si cerrás esta página antes, se pierden.
       </p>
     </form>
 
   </div>
 </section>
+
+<script>
+(function () {
+  const form = document.getElementById('cuestionario');
+  if (!form) return;
+  const pasos = Array.from(form.querySelectorAll('.q-paso'));
+  const barra = document.getElementById('q-barra');
+  const texto = document.getElementById('q-avance');
+  const total = Number(form.dataset.total) || pasos.length;
+  let actual = Number(form.dataset.paso) || 1;
+  let salir = false;
+
+  function respondidas() {
+    return form.querySelectorAll('input[type="radio"]:checked').length;
+  }
+
+  function hayRespuestas() {
+    if (respondidas() > 0) return true;
+    return Array.from(form.querySelectorAll('input.q-detalle')).some(function (campo) {
+      return campo.value.trim() !== '';
+    });
+  }
+
+  function pasoCompleto(n) {
+    const paso = pasos.find(function (p) { return Number(p.dataset.paso) === n; });
+    if (!paso) return false;
+    const nombres = new Set(Array.from(paso.querySelectorAll('input[type="radio"]')).map(function (i) {
+      return i.name;
+    }));
+    return Array.from(nombres).every(function (nombre) {
+      return paso.querySelector('input[name="' + nombre + '"]:checked');
+    });
+  }
+
+  function mostrar(n) {
+    actual = n;
+    pasos.forEach(function (p) {
+      p.hidden = Number(p.dataset.paso) !== n;
+    });
+    const hechas = respondidas();
+    if (barra) barra.style.width = (total ? (hechas / total * 100) : 0) + '%';
+    if (texto) {
+      texto.textContent = 'Paso ' + n + ' de ' + pasos.length +
+        ' · ' + hechas + ' de ' + total + ' preguntas respondidas';
+    }
+  }
+
+  form.addEventListener('click', function (e) {
+    const btn = e.target.closest('[data-ir]');
+    if (!btn) return;
+    const destino = Number(btn.dataset.ir);
+    if (destino > actual && !pasoCompleto(actual)) {
+      const aviso = pasos.find(function (p) {
+        return Number(p.dataset.paso) === actual;
+      }).querySelector('.q-aviso');
+      if (aviso) aviso.hidden = false;
+      return;
+    }
+    pasos.forEach(function (p) {
+      const aviso = p.querySelector('.q-aviso');
+      if (aviso) aviso.hidden = true;
+    });
+    mostrar(destino);
+    const titulo = document.querySelector('.q-progress');
+    if (titulo) titulo.scrollIntoView({block: 'start'});
+  });
+
+  form.addEventListener('change', function () { mostrar(actual); });
+
+  form.addEventListener('submit', function (e) {
+    if (!pasoCompleto(actual)) {
+      e.preventDefault();
+      const paso = pasos.find(function (p) { return Number(p.dataset.paso) === actual; });
+      const aviso = paso && paso.querySelector('.q-aviso');
+      if (aviso) aviso.hidden = false;
+      return;
+    }
+    salir = true;
+  });
+
+  window.addEventListener('beforeunload', function (e) {
+    if (salir || !hayRespuestas()) return;
+    const aviso = 'Si salís ahora vas a perder las respuestas del cuestionario.';
+    e.preventDefault();
+    e.returnValue = aviso;
+    return aviso;
+  });
+
+  document.addEventListener('click', function (e) {
+    const enlace = e.target.closest('a[href]');
+    if (!enlace || salir || !hayRespuestas()) return;
+    if (enlace.target === '_blank') return;
+    const href = enlace.getAttribute('href') || '';
+    if (href.charAt(0) === '#' || href.indexOf('mailto:') === 0 || href.indexOf('tel:') === 0) return;
+    if (!window.confirm('Si salís ahora vas a perder las respuestas del cuestionario.')) {
+      e.preventDefault();
+      return;
+    }
+    salir = true;
+  });
+
+  mostrar(actual);
+})();
+</script>
 {% endblock %}

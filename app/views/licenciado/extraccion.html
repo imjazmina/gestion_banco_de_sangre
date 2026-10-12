@@ -1,0 +1,113 @@
+{% extends "comun/layout.html" %}
+{% from "comun/_ui.html" import crumb, alerta, badge, btn %}
+{% from "comun/_iconos.html" import ico %}
+
+{% block titulo %}Extracción{% endblock %}
+
+{% block contenido %}
+<div class="page">
+  {% if unidad %}
+  {{ crumb(url_for('licenciado_ficha.ver', donor_id=cita.id_usuario, cita=cita.id_cita), 'Ficha', 'Extracción') }}
+
+  {% call alerta('ok', 'Extracción registrada correctamente') %}
+    La unidad quedó marcada como <strong>{{ unidad.estado }}</strong>{% if unidad.estado == 'En laboratorio' %} para tipificación y serología{% endif %}.
+  {% endcall %}
+
+  <div class="codigo">
+    <p class="kicker" style="margin:0;">Código único de unidad</p>
+    <b class="mono">{{ unidad.codigo }}</b>
+  </div>
+
+  <div class="summary" style="padding:16px;">
+    <p class="kicker" style="margin-bottom:12px;">Datos de la extracción</p>
+    <div class="data-grid" style="padding:0;gap:12px;">
+      <div><p class="data-label">Donante</p><p class="data-value" style="font-weight:500;">{{ cita.donante.nombre_completo }}</p></div>
+      <div><p class="data-label">Cédula</p><p class="data-value mono" style="font-weight:500;">{{ cita.donante.documento }}</p></div>
+      <div><p class="data-label">Estado</p><div class="data-value">{{ badge(unidad.estado, 'info' if unidad.estado == 'En laboratorio' else 'gray') }}</div></div>
+      <div><p class="data-label">Fecha</p><p class="data-value" style="font-weight:500;">{{ extraccion.fecha.strftime('%d/%m/%Y %H:%M') }}</p></div>
+      <div><p class="data-label">Código de extracción</p><p class="data-value mono" style="font-weight:500;">{{ extraccion.codigo_unico }}</p></div>
+      <div class="span"><p class="data-label">Observación</p><p class="data-value" style="font-weight:500;">{{ extraccion.observacion }}</p></div>
+    </div>
+  </div>
+
+  <div class="row mt-5">
+    {{ btn('Volver a agendamientos', 'primary', 'md', url_for('licenciado_agendamientos.lista')) }}
+    {% if unidad.estado == 'En laboratorio' %}
+    <form method="post">
+      <input type="hidden" name="accion" value="simular">
+      <button class="btn btn-secondary" type="submit">{{ ico('flask', 14) }} Simular resultado de laboratorio</button>
+    </form>
+    {% endif %}
+  </div>
+  {% if unidad.estado == 'En laboratorio' %}
+  <p class="faint" style="font-size:12px;margin-top:8px;">El resultado es sintético. No es un análisis del laboratorio del hospital.</p>
+  {% endif %}
+
+  {% else %}
+  {{ crumb(url_for('licenciado_evaluacion.ver', cita_id=cita.id_cita), 'Examen físico', 'Extracción') }}
+  <div class="section-head">
+    <div>
+      <h1>Extracción</h1>
+      <p>{{ cita.donante.nombre_completo }} · CI {{ cita.donante.documento }}</p>
+    </div>
+  </div>
+
+  {% if not apto %}
+  {% call alerta('warn', 'Atención no habilitada') %}
+    Faltan mediciones o alguna no es apta. No se puede extraer.
+  {% endcall %}
+  <div class="mt-4">
+    {{ btn('Volver al examen físico', 'secondary', 'md', url_for('licenciado_evaluacion.ver', cita_id=cita.id_cita)) }}
+  </div>
+  {% else %}
+  <form method="post">
+    <div class="two mb-4">
+      <div class="card card-pad">
+        <h3 style="margin:0 0 12px;font-size:14px;font-weight:600;">Flebotomía</h3>
+        <div class="stack" style="gap:16px;">
+          <div class="field">
+            <label>Brazo <span class="req">*</span></label>
+            <div class="radios">
+              {% for b in brazos %}
+              <label><input type="radio" name="brazo" value="{{ b }}" required> {{ b }}</label>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="field">
+            <label>Punción <span class="req">*</span></label>
+            <div class="radios">
+              {% for p in punciones %}
+              <label><input type="radio" name="puncion" value="{{ p }}" required> {{ p }}</label>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-pad">
+        <h3 style="margin:0 0 12px;font-size:14px;font-weight:600;">Reacción post-extracción</h3>
+        <div class="radios">
+          {% for r in reacciones %}
+          <label><input type="radio" name="reaccion" value="{{ r }}" required> {{ r }}</label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <div class="card card-pad" style="grid-column:1 / -1;">
+        <h3 style="margin:0 0 12px;font-size:14px;font-weight:600;">Observación</h3>
+        <div class="field">
+          <textarea class="control" name="observacion" rows="3" placeholder="Incidencias durante la extracción, si las hubo."></textarea>
+          <p class="hint">El código de la unidad lo genera el servidor. Lote, bolsa y tabuladora no se guardan: no hay columnas y el hardware está fuera de alcance.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="row-end">
+      {{ btn('Volver', 'ghost', 'md', url_for('licenciado_evaluacion.ver', cita_id=cita.id_cita)) }}
+      <button class="btn btn-teal" type="submit">{{ ico('check', 14) }} Finalizar extracción</button>
+    </div>
+  </form>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

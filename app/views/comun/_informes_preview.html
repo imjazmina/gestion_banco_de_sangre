@@ -1,0 +1,57 @@
+{% from "comun/_iconos.html" import ico %}
+<section>
+  <div class="card" style="overflow:hidden;">
+    <div class="preview-head">
+      <h2 class="kicker" style="margin:0;">Informes</h2>
+      <a class="link" href="{{ url_for(informes_endpoint) }}">Ver todos los informes {{ ico('chevron-right', 14) }}</a>
+    </div>
+    <div class="preview-grid">
+      <div class="preview-pane">
+        <h3>Donaciones (serie de prueba)</h3>
+        {% set max_c = colectas|map(attribute='v')|max %}
+        <div class="cols">
+          <div class="cols-bars">
+            {% for m in colectas %}
+            <div style="flex:1;display:flex;align-items:flex-end;justify-content:center;height:100%;">
+              <i class="{{ 'now' if m.mes == 'Sep' else '' }}" style="height:{{ (m.v / max_c * 100)|round(1) }}%;" title="{{ m.mes }}: {{ m.v }}"></i>
+            </div>
+            {% endfor %}
+          </div>
+          <div class="cols-labels">
+            {% for m in colectas %}
+            <span class="{{ 'now' if m.mes == 'Sep' else '' }}">{{ m.mes }}</span>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      <div class="preview-pane">
+        <h3>Diferimientos</h3>
+        {% set max_m = motivos|map(attribute='n')|max or 1 %}
+        <div class="mini-list">
+          {% for r in motivos %}
+          <div class="hbar">
+            <div>
+              <span class="truncate" style="display:block;font-size:10px;color:var(--ink-2);">{{ r.causa }}</span>
+              <div class="track"><i style="width:{{ (r.n / max_m * 100)|round(1) }}%;background:#D97706;"></i></div>
+            </div>
+            <strong style="font-size:11px;text-align:right;">{{ r.n }}</strong>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      <div class="preview-pane">
+        <h3>Sangre total en stock</h3>
+        {% set max_s = stock|map(attribute='n')|max or 1 %}
+        <div class="mini-list">
+          {% for r in stock %}
+          <div class="hbar" style="grid-template-columns:1.75rem minmax(0,1fr) 1.15rem;">
+            <span style="font-size:11px;color:var(--ink-2);">{{ r.grupo }}</span>
+            <div class="track" style="height:8px;"><i style="width:{{ (r.n / max_s * 100)|round(1) }}%;background:#120C61;"></i></div>
+            <strong style="font-size:11px;text-align:right;">{{ r.n }}</strong>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
