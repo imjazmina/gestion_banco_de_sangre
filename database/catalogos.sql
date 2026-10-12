@@ -93,16 +93,12 @@ ON CONFLICT (nombre) DO NOTHING;
 -- ---------- Cuestionario ----------
 INSERT INTO pregunta (parte, enunciado, preselecciona_exclusion)
 SELECT * FROM (VALUES
-  ('A', '¿Se siente Ud. bien y goza de buena salud?', false),
   ('A', '¿Padece de presión alta o baja?', true),
-  ('A', '¿Está tomando alguna medicación?', true),
-  ('A', '¿Ha descansado o comido bien las últimas 24 horas?', false),
-  ('A', '¿Ha tomado aspirina los últimos 5 días?', true),
   ('A', '¿Tuvo en la última semana gripe, estado febril, diarrea o tratamiento odontológico?', true),
   ('A', '¿Recibió dinero para realizar esta donación?', true),
-  ('A', '¿Sabe que el portador del virus VIH/SIDA puede contagiar estando aparentemente sano?', false),
+  ('A', '¿Sabe que el portador del virus VIH/SIDA puede contagiar estando aparentemente sano?', true),
   ('A', '¿Usted dona solamente para que le realicen los análisis del VIH/SIDA?', true),
-  ('A', '¿Alguna vez ha donado sangre, plaquetas o plasma?', false),
+  ('A', '¿Alguna vez ha donado sangre, plaquetas o plasma?', true),
   ('A', '¿Alguna vez ha sido rechazado como donante?', true),
   ('A', '¿Fue llamado después de una donación con respecto a resultados de sus análisis?', true),
   ('A', '¿Tuvo angina (dolor) de pecho, infarto, enfermedades del corazón o pulmón?', true),
@@ -128,12 +124,13 @@ SELECT * FROM (VALUES
   ('A', '¿Ha recibido vacunas o inmunización?', true),
   ('A', '¿Está o estuvo embarazada o se encuentra en período de lactancia?', true),
   ('A', 'Si ha estado fuera del país, ¿se ha sentido enfermo/a días previos o posteriores a su regreso?', true),
-  ('A', '¿Ud. ha leído y comprendido este cuestionario y fueron aclaradas todas sus dudas?', false),
-  ('B','¿Desayunaste hoy?',                                        false),
-  ('B','¿Dormiste al menos 6 horas anoche?',                       false),
+  ('A', '¿Ud. ha leído y comprendido este cuestionario y fueron aclaradas todas sus dudas?', true),
+  ('B', '¿Se siente Ud. bien y goza de buena salud?', true),
+  ('B','¿Desayunaste hoy?',                                        true),
+  ('B','¿Ha descansado o comido bien las últimas 24 horas?',       true),
   ('B','¿Consumiste alcohol en las últimas 12 horas?',             true),
-  ('B','¿Tenés fiebre, gripe o alguna infección en este momento?', true),
-  ('B','¿Estás tomando alguna medicación actualmente?',            true)
+  ('B','¿Estás tomando alguna medicación actualmente?',            true),
+  ('B','¿Ha tomado aspirina los últimos 5 días?',                 true)
 ) AS p(parte, enunciado, excluye)
 WHERE NOT EXISTS (SELECT 1 FROM pregunta q WHERE q.enunciado = p.enunciado);
 
