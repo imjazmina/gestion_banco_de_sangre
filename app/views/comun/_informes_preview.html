@@ -7,19 +7,22 @@
     </div>
     <div class="preview-grid">
       <div class="preview-pane">
-        <h3>Donaciones (serie de prueba)</h3>
-        {% set max_c = colectas|map(attribute='v')|max %}
+        <h3>Donaciones por mes</h3>
+        {# `or 1`: sin eso, un año sin donaciones da un máximo de cero y la
+           división de abajo revienta la pantalla de inicio. #}
+        {% set max_c = colectas|map(attribute='v')|max or 1 %}
         <div class="cols">
           <div class="cols-bars">
             {% for m in colectas %}
             <div style="flex:1;display:flex;align-items:flex-end;justify-content:center;height:100%;">
-              <i class="{{ 'now' if m.mes == 'Sep' else '' }}" style="height:{{ (m.v / max_c * 100)|round(1) }}%;" title="{{ m.mes }}: {{ m.v }}"></i>
+              {# El último es el mes en curso, que es el que se resalta. #}
+              <i class="{{ 'now' if loop.last else '' }}" style="height:{{ (m.v / max_c * 100)|round(1) }}%;" title="{{ m.mes }}: {{ m.v }}"></i>
             </div>
             {% endfor %}
           </div>
           <div class="cols-labels">
             {% for m in colectas %}
-            <span class="{{ 'now' if m.mes == 'Sep' else '' }}">{{ m.mes }}</span>
+            <span class="{{ 'now' if loop.last else '' }}">{{ m.mes }}</span>
             {% endfor %}
           </div>
         </div>
