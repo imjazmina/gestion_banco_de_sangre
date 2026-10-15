@@ -103,18 +103,28 @@
 
   <form method="get" class="card periodo" id="periodo-informe">
     {% if tab %}<input type="hidden" name="tab" value="{{ tab }}">{% endif %}
+    {# max=hoy: un informe de una fecha futura no puede tener nada, así que
+       el calendario directamente no ofrece esos días. #}
     <div class="field">
       <label for="desde">Desde</label>
-      <input class="control" type="date" id="desde" name="desde" value="{{ datos.desde.isoformat() }}" required>
+      <input class="control" type="date" id="desde" name="desde"
+             value="{{ datos.desde.isoformat() }}" max="{{ datos.hoy }}" required>
     </div>
     <div class="field">
       <label for="hasta">Hasta</label>
-      <input class="control" type="date" id="hasta" name="hasta" value="{{ datos.hasta.isoformat() }}" required>
+      <input class="control" type="date" id="hasta" name="hasta"
+             value="{{ datos.hasta.isoformat() }}" max="{{ datos.hoy }}" required>
     </div>
     <button class="btn btn-primary btn-sm" type="submit">Consultar período</button>
   </form>
   {% if datos.error %}
   <p class="inf-error">{{ datos.error }}</p>
+  {% endif %}
+  {% if datos.sin_datos %}
+  <p class="inf-error">
+    No hay donaciones ni diferimientos registrados en este período.
+    Las cifras en cero corresponden al período elegido, no a una falla del sistema.
+  </p>
   {% endif %}
   <p class="inf-pendiente" id="periodo-pendiente" hidden>
     Hay un período sin aplicar. Los informes siguen mostrando {{ datos.periodo }}.
