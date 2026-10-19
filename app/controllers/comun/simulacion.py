@@ -2,20 +2,49 @@
 Simulación del laboratorio y de las solicitudes publicadas.
 
 Los resultados son sintéticos (RN13). No hay rol de laboratorio ni pantalla
-para publicarlos a mano. Publicar una solicitud tampoco tiene pantalla de
-solicitante: si no hay ninguna vigente, esta función inserta unas pocas.
+para publicarlos a mano. Al cerrar la extracción, el resultado se calcula
+en otro hilo: la pantalla sigue en `En laboratorio` y no espera.
+
+Publicar una solicitud tampoco tiene pantalla de solicitante: si no hay
+ninguna vigente, esta función inserta unas pocas.
 """
+import logging
 import random
+import threading
+import time
 from datetime import date, datetime, timedelta
 
+from flask import current_app
+from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.models import (
     Asignacion, Auditoria, Cita, CitacionConsejeria, CompatibilidadAboRh,
-    Diferimiento, HorarioDisponible, Notificacion, RegistroDiferimiento,
-    ResultadoLaboratorio, Rol, Solicitud, TipoSangre, TransicionEstado,
-    Unidad, Usuario, UsuarioRol, db,
+    Diferimiento, Extraccion, HorarioDisponible, Notificacion,
+    RegistroDiferimiento, ResultadoLaboratorio, Rol, Solicitud, TipoSangre,
+    TransicionEstado, Unidad, Usuario, UsuarioRol, db,
 )
+
+logger = logging.getLogger(__name__)
+
+# Prototipo: no es un tiempo de laboratorio. Alcanza para que la pantalla
+# de la extracción se dibuje con la unidad todavía en laboratorio.
+DEMORA_LABORATORIO_SEGUNDOS = 8
+PROBABILIDAD_REACTIVO = 0.2
+# Una grafía por marcador. Las duplicadas sin espacio no se sortean.
+CAUSAS_SEROLOGIA = (
+    "VIH 1/2",
+    "HBsAg (Hepatitis B)",
+    "Anti-HCV (Hepatitis C)",
+    "VDRL (Sífilis)",
+    "Chagas (T. cruzi)",
+    "HTLV I/II",
+    "Anti-HBc (Hepatitis B)",
+    "CMV",
+)
+
+_en_curso = set()
+_en_curso_lock = threading.Lock()
 
 INSTITUCION_LOCAL = "Hospital Regional de Luque"
 DOCUMENTO_SOLICITANTE = "00000001"
@@ -41,6 +70,8 @@ def _transicion(unidad, personal, destino, motivo=None):
         fecha=datetime.now(),
     ))
     unidad.estado = destino
+    # El trigger lee el estado vigente al insertar la fila siguiente.
+    db.session.flush()
     Auditoria.registrar(personal.id_usuario, "UNIDAD", unidad.id_unidad,
                         Auditoria.CAMBIO_ESTADO)
 
@@ -55,26 +86,92 @@ def _jefatura():
             .first())
 
 
-def simular_resultado(unidad, personal):
-    """Escribe un resultado al azar y mueve la unidad. No es un análisis real."""
-    if unidad.estado != Unidad.EN_LABORATORIO:
-        raise ErrorSimulacion("Solo se simula el resultado de una unidad en laboratorio.")
-    if ResultadoLaboratorio.query.filter_by(id_unidad=unidad.id_unidad).first():
-        raise ErrorSimulacion("Esa unidad ya tiene un resultado simulado.")
+def agendar_resultado(id_unidad):
+    """Encola la simulación sin frenar el pedido que guardó la extracción."""
+    app = current_app._get_current_object()
+    with _en_curso_lock:
+        if id_unidad in _en_curso:
+            return
+        _en_curso.add(id_unidad)
+    threading.Thread(
+        target=_tarea_laboratorio,
+        args=(app, id_unidad),
+        name=f"laboratorio-{id_unidad}",
+        daemon=True,
+    ).start()
 
-    tipo = random.choice(TipoSangre.query.all())
-    if tipo is None:
+
+def reponer_laboratorio():
+    """Retoma unidades que siguen en laboratorio si el proceso se reinició."""
+    identificadores = [
+        fila.id_unidad
+        for fila in (Unidad.query
+                     .filter(Unidad.estado == Unidad.EN_LABORATORIO)
+                     .all())
+        if ResultadoLaboratorio.query.filter_by(id_unidad=fila.id_unidad).first() is None
+    ]
+    for id_unidad in identificadores:
+        agendar_resultado(id_unidad)
+
+
+def _tarea_laboratorio(app, id_unidad):
+    try:
+        time.sleep(DEMORA_LABORATORIO_SEGUNDOS)
+        with app.app_context():
+            simular_resultado(id_unidad)
+    except Exception:
+        logger.exception("No se pudo simular el laboratorio de la unidad %s", id_unidad)
+        db.session.rollback()
+    finally:
+        with _en_curso_lock:
+            _en_curso.discard(id_unidad)
+
+
+def simular_resultado(id_unidad):
+    """Escribe un resultado y mueve la unidad. No es un análisis real.
+
+    Si otro hilo ya lo hizo, termina sin insertar. No toca
+    `fecha_vencimiento`: esa fecha no se calcula acá.
+    """
+    db.session.execute(
+        text("SELECT pg_advisory_xact_lock(:clave)"),
+        {"clave": id_unidad},
+    )
+    unidad = db.session.get(Unidad, id_unidad)
+    if unidad is None or unidad.estado != Unidad.EN_LABORATORIO:
+        db.session.rollback()
+        return
+    if ResultadoLaboratorio.query.filter_by(id_unidad=unidad.id_unidad).first():
+        db.session.rollback()
+        return
+
+    extraccion = db.session.get(Extraccion, unidad.id_extraccion)
+    personal = db.session.get(Usuario, extraccion.id_personal) if extraccion else None
+    if personal is None:
+        db.session.rollback()
+        raise ErrorSimulacion("La extracción no tiene personal para firmar la transición.")
+
+    tipos = TipoSangre.query.all()
+    if not tipos:
+        db.session.rollback()
         raise ErrorSimulacion("Falta el catálogo de grupos sanguíneos.")
-    reactivo = random.choice((True, False))
-    if reactivo:
-        _reactivo(unidad, personal, tipo)
+    tipo = random.choice(tipos)
+    if random.random() < PROBABILIDAD_REACTIVO:
+        _reactivo(unidad, personal, extraccion, tipo)
     else:
         _no_reactivo(unidad, personal, tipo)
     try:
         db.session.commit()
     except SQLAlchemyError as exc:
         db.session.rollback()
-        raise ErrorSimulacion(str(getattr(exc, "orig", exc)).splitlines()[0])
+        raise ErrorSimulacion(str(getattr(exc, "orig", exc)).splitlines()[0]) from exc
+
+
+def _copiar_tipificacion(unidad, tipo):
+    unidad.id_tipo_sangre = tipo.id_tipo_sangre
+    donante = db.session.get(Usuario, unidad.id_donante)
+    if donante is not None:
+        donante.id_tipo_sangre = tipo.id_tipo_sangre
 
 
 def _no_reactivo(unidad, personal, tipo):
@@ -84,18 +181,26 @@ def _no_reactivo(unidad, personal, tipo):
         resultado=ResultadoLaboratorio.NO_REACTIVO,
         fecha=datetime.now(),
     ))
+    db.session.flush()
     _transicion(unidad, personal, Unidad.EN_STOCK)
-    unidad.id_tipo_sangre = tipo.id_tipo_sangre
-    donante = db.session.get(Usuario, unidad.id_donante)
-    if donante is not None:
-        donante.id_tipo_sangre = tipo.id_tipo_sangre
-    _intentar_asignar(unidad, personal, tipo)
+    _copiar_tipificacion(unidad, tipo)
+    _asignar_solicitud_de_la_cita(unidad, personal, tipo)
 
 
-def _reactivo(unidad, personal, tipo):
-    causa = Diferimiento.query.filter_by(nombre="Serología reactiva").first()
-    if causa is None:
-        raise ErrorSimulacion("Falta la causa «Serología reactiva» en el catálogo.")
+def _causas_serologicas():
+    filas = (Diferimiento.query
+             .filter(Diferimiento.nombre.in_(CAUSAS_SEROLOGIA),
+                     Diferimiento.tipo == "Permanente")
+             .all())
+    if not filas:
+        raise ErrorSimulacion("Faltan causas serológicas permanentes en el catálogo.")
+    return filas
+
+
+def _reactivo(unidad, personal, extraccion, tipo):
+    causas = _causas_serologicas()
+    cantidad = random.randint(1, min(3, len(causas)))
+    elegidas = random.sample(causas, cantidad)
     jefatura = _jefatura()
     if jefatura is None:
         raise ErrorSimulacion("No hay una cuenta de jefatura para firmar la citación.")
@@ -103,30 +208,31 @@ def _reactivo(unidad, personal, tipo):
     if franja is None:
         raise ErrorSimulacion("No hay franjas horarias para citar a consejería.")
 
-    registro = RegistroDiferimiento(
-        id_donante=unidad.id_donante,
-        id_diferimiento=causa.id_diferimiento,
-        id_personal=None,
-        origen=RegistroDiferimiento.LABORATORIO,
-        institucion_diagnostico=INSTITUCION_LOCAL,
-        fecha_inicio=date.today(),
-    )
-    db.session.add(registro)
-    db.session.flush()
-
     resultado = ResultadoLaboratorio(
         id_unidad=unidad.id_unidad,
-        id_diferimiento=causa.id_diferimiento,
-        id_registro_diferimiento=registro.id_registro,
         id_tipo_sangre=tipo.id_tipo_sangre,
         resultado=ResultadoLaboratorio.REACTIVO,
         fecha=datetime.now(),
     )
     db.session.add(resultado)
     db.session.flush()
-    unidad.id_tipo_sangre = tipo.id_tipo_sangre
-    _transicion(unidad, personal, Unidad.DESCARTADA,
-                motivo="Resultado simulado reactivo.")
+    for causa in elegidas:
+        db.session.add(RegistroDiferimiento(
+            id_donante=unidad.id_donante,
+            id_diferimiento=causa.id_diferimiento,
+            id_cita=extraccion.id_cita,
+            id_personal=None,
+            origen=RegistroDiferimiento.LABORATORIO,
+            institucion_diagnostico=INSTITUCION_LOCAL,
+            fecha_inicio=date.today(),
+            id_resultado=resultado.id_resultado,
+        ))
+    db.session.flush()
+    _copiar_tipificacion(unidad, tipo)
+    _transicion(
+        unidad, personal, Unidad.DESCARTADA,
+        motivo="Resultado reactivo: " + ", ".join(causa.nombre for causa in elegidas) + ".",
+    )
 
     citacion = CitacionConsejeria(
         id_donante=unidad.id_donante,
@@ -146,44 +252,52 @@ def _reactivo(unidad, personal, tipo):
     ))
 
 
-def _intentar_asignar(unidad, personal, tipo):
-    """Asigna a una solicitud compatible con cupo, si hay alguna."""
-    solicitudes = (Solicitud.query
-                   .filter(Solicitud.estado == Solicitud.PUBLICADA,
-                           Solicitud.consentimiento_publicacion.is_(True),
-                           Solicitud.unidades_asignadas < Solicitud.unidades_requeridas)
-                   .all())
-    for solicitud in solicitudes:
-        par = (CompatibilidadAboRh.query
-               .filter_by(id_tipo_donante=tipo.id_tipo_sangre,
-                          id_tipo_receptor=solicitud.id_tipo_sangre)
-               .first())
-        if par is None:
-            continue
-        db.session.add(Asignacion(
-            id_unidad=unidad.id_unidad,
-            id_solicitud=solicitud.id_solicitud,
-            fecha=datetime.now(),
-        ))
-        unidad.id_solicitud = solicitud.id_solicitud
-        _transicion(unidad, personal, Unidad.ASIGNADA)
-        solicitud.unidades_asignadas += 1
+def _asignar_solicitud_de_la_cita(unidad, personal, tipo):
+    """Asigna solo si la cita de la extracción sigue dirigida a una solicitud."""
+    extraccion = db.session.get(Extraccion, unidad.id_extraccion)
+    if extraccion is None:
+        return
+    cita = db.session.get(Cita, extraccion.id_cita)
+    if cita is None or cita.id_solicitud is None:
+        return
+    solicitud = db.session.get(Solicitud, cita.id_solicitud)
+    if solicitud is None:
+        return
+    compatible = (CompatibilidadAboRh.query
+                  .filter_by(id_tipo_donante=tipo.id_tipo_sangre,
+                             id_tipo_receptor=solicitud.id_tipo_sangre)
+                  .first())
+    abierta = (solicitud.estado == Solicitud.PUBLICADA
+               and solicitud.consentimiento_publicacion
+               and solicitud.unidades_asignadas < solicitud.unidades_requeridas)
+    if compatible is None or not abierta:
+        cita.id_solicitud = None
+        if cita.tipo_cita == Cita.SOLIDARIA:
+            cita.tipo_cita = Cita.ALTRUISTA
+        return
+    db.session.add(Asignacion(
+        id_unidad=unidad.id_unidad,
+        id_solicitud=solicitud.id_solicitud,
+        fecha=datetime.now(),
+    ))
+    unidad.id_solicitud = solicitud.id_solicitud
+    _transicion(unidad, personal, Unidad.ASIGNADA)
+    solicitud.unidades_asignadas += 1
+    db.session.add(Notificacion(
+        id_usuario=solicitud.id_solicitante,
+        id_solicitud=solicitud.id_solicitud,
+        tipo=Notificacion.ASIGNACION_SOLICITANTE,
+        mensaje="Se asignó una unidad a tu solicitud.",
+    ))
+    if solicitud.unidades_asignadas >= solicitud.unidades_requeridas:
+        solicitud.estado = Solicitud.COMPLETA
+        _soltar_citas(solicitud)
         db.session.add(Notificacion(
             id_usuario=solicitud.id_solicitante,
             id_solicitud=solicitud.id_solicitud,
-            tipo=Notificacion.ASIGNACION_SOLICITANTE,
-            mensaje="Se asignó una unidad a tu solicitud.",
+            tipo=Notificacion.META_COMPLETA,
+            mensaje="La cantidad publicada de tu solicitud ya se completó.",
         ))
-        if solicitud.unidades_asignadas >= solicitud.unidades_requeridas:
-            solicitud.estado = Solicitud.COMPLETA
-            _soltar_citas(solicitud)
-            db.session.add(Notificacion(
-                id_usuario=solicitud.id_solicitante,
-                id_solicitud=solicitud.id_solicitud,
-                tipo=Notificacion.META_COMPLETA,
-                mensaje="La cantidad publicada de tu solicitud ya se completó.",
-            ))
-        return
 
 
 def _soltar_citas(solicitud):

@@ -485,19 +485,10 @@ def ficha(id_usuario):
         if resultado is not None:
             resultados.append(resultado)
     abierta = next((c for c in citas if c.estado in Cita.ACTIVAS), None)
-    cita_laboratorio = None
-    for unidad in unidades:
-        if unidad.estado != Unidad.EN_LABORATORIO:
-            continue
-        extraccion = db.session.get(Extraccion, unidad.id_extraccion)
-        if extraccion is not None:
-            cita_laboratorio = db.session.get(Cita, extraccion.id_cita)
-            break
     return {
         "donante": donante,
         "edad": edad_de(donante),
         "cita_abierta": abierta,
-        "cita_laboratorio": cita_laboratorio,
         "citas": citas,
         "historial": historial(citas, diferimientos),
         "total_donaciones": len(completadas),

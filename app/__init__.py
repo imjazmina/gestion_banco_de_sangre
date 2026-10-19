@@ -1,3 +1,5 @@
+import os
+
 from flask import Flask, has_request_context
 from sqlalchemy import text
 from sqlalchemy.exc import OperationalError
@@ -38,6 +40,10 @@ def create_app(config_class=Config, inicializar=True):
     if inicializar:
         with app.app_context():
             _inicializar_base_de_datos(app)
+            # El recargador de depuración arranca el proceso dos veces.
+            if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
+                from app.controllers.comun.simulacion import reponer_laboratorio
+                reponer_laboratorio()
 
     return app
 

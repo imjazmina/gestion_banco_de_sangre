@@ -33,12 +33,21 @@ def marcar(citacion, estado, personal):
     db.session.commit()
 
 
-def registro_de(citacion):
-    from app.models import ResultadoLaboratorio
-    resultado = db.session.get(ResultadoLaboratorio, citacion.id_resultado)
-    if resultado is None or resultado.id_registro_diferimiento is None:
-        return None
-    return db.session.get(RegistroDiferimiento, resultado.id_registro_diferimiento)
+def registros_de(citacion):
+    """Diferimientos de laboratorio asociados a ese resultado. Puede haber varios."""
+    if citacion.id_resultado is None:
+        return []
+    return (RegistroDiferimiento.query
+            .filter_by(id_resultado=citacion.id_resultado)
+            .order_by(RegistroDiferimiento.id_registro)
+            .all())
+
+
+def registro_para_derivar(registros):
+    for registro in registros:
+        if puede_derivar(registro):
+            return registro
+    return None
 
 
 def puede_derivar(registro):

@@ -155,16 +155,14 @@
           {% endif %}
           {% for r in resultados if r.id_unidad == u.id_unidad %}
           <p style="margin:8px 0 0;font-size:12px;">Resultado simulado: {{ badge(r.resultado, 'danger' if r.resultado == 'Reactivo' else 'ok') }}</p>
+          {% for d in diferimientos if d.id_resultado == r.id_resultado %}
+          <p class="faint" style="margin:4px 0 0;font-size:12px;">{{ d.causa.nombre }}</p>
+          {% endfor %}
           {% endfor %}
         </div>
         {% else %}
         <p class="faint" style="text-align:center;padding:24px 0;margin:0;">Sin unidades.</p>
         {% endfor %}
-        {% if cita_laboratorio %}
-        <div>
-          {{ btn('Simular resultado de laboratorio', 'secondary', 'sm', url_for('licenciado_extraccion.ver', cita_id=cita_laboratorio.id_cita), 'flask') }}
-        </div>
-        {% endif %}
       </div>
     </div>
   </div>

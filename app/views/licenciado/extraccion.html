@@ -32,16 +32,8 @@
 
   <div class="row mt-5">
     {{ btn('Volver a agendamientos', 'primary', 'md', url_for('licenciado_agendamientos.lista')) }}
-    {% if unidad.estado == 'En laboratorio' %}
-    <form method="post">
-      <input type="hidden" name="accion" value="simular">
-      <button class="btn btn-secondary" type="submit">{{ ico('flask', 14) }} Simular resultado de laboratorio</button>
-    </form>
-    {% endif %}
   </div>
-  {% if unidad.estado == 'En laboratorio' %}
-  <p class="faint" style="font-size:12px;margin-top:8px;">El resultado es sintético. No es un análisis del laboratorio del hospital.</p>
-  {% endif %}
+ 
 
   {% else %}
   {{ crumb(url_for('licenciado_evaluacion.ver', cita_id=cita.id_cita), 'Examen físico', 'Extracción') }}
