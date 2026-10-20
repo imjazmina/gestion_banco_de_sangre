@@ -484,11 +484,14 @@ def ficha(id_usuario):
             id_unidad=unidad.id_unidad).first()
         if resultado is not None:
             resultados.append(resultado)
-    abierta = next((c for c in citas if c.estado in Cita.ACTIVAS), None)
+    confirmada = (Cita.query
+                  .filter_by(id_usuario=id_usuario, estado=Cita.CONFIRMADA)
+                  .order_by(Cita.fecha_hora_creacion.desc())
+                  .first())
     return {
         "donante": donante,
         "edad": edad_de(donante),
-        "cita_abierta": abierta,
+        "cita_abierta": confirmada,
         "citas": citas,
         "historial": historial(citas, diferimientos),
         "total_donaciones": len(completadas),

@@ -6,7 +6,8 @@
 
 {% block contenido %}
 {% set es_ausente = cita_actual is not none and cita_actual.estado == 'Ausente' %}
-{% set id_cita_flujo = cita_abierta.id_cita if cita_abierta else none %}
+{% set cita_flujo = cita_actual if cita_actual is not none else cita_abierta %}
+{% set id_cita_flujo = cita_flujo.id_cita if cita_flujo and cita_flujo.estado == 'Confirmada' else none %}
 <div class="page">
   {{ crumb(volver_url, volver_texto, 'Ficha del donante') }}
 
@@ -167,7 +168,7 @@
     </div>
   </div>
 
-  {% if cita_abierta and not es_ausente %}
+  {% if id_cita_flujo %}
   <div class="row-end mt-4">
     {{ btn('Evaluar donante', 'teal', 'md', url_for('licenciado_cuestionario.ver', cita_id=id_cita_flujo), 'activity') }}
   </div>
