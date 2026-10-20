@@ -95,10 +95,11 @@ INSERT INTO pregunta (parte, enunciado, preselecciona_exclusion)
 SELECT * FROM (VALUES
   ('A', '¿Padece de presión alta o baja?', true),
   ('A', '¿Tuvo en la última semana gripe, estado febril, diarrea o tratamiento odontológico?', true),
-  ('A', '¿Recibió dinero para realizar esta donación?', true),
   ('A', '¿Sabe que el portador del virus VIH/SIDA puede contagiar estando aparentemente sano?', true),
   ('A', '¿Usted dona solamente para que le realicen los análisis del VIH/SIDA?', true),
-  ('A', '¿Alguna vez ha donado sangre, plaquetas o plasma?', true),
+
+  ('A', '¿Alguna vez ha donado sangre, plaquetas o plasma?', true), 
+  ('A', '¿Donde y cuando?', true),
   ('A', '¿Alguna vez ha sido rechazado como donante?', true),
   ('A', '¿Fue llamado después de una donación con respecto a resultados de sus análisis?', true),
   ('A', '¿Tuvo angina (dolor) de pecho, infarto, enfermedades del corazón o pulmón?', true),
@@ -109,8 +110,10 @@ SELECT * FROM (VALUES
   ('A', '¿Ha recibido hormonas de crecimiento de origen humano?', true),
   ('A', '¿Ha tenido sífilis, gonorrea, tratamiento o análisis positivo para alguna enfermedad de transmisión sexual (VDRL)?', true),
   ('A', '¿Ha mantenido relaciones sexuales con alguna persona que haya tenido alguna enfermedad citada en la pregunta anterior?', true),
+
   ('A', '¿Ha recibido tratamiento de acupuntura, tatuaje, colocación de aros, piercing o accidente de punción?', true),
   ('A', '¿Estuvo bajo tratamiento antirrábico o en exposición a un animal rabioso?', true),
+  ('A', '¿Mantuvo relaciones sexuales con personas comprendidas en los puntos anteriores?', true),
   ('A', '¿Estuvo bajo tratamiento médico?', true),
   ('A', '¿Sufrió algún tipo de cirugía?', true),
   ('A', '¿Estuvo detenido por más de 72 horas en una comisaría o institución carcelaria?', true),
@@ -118,10 +121,10 @@ SELECT * FROM (VALUES
   ('A', '¿Mantuvo relaciones sexuales con personas con VIH/SIDA o hepatitis, o con análisis positivo para las mismas?', true),
   ('A', '¿Mantuvo relaciones sexuales con personas que hayan sido transfundidas y/o hayan recibido injerto o trasplante de tejido?', true),
   ('A', '¿Pagó o recibió dinero y/o droga a cambio de sexo?', true),
-  ('A', '¿Mantuvo relaciones sexuales con personas comprendidas en los puntos 21 y 22?', true),
   ('A', '¿Mantuvo relaciones sexuales ocasionales sin protección?', true),
   ('A', '¿Tuvo relaciones sexuales vía anal?', true),
   ('A', '¿Ha recibido vacunas o inmunización?', true),
+  ('A', '¿Cuales?', true),
   ('A', '¿Está o estuvo embarazada o se encuentra en período de lactancia?', true),
   ('A', 'Si ha estado fuera del país, ¿se ha sentido enfermo/a días previos o posteriores a su regreso?', true),
   ('A', '¿Ud. ha leído y comprendido este cuestionario y fueron aclaradas todas sus dudas?', true),
@@ -130,7 +133,9 @@ SELECT * FROM (VALUES
   ('B','¿Ha descansado o comido bien las últimas 24 horas?',       true),
   ('B','¿Consumiste alcohol en las últimas 12 horas?',             true),
   ('B','¿Estás tomando alguna medicación actualmente?',            true),
-  ('B','¿Ha tomado aspirina los últimos 5 días?',                 true)
+  ('B', '¿Por que?', true),
+  ('B','¿Ha tomado aspirina los últimos 5 días?',                 true),
+  ('B', '¿Recibió dinero para realizar esta donación?', true)
 ) AS p(parte, enunciado, excluye)
 WHERE NOT EXISTS (SELECT 1 FROM pregunta q WHERE q.enunciado = p.enunciado);
 

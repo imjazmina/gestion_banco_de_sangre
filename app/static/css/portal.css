@@ -543,7 +543,7 @@ table.data tbody tr:nth-child(even){background:#FBFCFD;}
 .q-nota{font-size:13px; color:var(--ink2); margin:-6px 0 12px 33px; font-style:italic;}
 
 /* clear: el legend flota, así que lo que sigue tiene que bajar debajo. */
-.q-nota, .q-choice, .q-detalle{clear:both;}
+.q-nota, .q-choice, .q-detalle, .q-complemento{clear:both;}
 .q-choice{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
 /* El radio se esconde pero sigue existiendo: el teclado y el lector de
    pantalla lo usan igual, y el label es lo que se ve. */
@@ -553,6 +553,8 @@ table.data tbody tr:nth-child(even){background:#FBFCFD;}
 .q-choice input:checked + label{background:var(--navy); border-color:var(--navy); color:#fff;}
 .q-choice input:focus-visible + label{outline:2px solid var(--teal); outline-offset:2px;}
 .q-detalle{width:100%; height:44px; margin-top:10px; padding:0 12px; border:1px solid var(--line); border-radius:var(--r-input); font-size:15px;}
+.q-detalle-etiq{display:block; margin:12px 0 0; font-size:13.5px; font-weight:600;}
+.q-complemento .q-detalle{margin-top:6px;}
 
 .q-aviso{margin:0 0 4px; font-size:13.5px; color:var(--danger);}
 .q-acciones{display:flex; gap:10px; margin-top:20px;}

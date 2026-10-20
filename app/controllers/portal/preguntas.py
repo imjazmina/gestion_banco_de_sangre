@@ -1,26 +1,9 @@
-"""
-El cuestionario oficial del banco de sangre: las 36 preguntas de la Parte A.
 
-Por qué está acá y no en la base: la tabla `pregunta` guarda el enunciado,
-la parte (A o B) y si un "sí" sugiere diferimiento. No tiene dónde guardar
-el bloque del formulario, el número de orden, la aclaración que piden
-algunas preguntas ni cuál de las dos respuestas es la que el personal
-revisa. Como el esquema no se toca, eso vive en este archivo y se empareja
-con las filas de la base por el enunciado, que es único.
-
-El texto de los enunciados es el mismo que carga database/catalogos.sql. Si
-se cambia uno, hay que cambiarlo en los dos lados o la pregunta queda sin
-su bloque; database/verificar_preguntas.py lo comprueba.
-
-Sobre `alerta`: dice cuál de las dos respuestas tiene que mirar el
-personal, y no siempre es el "sí" —en «¿Se siente bien?» lo preocupante es
-el "no"—. El sistema marca, no decide: la aptitud la determina el personal
-de salud.
-"""
 from collections import namedtuple
 
-P = namedtuple("P", "orden seccion enunciado alerta detalle nota")
-P.__new__.__defaults__ = (None, None, None)
+P = namedtuple(
+    "P", "orden seccion enunciado alerta detalle nota exige_detalle")
+P.__new__.__defaults__ = (None, None, None, False)
 
 # Los tres bloques, en el orden del formulario en papel.
 SECCIONES = ["En la actualidad",
@@ -33,7 +16,7 @@ PREGUNTAS = [
     P(2, "En la actualidad", "¿Padece de presión alta o baja?",
       alerta="Si"),
     P(3, "En la actualidad", "¿Está tomando alguna medicación?",
-      alerta="Si", detalle="¿Cuál y por qué?"),
+      alerta="Si", detalle="¿Por qué?", exige_detalle=True),
     P(4, "En la actualidad", "¿Ha descansado o comido bien las últimas 24 horas?",
       alerta="No"),
     P(5, "En la actualidad", "¿Ha tomado aspirina los últimos 5 días?",
@@ -47,7 +30,7 @@ PREGUNTAS = [
     P(9, "En la actualidad", "¿Usted dona solamente para que le realicen los análisis del VIH/SIDA?",
       alerta="Si"),
     P(10, "Antecedentes personales", "¿Alguna vez ha donado sangre, plaquetas o plasma?",
-      alerta=None, detalle="¿Dónde y cuándo?"),
+      alerta=None, detalle="¿Dónde y cuándo?", exige_detalle=True),
     P(11, "Antecedentes personales", "¿Alguna vez ha sido rechazado como donante?",
       alerta="Si"),
     P(12, "Antecedentes personales", "¿Fue llamado después de una donación con respecto a resultados de sus análisis?",
@@ -93,7 +76,7 @@ PREGUNTAS = [
     P(32, "En los ultimos 12 meses", "¿Tuvo relaciones sexuales vía anal?",
       alerta="Si"),
     P(33, "En los ultimos 12 meses", "¿Ha recibido vacunas o inmunización?",
-      alerta="Si", detalle="¿Cuáles?"),
+      alerta="Si", detalle="¿Cuáles?", exige_detalle=True),
     P(34, "En los ultimos 12 meses", "¿Está o estuvo embarazada o se encuentra en período de lactancia?",
       alerta="Si"),
     P(35, "En los ultimos 12 meses", "Si ha estado fuera del país, ¿se ha sentido enfermo/a días previos o posteriores a su regreso?",

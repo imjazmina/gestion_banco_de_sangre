@@ -60,7 +60,21 @@ class ErrorSimulacion(Exception):
     """La simulación no pudo escribir. El mensaje se muestra al personal."""
 
 
+# Alta queda en Registrada al crear la unidad. Desde ahí la simulación
+# solo escribe este orden. No reescribe unidades que ya siguieron otro.
+_FLUJO = {
+    (Unidad.REGISTRADA, Unidad.EN_LABORATORIO),
+    (Unidad.EN_LABORATORIO, Unidad.EN_STOCK),
+    (Unidad.EN_LABORATORIO, Unidad.DESCARTADA),
+    (Unidad.EN_STOCK, Unidad.ASIGNADA),
+    (Unidad.EN_STOCK, Unidad.VENCIDA),
+}
+
+
 def _transicion(unidad, personal, destino, motivo=None):
+    if (unidad.estado, destino) not in _FLUJO:
+        raise ErrorSimulacion(
+            "Transicion fuera del flujo: %s a %s" % (unidad.estado, destino))
     db.session.add(TransicionEstado(
         id_unidad=unidad.id_unidad,
         id_personal=personal.id_usuario,
@@ -393,12 +407,12 @@ def asegurar_publicadas():
 
 
 def marcar_vencidas(personal):
-    """Pasa a Vencida solo si `fecha_vencimiento` ya está cargada y superada."""
+    """Pasa a Vencida una unidad en stock cuya fecha cargada ya se superó."""
     hoy = date.today()
     unidades = (Unidad.query
                 .filter(Unidad.fecha_vencimiento.isnot(None),
                         Unidad.fecha_vencimiento < hoy,
-                        Unidad.estado.in_((Unidad.EN_STOCK, Unidad.ASIGNADA)))
+                        Unidad.estado == Unidad.EN_STOCK)
                 .all())
     for unidad in unidades:
         _transicion(unidad, personal, Unidad.VENCIDA,

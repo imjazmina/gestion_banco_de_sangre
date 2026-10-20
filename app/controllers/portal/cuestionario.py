@@ -35,7 +35,7 @@ LARGO_DETALLE = 180
 # formulario que el esquema no guarda.
 Item = namedtuple(
     "Item", "id_pregunta orden seccion enunciado nota pide_detalle "
-            "etiqueta_detalle alerta_si")
+            "etiqueta_detalle alerta_si exige_detalle")
 
 
 def _items():
@@ -62,7 +62,8 @@ def _items():
             nota=datos.nota,
             pide_detalle=datos.detalle is not None,
             etiqueta_detalle=datos.detalle,
-            alerta_si=datos.alerta))
+            alerta_si=datos.alerta,
+            exige_detalle=datos.exige_detalle))
     return sorted(items, key=lambda i: i.orden)
 
 
@@ -95,16 +96,32 @@ def _valor(respuesta, detalle):
     return f"{respuesta} — {detalle}" if detalle else respuesta
 
 
-def _mensaje_faltantes(ordenes):
-    """Texto corto para la persona cuando falta alguna de las 36."""
+def _cuales(ordenes, una, varias):
     if len(ordenes) == 1:
-        cuales = f"la pregunta {ordenes[0]}"
-    elif len(ordenes) <= 6:
+        return una.format(n=ordenes[0])
+    if len(ordenes) <= 6:
         previas = ", ".join(str(n) for n in ordenes[:-1])
-        cuales = f"las preguntas {previas} y {ordenes[-1]}"
+        return varias.format(previas=previas, ultima=ordenes[-1])
+    return None
+
+
+def _mensaje_faltantes(ordenes, sin_detalle=()):
+    """Texto corto para la persona cuando falta alguna de las 36."""
+    partes = []
+    if ordenes:
+        cuales = _cuales(ordenes, "la pregunta {n}",
+                         "las preguntas {previas} y {ultima}")
+        partes.append(f"falta responder {cuales or 'varias preguntas'}")
+    if sin_detalle:
+        cuales = _cuales(sin_detalle, "la pregunta {n}",
+                         "las preguntas {previas} y {ultima}")
+        partes.append(
+            f"falta completar la aclaración de {cuales or 'varias preguntas'}")
+    if len(partes) == 2:
+        texto = f"{partes[0][0].upper()}{partes[0][1:]} y {partes[1]}"
     else:
-        cuales = "varias preguntas"
-    return (f"No pudimos enviar el cuestionario. Falta responder {cuales}. "
+        texto = f"{partes[0][0].upper()}{partes[0][1:]}"
+    return (f"No pudimos enviar el cuestionario. {texto}. "
             f"Tus respuestas siguen en esta pantalla: completalas y volvé a enviarlo.")
 
 
@@ -125,6 +142,7 @@ def enviar(cita, usuario, formulario):
             "No pudimos enviar el cuestionario. Intentá de nuevo más tarde.")
 
     faltan = []
+    sin_detalle = []
     cambios = []
     for pregunta in items:
         clave = f"p{pregunta.id_pregunta}"
@@ -132,14 +150,21 @@ def enviar(cita, usuario, formulario):
         if respuesta not in (SI, NO):
             faltan.append(pregunta.orden)
             continue
-        cambios.append((pregunta,
-                        _valor(respuesta, formulario.get(f"{clave}_detalle"))))
+        detalle = formulario.get(f"{clave}_detalle")
+        # El complemento solo corresponde al «Sí». Con «No» no se guarda,
+        # aunque el formulario todavía traiga el texto anterior.
+        if pregunta.exige_detalle and respuesta != SI:
+            detalle = ""
+        elif pregunta.exige_detalle and not (detalle or "").strip():
+            sin_detalle.append(pregunta.orden)
+            continue
+        cambios.append((pregunta, _valor(respuesta, detalle)))
 
-    if faltan:
+    if faltan or sin_detalle:
         current_app.logger.warning(
-            "Cita %s: cuestionario rechazado, faltan las preguntas %s",
-            cita.id_cita, faltan)
-        raise ErrorCuestionario(_mensaje_faltantes(faltan))
+            "Cita %s: cuestionario rechazado, faltan %s, sin detalle %s",
+            cita.id_cita, faltan, sin_detalle)
+        raise ErrorCuestionario(_mensaje_faltantes(faltan, sin_detalle))
 
     ya = respuestas(cita)
     if any(p.id_pregunta in ya for p in items):
