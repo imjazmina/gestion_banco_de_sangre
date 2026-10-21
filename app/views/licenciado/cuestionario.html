@@ -55,18 +55,29 @@
   <div class="mb-4">
     <p class="kicker" style="margin-bottom:8px;">Parte B · condiciones del día</p>
     <form method="post" id="parte-b" class="q-grid">
+      <p id="parte-b-aviso" hidden style="color:var(--danger);font-size:13px;margin:0 0 8px;">Completá la aclaración de las preguntas respondidas con sí.</p>
       {% for p in preguntas %}
       {% set hecha = respuestas.get(p.id_pregunta) %}
+      {% set crudo = hecha.valor if hecha else '' %}
+      {% set resp = crudo.split(' — ')[0] %}
+      {% set detalle = '' if p.exige_detalle and resp != 'Si' else (crudo.split(' — ', 1)[1] if ' — ' in crudo else '') %}
       <div class="card q" role="group" aria-labelledby="pb-{{ p.id_pregunta }}">
         <div class="q-top">
           <p id="pb-{{ p.id_pregunta }}" style="margin:0;flex:1;min-width:0;">
             <span class="muted" style="font-size:12px;font-weight:600;margin-right:8px;">{{ loop.index }}.</span>{{ p.enunciado }}
           </p>
           <div class="radios q-actions" style="gap:12px;">
-            <label><input type="radio" name="p{{ p.id_pregunta }}" value="Si" {% if hecha and hecha.valor == 'Si' %}checked{% endif %} required> Sí</label>
-            <label><input type="radio" name="p{{ p.id_pregunta }}" value="No" {% if hecha and hecha.valor == 'No' %}checked{% endif %}> No</label>
+            <label><input type="radio" name="p{{ p.id_pregunta }}" value="Si" {% if resp == 'Si' %}checked{% endif %} required> Sí</label>
+            <label><input type="radio" name="p{{ p.id_pregunta }}" value="No" {% if resp == 'No' %}checked{% endif %}> No</label>
           </div>
         </div>
+        {% if p.exige_detalle %}
+        <div data-condicional="1" {% if resp != 'Si' %}hidden{% endif %} style="margin:8px 0 0 24px;">
+          <label class="faint" for="p{{ p.id_pregunta }}_detalle" style="display:block;font-size:12px;font-weight:600;margin-bottom:4px;">{{ p.etiqueta_detalle }}</label>
+          <input class="control" type="text" id="p{{ p.id_pregunta }}_detalle"
+                 name="p{{ p.id_pregunta }}_detalle" value="{{ detalle }}" maxlength="180">
+        </div>
+        {% endif %}
         {% if p.preselecciona_exclusion %}
         <p class="faint" style="font-size:12px;margin:4px 0 0 24px;">Un «sí» sugiere revisar diferimiento. No lo aplica solo.</p>
         {% endif %}
@@ -109,4 +120,39 @@
   </form>
   {% endcall %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function () {
+  const form = document.getElementById('parte-b');
+  if (!form) return;
+
+  function sincronizar(card) {
+    const bloque = card.querySelector('[data-condicional]');
+    if (!bloque) return;
+    const si = card.querySelector('input[type="radio"][value="Si"]');
+    const campo = bloque.querySelector('input');
+    const mostrar = !!(si && si.checked);
+    bloque.hidden = !mostrar;
+    if (!mostrar && campo) campo.value = '';
+  }
+
+  form.querySelectorAll('.card.q').forEach(sincronizar);
+  form.addEventListener('change', function (e) {
+    const card = e.target.closest('.card.q');
+    if (card) sincronizar(card);
+  });
+  form.addEventListener('submit', function (e) {
+    const falta = Array.from(form.querySelectorAll('[data-condicional]')).some(function (bloque) {
+      if (bloque.hidden) return false;
+      const campo = bloque.querySelector('input');
+      return !campo || campo.value.trim() === '';
+    });
+    const aviso = document.getElementById('parte-b-aviso');
+    if (aviso) aviso.hidden = !falta;
+    if (falta) e.preventDefault();
+  });
+})();
+</script>
 {% endblock %}

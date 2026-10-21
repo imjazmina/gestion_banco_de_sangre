@@ -135,10 +135,14 @@ def marcar_ausente(cita, personal):
 
 
 def preguntas_parte_b():
-    return (Pregunta.query
-            .filter_by(parte=Pregunta.PARTE_PERSONAL)
-            .order_by(Pregunta.id_pregunta)
-            .all())
+    """La parte B del catálogo. La aclaración no se lista como pregunta aparte."""
+    from app.controllers.portal.cuestionario import principales
+
+    filas = (Pregunta.query
+             .filter_by(parte=Pregunta.PARTE_PERSONAL)
+             .order_by(Pregunta.id_pregunta)
+             .all())
+    return principales(filas)
 
 
 def respuestas_de(cita):
@@ -159,12 +163,22 @@ def guardar_parte_b(cita, personal, formulario):
     if not preguntas:
         raise ErrorJornada("No hay preguntas de la parte B en el catálogo.")
 
+    from app.controllers.portal.cuestionario import _valor
+
     ahora = datetime.now()
     existentes = respuestas_de(cita)
     for pregunta in preguntas:
         valor = (formulario.get(f"p{pregunta.id_pregunta}") or "").strip()
         if valor not in ("Si", "No"):
             raise ErrorJornada("Respondé todas las preguntas de la parte B.")
+        detalle = formulario.get(f"p{pregunta.id_pregunta}_detalle")
+        if getattr(pregunta, "exige_detalle", False) and valor != "Si":
+            detalle = ""
+        elif getattr(pregunta, "exige_detalle", False) and not (detalle or "").strip():
+            raise ErrorJornada(
+                "Completá la aclaración de las preguntas respondidas con sí.")
+        if getattr(pregunta, "exige_detalle", False):
+            valor = _valor(valor, detalle)
         fila_resp = existentes.get(pregunta.id_pregunta)
         if fila_resp is None:
             db.session.add(Cuestionario(
