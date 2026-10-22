@@ -10,7 +10,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/portal.css') }}">
 </head>
-<body{% if usuario %} class="has-bottom-nav"{% endif %}>
+{# La barra de abajo está siempre, con sesión o sin ella: en el celular es
+   la forma en que la gente espera moverse por un sitio. #}
+<body class="has-bottom-nav">
 <div id="app">
 
 {% from "portal/_ui.html" import ico %}
@@ -18,16 +20,18 @@
 {# ------------------------------ CABECERA ------------------------------ #}
 <header class="site">
   <div class="wrap header-inner">
+    {# El botón del menú va antes del logo: en el celular el pulgar llega
+       primero al borde izquierdo, y deja el lado derecho libre para la
+       acción principal. En pantalla grande se oculta. #}
+    <button class="mobile-toggle" type="button" aria-label="Abrir menú"
+            aria-expanded="false" aria-controls="menu-movil">{{ ico('menu') }}</button>
     <a class="logo" href="{{ url_for('main.index') }}">
-      <span class="mark">{{ ico('drop') }}</span> Banco de sangre
+      <span class="mark">{{ ico('drop') }}</span>
+      <span class="logo-text">Banco de sangre</span>
     </a>
     <div class="header-right">
       {# En el celular la barra de arriba no entra, así que las opciones se
-         mueven a este panel. Sin él, quien no tiene sesión se queda sin
-         menú, y quien la tiene no puede llegar a Información, Solicitudes
-         ni Salir: la barra de abajo no las lleva. #}
-      <button class="mobile-toggle" type="button" aria-label="Abrir menú"
-              aria-expanded="false" aria-controls="menu-movil">{{ ico('menu') }}</button>
+         mueven al panel desplegable y a la barra de abajo. #}
       {% if usuario %}
         <nav class="main-nav">
           <a class="nav-link {{ 'active' if activo == 'inicio' }}" href="{{ url_for('main.index') }}">Inicio</a>
@@ -50,7 +54,11 @@
         <div class="header-actions">
           <a class="btn btn-ghost hide-sm"     href="{{ url_for('auth.ingresar') }}">Iniciar sesión</a>
           <a class="btn btn-secondary hide-sm" href="{{ url_for('auth.registro') }}">Crear cuenta</a>
-          <a class="btn btn-donate"            href="{{ url_for('auth.ingresar', donar=1) }}">{{ ico('drop') }} Quiero donar</a>
+          {# En pantallas angostas el texto largo no entra al lado del logo y
+             el botón se parte en dos renglones. Se acorta a «Donar». #}
+          <a class="btn btn-donate" href="{{ url_for('auth.ingresar', donar=1) }}">
+            {{ ico('drop') }}<span class="cta-largo">Quiero donar</span><span class="cta-corto">Donar</span>
+          </a>
         </div>
       {% endif %}
     </div>
@@ -109,7 +117,10 @@
 <footer class="site">
   <div class="wrap">
     <div class="footer-grid">
-      <div class="footer-col" style="max-width:280px;">
+      {# En el celular esta columna se oculta: el logo ya está en la cabecera
+         y la descripción no aporta nada que no diga la propia pantalla.
+         Era la que hacía que el pie ocupara toda la pantalla. #}
+      <div class="footer-col footer-col-brand" style="max-width:280px;">
         <div class="logo" style="margin-bottom:12px;"><span class="mark">{{ ico('drop') }}</span>Banco de sangre</div>
         <p>Hospital Regional de Luque. Portal de donantes para agendar cita e informarse de forma segura.</p>
       </div>
@@ -127,14 +138,16 @@
       </div>
       <div class="footer-col">
         <h4>Contacto</h4>
-        <p>{{ ico('mapPin') }} Av. Mcal. López, Luque</p>
-        <p>{{ ico('phone') }} (021) 645-000</p>
-        <p>{{ ico('mail') }} bancodesangre@hrl.gov.py</p>
+        <p class="footer-dato">{{ ico('mapPin') }} Av. Mcal. López, Luque</p>
+        <p class="footer-dato">{{ ico('phone') }} (021) 645-000</p>
+        <p class="footer-dato">{{ ico('mail') }} bancodesangre@hrl.gov.py</p>
       </div>
       <div class="footer-col">
         <h4>Horario</h4>
-        <p>Lunes a viernes, 07:00–15:00</p>
-        <p>Sábados, 07:00–11:00</p>
+        {# El día y la hora en renglones separados: en la columna angosta del
+           celular, en una sola línea el horario se partía por la mitad. #}
+        <p>Lunes a viernes<br><b>07:00–15:00</b></p>
+        <p>Sábados<br><b>07:00–11:00</b></p>
       </div>
       <div class="footer-col">
         <h4>Legal</h4>
@@ -151,15 +164,22 @@
   </div>
 </footer>
 
-{% if usuario %}
 <div class="bottom-nav show">
+  {% if usuario %}
   <a class="bn-item {{ 'active' if activo == 'inicio' }}"      href="{{ url_for('main.index') }}">{{ ico('activity') }}<span>Inicio</span></a>
   <a class="bn-item {{ 'active' if activo == 'donar' }}" href="{{ url_for('donar.agendar') }}">{{ ico('drop') }}<span>Donar</span></a>
   <a class="bn-item {{ 'active' if activo == 'mi-cita' }}" href="{{ url_for('mi_cita.ver') }}">{{ ico('calendar') }}<span>Mi cita</span></a>
   <a class="bn-item {{ 'active' if activo == 'notificaciones' }}" href="{{ url_for('notificaciones.listar') }}">{{ ico('bell') }}<span>Avisos</span></a>
   <a class="bn-item {{ 'active' if activo == 'perfil' }}"      href="{{ url_for('perfil.ver') }}">{{ ico('user') }}<span>Perfil</span></a>
+  {% else %}
+  {# Sin sesión son cuatro: las dos pantallas que se pueden ver sin entrar,
+     la acción principal y el acceso a la cuenta. #}
+  <a class="bn-item {{ 'active' if activo == 'home' }}" href="{{ url_for('main.index') }}">{{ ico('activity') }}<span>Inicio</span></a>
+  <a class="bn-item {{ 'active' if activo == 'informacion' }}" href="{{ url_for('informacion.ver') }}">{{ ico('info') }}<span>Información</span></a>
+  <a class="bn-item {{ 'active' if activo == 'donar' }}" href="{{ url_for('auth.ingresar', donar=1) }}">{{ ico('drop') }}<span>Donar</span></a>
+  <a class="bn-item {{ 'active' if activo == 'ingresar' }}" href="{{ url_for('auth.ingresar') }}">{{ ico('user') }}<span>Ingresar</span></a>
+  {% endif %}
 </div>
-{% endif %}
 
 </div>
 

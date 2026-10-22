@@ -93,16 +93,13 @@ ON CONFLICT (nombre) DO NOTHING;
 -- ---------- Cuestionario ----------
 INSERT INTO pregunta (parte, enunciado, preselecciona_exclusion)
 SELECT * FROM (VALUES
-  ('A', '¿Se siente Ud. bien y goza de buena salud?', false),
   ('A', '¿Padece de presión alta o baja?', true),
-  ('A', '¿Está tomando alguna medicación?', true),
-  ('A', '¿Ha descansado o comido bien las últimas 24 horas?', false),
-  ('A', '¿Ha tomado aspirina los últimos 5 días?', true),
   ('A', '¿Tuvo en la última semana gripe, estado febril, diarrea o tratamiento odontológico?', true),
-  ('A', '¿Recibió dinero para realizar esta donación?', true),
-  ('A', '¿Sabe que el portador del virus VIH/SIDA puede contagiar estando aparentemente sano?', false),
+  ('A', '¿Sabe que el portador del virus VIH/SIDA puede contagiar estando aparentemente sano?', true),
   ('A', '¿Usted dona solamente para que le realicen los análisis del VIH/SIDA?', true),
-  ('A', '¿Alguna vez ha donado sangre, plaquetas o plasma?', false),
+
+  ('A', '¿Alguna vez ha donado sangre, plaquetas o plasma?', true), 
+  ('A', '¿Donde y cuando?', true),
   ('A', '¿Alguna vez ha sido rechazado como donante?', true),
   ('A', '¿Fue llamado después de una donación con respecto a resultados de sus análisis?', true),
   ('A', '¿Tuvo angina (dolor) de pecho, infarto, enfermedades del corazón o pulmón?', true),
@@ -113,8 +110,10 @@ SELECT * FROM (VALUES
   ('A', '¿Ha recibido hormonas de crecimiento de origen humano?', true),
   ('A', '¿Ha tenido sífilis, gonorrea, tratamiento o análisis positivo para alguna enfermedad de transmisión sexual (VDRL)?', true),
   ('A', '¿Ha mantenido relaciones sexuales con alguna persona que haya tenido alguna enfermedad citada en la pregunta anterior?', true),
+
   ('A', '¿Ha recibido tratamiento de acupuntura, tatuaje, colocación de aros, piercing o accidente de punción?', true),
   ('A', '¿Estuvo bajo tratamiento antirrábico o en exposición a un animal rabioso?', true),
+  ('A', '¿Mantuvo relaciones sexuales con personas comprendidas en los puntos anteriores?', true),
   ('A', '¿Estuvo bajo tratamiento médico?', true),
   ('A', '¿Sufrió algún tipo de cirugía?', true),
   ('A', '¿Estuvo detenido por más de 72 horas en una comisaría o institución carcelaria?', true),
@@ -122,18 +121,21 @@ SELECT * FROM (VALUES
   ('A', '¿Mantuvo relaciones sexuales con personas con VIH/SIDA o hepatitis, o con análisis positivo para las mismas?', true),
   ('A', '¿Mantuvo relaciones sexuales con personas que hayan sido transfundidas y/o hayan recibido injerto o trasplante de tejido?', true),
   ('A', '¿Pagó o recibió dinero y/o droga a cambio de sexo?', true),
-  ('A', '¿Mantuvo relaciones sexuales con personas comprendidas en los puntos 21 y 22?', true),
   ('A', '¿Mantuvo relaciones sexuales ocasionales sin protección?', true),
   ('A', '¿Tuvo relaciones sexuales vía anal?', true),
   ('A', '¿Ha recibido vacunas o inmunización?', true),
+  ('A', '¿Cuales?', true),
   ('A', '¿Está o estuvo embarazada o se encuentra en período de lactancia?', true),
   ('A', 'Si ha estado fuera del país, ¿se ha sentido enfermo/a días previos o posteriores a su regreso?', true),
-  ('A', '¿Ud. ha leído y comprendido este cuestionario y fueron aclaradas todas sus dudas?', false),
-  ('B','¿Desayunaste hoy?',                                        false),
-  ('B','¿Dormiste al menos 6 horas anoche?',                       false),
+  ('A', '¿Ud. ha leído y comprendido este cuestionario y fueron aclaradas todas sus dudas?', true),
+  ('B', '¿Se siente Ud. bien y goza de buena salud?', true),
+  ('B','¿Desayunaste hoy?',                                        true),
+  ('B','¿Ha descansado o comido bien las últimas 24 horas?',       true),
   ('B','¿Consumiste alcohol en las últimas 12 horas?',             true),
-  ('B','¿Tenés fiebre, gripe o alguna infección en este momento?', true),
-  ('B','¿Estás tomando alguna medicación actualmente?',            true)
+  ('B','¿Estás tomando alguna medicación actualmente?',            true),
+  ('B', '¿Por que?', true),
+  ('B','¿Ha tomado aspirina los últimos 5 días?',                 true),
+  ('B', '¿Recibió dinero para realizar esta donación?', true)
 ) AS p(parte, enunciado, excluye)
 WHERE NOT EXISTS (SELECT 1 FROM pregunta q WHERE q.enunciado = p.enunciado);
 
@@ -475,25 +477,33 @@ BEGIN
     INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, motivo, fecha)
     VALUES (v_uni, v_pers, 'En laboratorio', 'Descartada', 'Resultado reactivo', v_momento + interval '1 day');
     UPDATE unidad SET estado = 'Descartada' WHERE id_unidad = v_uni;
-  ELSIF p_estado = 'Asignada' AND v_sol IS NOT NULL THEN
-    INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha)
-    VALUES (v_uni, v_pers, 'En laboratorio', 'En stock', v_momento + interval '1 day');
-    INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha)
-    VALUES (v_uni, v_pers, 'En stock', 'Asignada', v_momento + interval '2 days');
-    UPDATE unidad SET estado = 'Asignada' WHERE id_unidad = v_uni;
-    INSERT INTO asignacion (id_unidad, id_solicitud, fecha)
-    SELECT v_uni, v_sol, v_momento + interval '2 days'
-     WHERE NOT EXISTS (SELECT 1 FROM asignacion a WHERE a.id_unidad = v_uni);
-  ELSIF p_estado = 'En stock' THEN
+  ELSIF p_estado = 'Utilizada' AND v_sol IS NOT NULL THEN
     INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha)
     VALUES (v_uni, v_pers, 'En laboratorio', 'En stock', v_momento + interval '1 day');
     UPDATE unidad SET estado = 'En stock' WHERE id_unidad = v_uni;
+    INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha)
+    VALUES (v_uni, v_pers, 'En stock', 'Asignada', v_momento + interval '2 days');
+    UPDATE unidad SET estado = 'Asignada', id_solicitud = v_sol WHERE id_unidad = v_uni;
+    INSERT INTO asignacion (id_unidad, id_solicitud, fecha)
+    SELECT v_uni, v_sol, v_momento + interval '2 days'
+     WHERE NOT EXISTS (SELECT 1 FROM asignacion a WHERE a.id_unidad = v_uni);
+    INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, motivo, fecha)
+    VALUES (v_uni, v_pers, 'Asignada', 'Utilizada', 'Urgenci', v_momento + interval '3 days');
+    UPDATE unidad SET estado = 'Utilizada' WHERE id_unidad = v_uni;
+  ELSIF p_estado = 'Asignada' AND v_sol IS NOT NULL THEN
+    INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha)
+    VALUES (v_uni, v_pers, 'En laboratorio', 'En stock', v_momento + interval '1 day');
+    UPDATE unidad SET estado = 'En stock' WHERE id_unidad = v_uni;
+    INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha)
+    VALUES (v_uni, v_pers, 'En stock', 'Asignada', v_momento + interval '2 days');
+    UPDATE unidad SET estado = 'Asignada', id_solicitud = v_sol WHERE id_unidad = v_uni;
+    INSERT INTO asignacion (id_unidad, id_solicitud, fecha)
+    SELECT v_uni, v_sol, v_momento + interval '2 days'
+     WHERE NOT EXISTS (SELECT 1 FROM asignacion a WHERE a.id_unidad = v_uni);
   ELSE
     INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha)
     VALUES (v_uni, v_pers, 'En laboratorio', 'En stock', v_momento + interval '1 day');
-    INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, motivo, fecha)
-    VALUES (v_uni, v_pers, 'En stock', 'Utilizada', 'Uso clínico de maqueta', v_momento + interval '3 days');
-    UPDATE unidad SET estado = 'Utilizada' WHERE id_unidad = v_uni;
+    UPDATE unidad SET estado = 'En stock' WHERE id_unidad = v_uni;
   END IF;
   RETURN v_uni;
 END;
@@ -917,8 +927,7 @@ SELECT maqueta_diferimiento('7222222', 'Tatuaje, piercing o acupuntura', (SELECT
 SELECT maqueta_cita('7333333', 'Donacion altruista', DATE '2025-09-02', TIME '08:00', 'No apto', NULL, '10000001');
 SELECT maqueta_diferimiento('7333333', 'Hemoglobina baja', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '7333333' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2025-09-02') AND h.hora_inicio = TIME '08:00' LIMIT 1), 'MEDICION', 'Hospital Regional de Luque', DATE '2025-09-02', NULL);
 SELECT maqueta_medicion((SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='7333333' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2025-09-02') LIMIT 1), 'HB', 11.0, TIMESTAMP '2025-09-02 08:15');
-SELECT maqueta_cita('7444444', 'Donacion altruista', DATE '2026-02-11', TIME '09:00', 'No apto', NULL, '10000001');
-SELECT maqueta_diferimiento('7444444', 'Anti-HCV (Hepatitis C)', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '7444444' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-02-11') AND h.hora_inicio = TIME '09:00' LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2026-02-11', NULL);
+SELECT maqueta_diferimiento('7444444', 'Anti-HCV (Hepatitis C)', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '7444444' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2025-04-14') AND h.hora_inicio = TIME '09:00' LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2025-04-14', NULL);
 SELECT maqueta_diferimiento('7555555', 'Enfermedad infecciosa reciente', NULL, 'CUESTIONARIO_PERSONAL', 'Hospital Nacional de Itauguá', DATE '2026-07-01', NULL);
 SELECT maqueta_diferimiento('5485567', 'VIH 1/2', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '5485567' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-08-20') AND h.hora_inicio = TIME '11:00' LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2026-08-20', NULL);
 SELECT maqueta_cita('90000201', 'Donacion altruista', DATE '2026-09-01', TIME '07:00', 'No apto', NULL, '10000001');
@@ -955,22 +964,22 @@ SELECT maqueta_diferimiento('90000208', 'Peso inferior al mínimo', (SELECT c.id
 SELECT maqueta_diferimiento('90000001', 'VDRL (Sífilis)', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000001' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-01') LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2026-09-01', NULL);
 SELECT maqueta_diferimiento('90000002', 'Chagas (T. cruzi)', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000002' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-02') LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2026-09-02', NULL);
 SELECT maqueta_diferimiento('90000003', 'HTLV I/II', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000003' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-03') LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2026-09-03', NULL);
+SELECT maqueta_diferimiento('90000004', 'CMV', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000004' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-04') LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2026-09-04', NULL);
 
--- Vincular resultados reactivos de Diego, Ramón y Julieta al diferimiento
-
-
-UPDATE resultado_laboratorio r
-   SET id_registro_diferimiento = rd.id_registro,
-       id_diferimiento = d.id_diferimiento
-  FROM unidad u
-  JOIN usuario don ON don.id_usuario = u.id_donante
-  JOIN registro_diferimiento rd ON rd.id_donante = don.id_usuario
-  JOIN diferimiento d ON d.id_diferimiento = rd.id_diferimiento
- WHERE r.id_unidad = u.id_unidad
+-- Cada resultado reactivo apunta a los diferimientos de laboratorio de esa extracción.
+UPDATE registro_diferimiento rd
+   SET id_resultado = r.id_resultado
+  FROM resultado_laboratorio r
+  JOIN unidad u ON u.id_unidad = r.id_unidad
+  JOIN extraccion e ON e.id_extraccion = u.id_extraccion
+ WHERE rd.id_donante = u.id_donante
+   AND rd.id_cita = e.id_cita
+   AND rd.origen = 'LABORATORIO'
    AND r.resultado = 'Reactivo'
-   AND d.tipo = 'Permanente'
-   AND don.documento IN ('2345678','7444444','5485567','90000001','90000002','90000003');
-
+   AND rd.id_resultado IS NULL
+   AND rd.id_diferimiento IN (
+        SELECT d.id_diferimiento FROM diferimiento d WHERE d.tipo = 'Permanente'
+   );
 
 -- Citaciones de consejería (solo permanentes con resultado)
 

@@ -36,12 +36,18 @@ h2 > svg.icon, h1 > svg.icon{display:inline-block; vertical-align:-4px; margin-r
 #app > main{flex:1 0 auto;}
 #app > footer.site{flex-shrink:0;}
 .wrap{max-width:1180px; margin:0 auto; padding:0 24px;}
-@media(max-width:768px){.wrap{padding:0 16px;}}
+/* En el celular el margen lateral es lo único que separa el texto del borde
+   de la pantalla. Con 16px el contenido se lee pegado al vidrio; 20px dan
+   aire sin comerse ancho útil. */
+@media(max-width:768px){.wrap{padding:0 20px;}}
 
 /* ---------- header ---------- */
 header.site{position:sticky; top:0; z-index:40; background:var(--surface); border-bottom:1px solid var(--line); transition:box-shadow .2s ease;}
 header.site.scrolled{box-shadow:0 4px 18px rgba(18,12,97,.06);}
-.header-inner{display:flex; align-items:center; justify-content:space-between; height:64px;}
+/* Sin space-between: el botón del menú y el logo quedan juntos a la
+   izquierda, y .header-right se va solo al otro extremo con margin-left:auto.
+   Con space-between el logo quedaba suelto en el medio. */
+.header-inner{display:flex; align-items:center; height:64px;}
 .header-right{display:flex; align-items:center; gap:4px; margin-left:auto;}
 .hide-sm{}
 .logo{display:flex; align-items:center; gap:10px; font-weight:600; font-size:18px; color:var(--navy); white-space:nowrap; flex-shrink:0;}
@@ -58,8 +64,10 @@ nav.main-nav a.active{background:var(--hero); color:var(--navy); border-color:#F
 .bell-wrap{position:relative;}
 .bell-dot{position:absolute; top:6px; right:6px; width:8px; height:8px; border-radius:50%; background:var(--blood); border:1.5px solid var(--surface);}
 .avatar{width:36px; height:36px; border-radius:50%; background:var(--navy); color:#fff; display:flex; align-items:center; justify-content:center; font-size:13px; font-weight:600;}
-.mobile-toggle{display:none; align-items:center; justify-content:center; width:44px; height:44px; border:1px solid var(--line); border-radius:var(--r-input); background:var(--surface); color:var(--navy); order:-1; margin-right:4px;}
+.mobile-toggle{display:none; align-items:center; justify-content:center; width:44px; height:44px; border:1px solid var(--line); border-radius:var(--r-input); background:var(--surface); color:var(--navy); margin-right:10px; flex-shrink:0;}
 .menu-movil{display:none;}
+/* El texto corto del botón de donar solo aparece en pantallas angostas. */
+.cta-corto{display:none;}
 @media(max-width:900px){
   nav.main-nav{display:none;}
   .mobile-toggle{display:flex;}
@@ -73,9 +81,22 @@ nav.main-nav a.active{background:var(--hero); color:var(--navy); border-color:#F
   .menu-movil a:last-child{border-bottom:none;}
   .menu-movil svg{width:19px; height:19px; color:var(--ink2);}
 }
+/* Cabecera en pantallas angostas: entran el botón del menú, el logo y la
+   acción principal. Para que los tres quepan sin apretarse, el nombre se
+   achica y el botón pasa a decir solo «Donar». */
+@media(max-width:480px){
+  .logo{font-size:16px; gap:8px; min-width:0;}
+  .logo-text{overflow:hidden; text-overflow:ellipsis;}
+  .mobile-toggle{margin-right:8px;}
+  .cta-largo{display:none;}
+  .cta-corto{display:inline;}
+  .header-actions .btn-donate{padding:0 14px;}
+}
 
 /* ---------- buttons ---------- */
-.btn{height:40px; padding:0 18px; border-radius:var(--r-input); font-size:14px; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:8px; border:1px solid transparent; transition:background .15s ease, border-color .15s ease, transform .15s ease, box-shadow .15s ease;}
+/* white-space:nowrap: sin esto, en el celular «Quiero donar» se parte en dos
+   renglones y el botón crece hacia abajo en lugar de a lo ancho. */
+.btn{height:40px; padding:0 18px; border-radius:var(--r-input); font-size:14px; font-weight:600; display:inline-flex; align-items:center; justify-content:center; gap:8px; white-space:nowrap; border:1px solid transparent; transition:background .15s ease, border-color .15s ease, transform .15s ease, box-shadow .15s ease;}
 .btn svg{width:16px; height:16px;}
 .btn-primary{background:var(--navy); color:#fff;}
 .btn-primary:hover{background:var(--navy-ink); transform:translateY(-1px);}
@@ -199,8 +220,12 @@ section.block{padding:56px 0;}
 
 /* ---------- hero ---------- */
 .hero{background:var(--hero); border-bottom:1px solid #F3DADA;}
-.hero-grid{display:grid; grid-template-columns:1.1fr .9fr; gap:48px; align-items:center; padding:64px 0;}
-@media(max-width:900px){.hero-grid{grid-template-columns:1fr; padding:40px 0; gap:32px;}}
+/* padding-top/bottom y no la forma corta `padding:64px 0`: esta clase va en
+   el mismo elemento que .wrap, y la forma corta le borraba los márgenes
+   laterales. El hero quedaba pegado al borde de la pantalla mientras el
+   resto de la página sí los respetaba. */
+.hero-grid{display:grid; grid-template-columns:1.1fr .9fr; gap:48px; align-items:center; padding-top:64px; padding-bottom:64px;}
+@media(max-width:900px){.hero-grid{grid-template-columns:1fr; padding-top:36px; padding-bottom:36px; gap:28px;}}
 .hero-eyebrow{color:var(--blood-ink); font-weight:600; font-size:14px; margin-bottom:14px; display:flex; align-items:center; gap:8px; flex-wrap:wrap;}
 .hero h1.display{margin-bottom:16px;}
 .hero p.lead{font-size:17px; color:var(--ink2); max-width:46ch; margin-bottom:28px;}
@@ -321,6 +346,27 @@ footer.site{border-top:3px solid var(--navy); background:var(--surface); padding
 .footer-col h4{font-size:13px; font-weight:600; margin-bottom:12px; color:var(--ink);}
 .footer-col a, .footer-col p{display:block; font-size:13.5px; color:var(--ink2); margin-bottom:8px;}
 .footer-bottom{margin-top:28px; padding-top:20px; border-top:1px solid var(--line); font-size:12px; color:var(--ink2);}
+
+/* Pie en el celular. Apilado en una sola columna ocupaba más que la pantalla
+   entera. Pasa a dos columnas, se oculta el bloque de marca —el logo ya está
+   arriba— y se saca la separación extra entre enlaces, que se sumaba a la
+   altura mínima de toque y daba 48px por renglón. */
+@media(max-width:900px){
+  footer.site{padding:28px 0 20px; margin-top:16px;}
+  .footer-grid{display:grid; grid-template-columns:1fr 1fr; gap:20px 18px;}
+  .footer-col h4{margin-bottom:4px;}
+  .footer-col a, .footer-col p{font-size:13px; margin-bottom:0;}
+  .footer-col p{margin-bottom:10px; line-height:1.5;}
+  .footer-col p b{font-weight:600; color:var(--ink);}
+  /* Solo los datos de contacto: llevan ícono y hay que alinearlo con el
+     texto. Los demás párrafos siguen en bloque, porque usan <br>. */
+  .footer-col p.footer-dato{display:flex; align-items:center; gap:7px; min-height:30px; margin-bottom:0;}
+  .footer-col p.footer-dato svg{flex-shrink:0;}
+  .footer-bottom{margin-top:20px; padding-top:14px; font-size:11.5px;}
+}
+@media(max-width:600px){
+  .footer-col-brand{display:none;}
+}
 
 /* ---------- dashboard ---------- */
 .dash-hero{background:linear-gradient(0deg, var(--surface), var(--surface)); border:1px solid var(--line); border-radius:12px; padding:28px; display:flex; justify-content:space-between; gap:24px; align-items:center; flex-wrap:wrap;}
@@ -543,7 +589,7 @@ table.data tbody tr:nth-child(even){background:#FBFCFD;}
 .q-nota{font-size:13px; color:var(--ink2); margin:-6px 0 12px 33px; font-style:italic;}
 
 /* clear: el legend flota, así que lo que sigue tiene que bajar debajo. */
-.q-nota, .q-choice, .q-detalle{clear:both;}
+.q-nota, .q-choice, .q-detalle, .q-complemento{clear:both;}
 .q-choice{display:grid; grid-template-columns:1fr 1fr; gap:10px;}
 /* El radio se esconde pero sigue existiendo: el teclado y el lector de
    pantalla lo usan igual, y el label es lo que se ve. */
@@ -553,6 +599,8 @@ table.data tbody tr:nth-child(even){background:#FBFCFD;}
 .q-choice input:checked + label{background:var(--navy); border-color:var(--navy); color:#fff;}
 .q-choice input:focus-visible + label{outline:2px solid var(--teal); outline-offset:2px;}
 .q-detalle{width:100%; height:44px; margin-top:10px; padding:0 12px; border:1px solid var(--line); border-radius:var(--r-input); font-size:15px;}
+.q-detalle-etiq{display:block; margin:12px 0 0; font-size:13.5px; font-weight:600;}
+.q-complemento .q-detalle{margin-top:6px;}
 
 .q-aviso{margin:0 0 4px; font-size:13.5px; color:var(--danger);}
 .q-acciones{display:flex; gap:10px; margin-top:20px;}

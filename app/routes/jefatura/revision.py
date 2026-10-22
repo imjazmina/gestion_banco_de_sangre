@@ -20,7 +20,8 @@ def ver(cita_id):
     if request.method == "POST":
         try:
             if request.form.get("accion") == "derivar":
-                registro = consejeria.registro_de(citacion)
+                registro = consejeria.registro_para_derivar(
+                    consejeria.registros_de(citacion))
                 consejeria.derivar(
                     registro, personal,
                     request.form.get("establecimiento"),
@@ -35,11 +36,12 @@ def ver(cita_id):
         return redirect(url_for("jefatura_revision.ver", cita_id=cita_id))
 
     donante = db.session.get(Usuario, citacion.id_donante)
-    registro = consejeria.registro_de(citacion)
+    registros = consejeria.registros_de(citacion)
+    externo = consejeria.registro_para_derivar(registros)
     return pintar(
         "jefatura/revision.html",
         citacion=citacion,
         donante=donante,
-        registro=registro,
-        puede_derivar=consejeria.puede_derivar(registro),
+        registros=registros,
+        puede_derivar=externo is not None,
     )

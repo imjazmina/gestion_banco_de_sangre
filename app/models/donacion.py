@@ -175,6 +175,8 @@ class RegistroDiferimiento(db.Model):
     institucion_diagnostico = db.Column(db.String(120), nullable=False)
     fecha_inicio = db.Column(db.Date, nullable=False)
     fecha_fin = db.Column(db.Date)
+    id_resultado = db.Column(
+        db.Integer, db.ForeignKey("resultado_laboratorio.id_resultado"))
 
     causa = db.relationship("Diferimiento", lazy="joined")
 
@@ -250,10 +252,6 @@ class ResultadoLaboratorio(db.Model):
     id_resultado = db.Column(db.Integer, primary_key=True)
     id_unidad = db.Column(
         db.Integer, db.ForeignKey("unidad.id_unidad"), nullable=False, unique=True)
-    id_diferimiento = db.Column(
-        db.Integer, db.ForeignKey("diferimiento.id_diferimiento"))
-    id_registro_diferimiento = db.Column(
-        db.Integer, db.ForeignKey("registro_diferimiento.id_registro"))
     id_tipo_sangre = db.Column(
         db.Integer, db.ForeignKey("tipo_sangre.id_tipo_sangre"), nullable=False)
     resultado = db.Column(db.String(20), nullable=False)

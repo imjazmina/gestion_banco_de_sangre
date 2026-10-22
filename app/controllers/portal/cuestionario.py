@@ -1,22 +1,22 @@
 """
 Cuestionario previo a la donación.
 
-Son 36 preguntas: en una sola pantalla de celular no se responden, así que
-la pantalla las muestra en tres pasos, uno por bloque del formulario
-original. Esos pasos solo cambian de vista. Las respuestas viven en el
-formulario hasta que la persona aprieta «Enviar cuestionario»: ahí se
-validan las 36 y se insertan juntas. Si algo falla, no queda nada escrito
-y la cita no pasa a confirmada.
+Las preguntas salen de la tabla `pregunta`, en el orden del catálogo. En el
+celular se muestran en tres pasos, uno por bloque. Esos pasos solo cambian
+de vista. Las respuestas viven en el formulario hasta que la persona aprieta
+«Enviar cuestionario»: ahí se validan todas y se insertan juntas. Si algo
+falla, no queda nada escrito y la cita no pasa a confirmada.
 
-La tabla `pregunta` guarda el enunciado y poco más; el bloque, el número y
-la aclaración que piden algunas viven en preguntas.py y se emparejan por el
-enunciado. Acá se juntan las dos mitades en un solo objeto para que las
-pantallas no tengan que saber de dónde sale cada dato.
+El bloque, el número y cuál respuesta tiene que mirar el personal no están
+en la tabla: se completan desde preguntas.py cuando el enunciado coincide.
+La aclaración, si el catálogo la cargó como pregunta siguiente, usa el texto
+de esa fila.
 
 Lo que el portal NO hace: decidir. Una respuesta marcada no rechaza al
 donante ni cancela la cita. El personal de salud lee el cuestionario y
 decide en el momento, que es como tiene que ser.
 """
+import unicodedata
 from collections import namedtuple
 from datetime import date, datetime
 
@@ -35,35 +35,70 @@ LARGO_DETALLE = 180
 # formulario que el esquema no guarda.
 Item = namedtuple(
     "Item", "id_pregunta orden seccion enunciado nota pide_detalle "
-            "etiqueta_detalle alerta_si")
+            "etiqueta_detalle alerta_si exige_detalle")
+
+
+def _norm(texto):
+    """El enunciado, sin acentos ni signos, para reconocer la aclaración."""
+    base = unicodedata.normalize("NFD", texto or "")
+    base = "".join(c for c in base if unicodedata.category(c) != "Mn")
+    return "".join(c for c in base.lower() if c.isalnum())
+
+
+def _aclaraciones():
+    """Las aclaraciones que ya son condicionales, por el texto del catálogo."""
+    return {_norm(p.detalle) for p in catalogo.PREGUNTAS
+            if p.exige_detalle and p.detalle}
+
+
+def principales(filas):
+    """
+    Las filas de `pregunta`, en el orden de la tabla.
+
+    «¿Dónde y cuándo?», «¿Cuáles?» y «¿Por qué?» están cargadas como
+    preguntas, pero no se responden solas: quedan en la anterior y siguen
+    la regla ya armada (solo con «Sí», y entonces obligatorias).
+    """
+    marcas = _aclaraciones()
+    salida = []
+    for fila in filas:
+        if salida and _norm(fila.enunciado) in marcas:
+            padre = salida[-1]
+            padre.exige_detalle = True
+            padre.etiqueta_detalle = fila.enunciado
+            continue
+        datos = catalogo.datos_de(fila.enunciado)
+        fila.exige_detalle = bool(datos and datos.exige_detalle)
+        fila.etiqueta_detalle = datos.detalle if datos and datos.detalle else None
+        fila.nota_form = datos.nota if datos else None
+        fila.alerta_si = datos.alerta if datos else None
+        fila.seccion_form = datos.seccion if datos else None
+        salida.append(fila)
+    return salida
 
 
 def _items():
-    """
-    Las preguntas del donante, ya emparejadas y en orden.
-
-    Una fila de la base sin entrada en el catálogo queda afuera: es una
-    pregunta vieja o de prueba, y mostrarla sin bloque ni número la pondría
-    en cualquier lado del formulario.
-    """
-    filas = Pregunta.query.filter(
-        Pregunta.parte == Pregunta.PARTE_DONANTE).all()
-
+    """La parte A, leída de la tabla y en el orden en que fue cargada."""
+    filas = (Pregunta.query
+             .filter(Pregunta.parte == Pregunta.PARTE_DONANTE)
+             .order_by(Pregunta.id_pregunta)
+             .all())
+    seccion = catalogo.SECCIONES[0]
     items = []
-    for fila in filas:
-        datos = catalogo.datos_de(fila.enunciado)
-        if datos is None:
-            continue
+    for orden, fila in enumerate(principales(filas), start=1):
+        if fila.seccion_form:
+            seccion = fila.seccion_form
         items.append(Item(
             id_pregunta=fila.id_pregunta,
-            orden=datos.orden,
-            seccion=datos.seccion,
+            orden=orden,
+            seccion=seccion,
             enunciado=fila.enunciado,
-            nota=datos.nota,
-            pide_detalle=datos.detalle is not None,
-            etiqueta_detalle=datos.detalle,
-            alerta_si=datos.alerta))
-    return sorted(items, key=lambda i: i.orden)
+            nota=fila.nota_form,
+            pide_detalle=bool(fila.etiqueta_detalle),
+            etiqueta_detalle=fila.etiqueta_detalle,
+            alerta_si=fila.alerta_si,
+            exige_detalle=bool(fila.exige_detalle)))
+    return items
 
 
 def preguntas(seccion=None):
@@ -95,16 +130,32 @@ def _valor(respuesta, detalle):
     return f"{respuesta} — {detalle}" if detalle else respuesta
 
 
-def _mensaje_faltantes(ordenes):
-    """Texto corto para la persona cuando falta alguna de las 36."""
+def _cuales(ordenes, una, varias):
     if len(ordenes) == 1:
-        cuales = f"la pregunta {ordenes[0]}"
-    elif len(ordenes) <= 6:
+        return una.format(n=ordenes[0])
+    if len(ordenes) <= 6:
         previas = ", ".join(str(n) for n in ordenes[:-1])
-        cuales = f"las preguntas {previas} y {ordenes[-1]}"
+        return varias.format(previas=previas, ultima=ordenes[-1])
+    return None
+
+
+def _mensaje_faltantes(ordenes, sin_detalle=()):
+    """Texto corto para la persona cuando falta alguna de las 36."""
+    partes = []
+    if ordenes:
+        cuales = _cuales(ordenes, "la pregunta {n}",
+                         "las preguntas {previas} y {ultima}")
+        partes.append(f"falta responder {cuales or 'varias preguntas'}")
+    if sin_detalle:
+        cuales = _cuales(sin_detalle, "la pregunta {n}",
+                         "las preguntas {previas} y {ultima}")
+        partes.append(
+            f"falta completar la aclaración de {cuales or 'varias preguntas'}")
+    if len(partes) == 2:
+        texto = f"{partes[0][0].upper()}{partes[0][1:]} y {partes[1]}"
     else:
-        cuales = "varias preguntas"
-    return (f"No pudimos enviar el cuestionario. Falta responder {cuales}. "
+        texto = f"{partes[0][0].upper()}{partes[0][1:]}"
+    return (f"No pudimos enviar el cuestionario. {texto}. "
             f"Tus respuestas siguen en esta pantalla: completalas y volvé a enviarlo.")
 
 
@@ -116,15 +167,15 @@ def enviar(cita, usuario, formulario):
     no queda nada. No actualiza respuestas que ya existían.
     """
     items = preguntas()
-    if len(items) != len(catalogo.PREGUNTAS):
+    if not items:
         current_app.logger.error(
-            "Cita %s: el cuestionario del donante tiene %s preguntas "
-            "emparejadas y el catálogo tiene %s",
-            cita.id_cita, len(items), len(catalogo.PREGUNTAS))
+            "Cita %s: la parte A no tiene preguntas en el catálogo",
+            cita.id_cita)
         raise ErrorCuestionario(
             "No pudimos enviar el cuestionario. Intentá de nuevo más tarde.")
 
     faltan = []
+    sin_detalle = []
     cambios = []
     for pregunta in items:
         clave = f"p{pregunta.id_pregunta}"
@@ -132,14 +183,21 @@ def enviar(cita, usuario, formulario):
         if respuesta not in (SI, NO):
             faltan.append(pregunta.orden)
             continue
-        cambios.append((pregunta,
-                        _valor(respuesta, formulario.get(f"{clave}_detalle"))))
+        detalle = formulario.get(f"{clave}_detalle")
+        # El complemento solo corresponde al «Sí». Con «No» no se guarda,
+        # aunque el formulario todavía traiga el texto anterior.
+        if pregunta.exige_detalle and respuesta != SI:
+            detalle = ""
+        elif pregunta.exige_detalle and not (detalle or "").strip():
+            sin_detalle.append(pregunta.orden)
+            continue
+        cambios.append((pregunta, _valor(respuesta, detalle)))
 
-    if faltan:
+    if faltan or sin_detalle:
         current_app.logger.warning(
-            "Cita %s: cuestionario rechazado, faltan las preguntas %s",
-            cita.id_cita, faltan)
-        raise ErrorCuestionario(_mensaje_faltantes(faltan))
+            "Cita %s: cuestionario rechazado, faltan %s, sin detalle %s",
+            cita.id_cita, faltan, sin_detalle)
+        raise ErrorCuestionario(_mensaje_faltantes(faltan, sin_detalle))
 
     ya = respuestas(cita)
     if any(p.id_pregunta in ya for p in items):
@@ -169,7 +227,7 @@ def enviar(cita, usuario, formulario):
 def completo(cita):
     """True si las 36 preguntas del donante ya tienen fila en esta cita."""
     items = preguntas()
-    if len(items) != len(catalogo.PREGUNTAS):
+    if not items:
         return False
     ya = respuestas(cita)
     return all(p.id_pregunta in ya for p in items)

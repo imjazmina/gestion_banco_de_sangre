@@ -12,9 +12,11 @@
   </div>
   {% call alerta('info') %}La citación que ve el donante es genérica. El resultado no se le envía por la plataforma.{% endcall %}
 
-  {% if registro %}
+  {% if registros %}
   <div class="card card-pad mt-4">
+    {% for registro in registros %}
     <p>Diferimiento: {{ registro.causa.nombre }} · {{ registro.institucion_diagnostico }}</p>
+    {% endfor %}
   </div>
   {% endif %}
 

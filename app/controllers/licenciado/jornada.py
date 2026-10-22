@@ -135,10 +135,14 @@ def marcar_ausente(cita, personal):
 
 
 def preguntas_parte_b():
-    return (Pregunta.query
-            .filter_by(parte=Pregunta.PARTE_PERSONAL)
-            .order_by(Pregunta.id_pregunta)
-            .all())
+    """La parte B del catálogo. La aclaración no se lista como pregunta aparte."""
+    from app.controllers.portal.cuestionario import principales
+
+    filas = (Pregunta.query
+             .filter_by(parte=Pregunta.PARTE_PERSONAL)
+             .order_by(Pregunta.id_pregunta)
+             .all())
+    return principales(filas)
 
 
 def respuestas_de(cita):
@@ -159,12 +163,22 @@ def guardar_parte_b(cita, personal, formulario):
     if not preguntas:
         raise ErrorJornada("No hay preguntas de la parte B en el catálogo.")
 
+    from app.controllers.portal.cuestionario import _valor
+
     ahora = datetime.now()
     existentes = respuestas_de(cita)
     for pregunta in preguntas:
         valor = (formulario.get(f"p{pregunta.id_pregunta}") or "").strip()
         if valor not in ("Si", "No"):
             raise ErrorJornada("Respondé todas las preguntas de la parte B.")
+        detalle = formulario.get(f"p{pregunta.id_pregunta}_detalle")
+        if getattr(pregunta, "exige_detalle", False) and valor != "Si":
+            detalle = ""
+        elif getattr(pregunta, "exige_detalle", False) and not (detalle or "").strip():
+            raise ErrorJornada(
+                "Completá la aclaración de las preguntas respondidas con sí.")
+        if getattr(pregunta, "exige_detalle", False):
+            valor = _valor(valor, detalle)
         fila_resp = existentes.get(pregunta.id_pregunta)
         if fila_resp is None:
             db.session.add(Cuestionario(
@@ -461,7 +475,9 @@ def ficha(id_usuario):
     citas = (Cita.query
              .filter_by(id_usuario=id_usuario)
              .order_by(Cita.fecha_hora_creacion.desc())
-             .all())
+             .filter(Cita.estado.in_([Cita.COMPLETADA, Cita.NO_APTO]))
+             .all()
+            )
     diferimientos = (RegistroDiferimiento.query
                      .filter_by(id_donante=id_usuario)
                      .order_by(RegistroDiferimiento.fecha_inicio.desc())
@@ -482,20 +498,14 @@ def ficha(id_usuario):
             id_unidad=unidad.id_unidad).first()
         if resultado is not None:
             resultados.append(resultado)
-    abierta = next((c for c in citas if c.estado in Cita.ACTIVAS), None)
-    cita_laboratorio = None
-    for unidad in unidades:
-        if unidad.estado != Unidad.EN_LABORATORIO:
-            continue
-        extraccion = db.session.get(Extraccion, unidad.id_extraccion)
-        if extraccion is not None:
-            cita_laboratorio = db.session.get(Cita, extraccion.id_cita)
-            break
+    confirmada = (Cita.query
+                  .filter_by(id_usuario=id_usuario, estado=Cita.CONFIRMADA)
+                  .order_by(Cita.fecha_hora_creacion.desc())
+                  .first())
     return {
         "donante": donante,
         "edad": edad_de(donante),
-        "cita_abierta": abierta,
-        "cita_laboratorio": cita_laboratorio,
+        "cita_abierta": confirmada,
         "citas": citas,
         "historial": historial(citas, diferimientos),
         "total_donaciones": len(completadas),
