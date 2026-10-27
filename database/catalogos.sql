@@ -468,40 +468,40 @@ BEGIN
                       componente, estado, fecha_vencimiento)
   VALUES (v_ext, v_don, v_sol, p_codigo, v_tipo, 'sangre_total', 'Registrada', p_vto)
   RETURNING id_unidad INTO v_uni;
-  INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha)
+  INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha_hora)
   VALUES (v_uni, v_pers, 'Registrada', 'En laboratorio', v_momento + interval '20 minutes');
   UPDATE unidad SET estado = 'En laboratorio' WHERE id_unidad = v_uni;
   INSERT INTO resultado_laboratorio (id_unidad, id_tipo_sangre, resultado, fecha)
   VALUES (v_uni, v_tipo, p_resultado, v_momento + interval '1 day');
   IF p_resultado = 'Reactivo' THEN
-    INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, motivo, fecha)
+    INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, motivo, fecha_hora)
     VALUES (v_uni, v_pers, 'En laboratorio', 'Descartada', 'Resultado reactivo', v_momento + interval '1 day');
     UPDATE unidad SET estado = 'Descartada' WHERE id_unidad = v_uni;
   ELSIF p_estado = 'Utilizada' AND v_sol IS NOT NULL THEN
-    INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha)
+    INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha_hora)
     VALUES (v_uni, v_pers, 'En laboratorio', 'En stock', v_momento + interval '1 day');
     UPDATE unidad SET estado = 'En stock' WHERE id_unidad = v_uni;
-    INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha)
+    INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha_hora)
     VALUES (v_uni, v_pers, 'En stock', 'Asignada', v_momento + interval '2 days');
     UPDATE unidad SET estado = 'Asignada', id_solicitud = v_sol WHERE id_unidad = v_uni;
     INSERT INTO asignacion (id_unidad, id_solicitud, fecha)
     SELECT v_uni, v_sol, v_momento + interval '2 days'
      WHERE NOT EXISTS (SELECT 1 FROM asignacion a WHERE a.id_unidad = v_uni);
-    INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, motivo, fecha)
+    INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, motivo, fecha_hora)
     VALUES (v_uni, v_pers, 'Asignada', 'Utilizada', 'Urgenci', v_momento + interval '3 days');
     UPDATE unidad SET estado = 'Utilizada' WHERE id_unidad = v_uni;
   ELSIF p_estado = 'Asignada' AND v_sol IS NOT NULL THEN
-    INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha)
+    INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha_hora)
     VALUES (v_uni, v_pers, 'En laboratorio', 'En stock', v_momento + interval '1 day');
     UPDATE unidad SET estado = 'En stock' WHERE id_unidad = v_uni;
-    INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha)
+    INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha_hora)
     VALUES (v_uni, v_pers, 'En stock', 'Asignada', v_momento + interval '2 days');
     UPDATE unidad SET estado = 'Asignada', id_solicitud = v_sol WHERE id_unidad = v_uni;
     INSERT INTO asignacion (id_unidad, id_solicitud, fecha)
     SELECT v_uni, v_sol, v_momento + interval '2 days'
      WHERE NOT EXISTS (SELECT 1 FROM asignacion a WHERE a.id_unidad = v_uni);
   ELSE
-    INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha)
+    INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha_hora)
     VALUES (v_uni, v_pers, 'En laboratorio', 'En stock', v_momento + interval '1 day');
     UPDATE unidad SET estado = 'En stock' WHERE id_unidad = v_uni;
   END IF;

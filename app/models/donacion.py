@@ -243,7 +243,7 @@ class TransicionEstado(db.Model):
     estado_origen = db.Column(db.String(20), nullable=False)
     estado_destino = db.Column(db.String(20), nullable=False)
     motivo = db.Column(db.Text)
-    fecha = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    fecha = db.Column("fecha_hora", db.DateTime, nullable=False, default=datetime.now)
 
 
 class ResultadoLaboratorio(db.Model):
