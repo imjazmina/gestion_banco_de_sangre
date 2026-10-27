@@ -86,7 +86,7 @@ def fila(cita):
         "id": cita.id_cita,
         "hora": cita.horario.hora_inicio.strftime("%H:%M"),
         "donante": cita.donante.nombre_completo,
-        "ci": cita.donante.documento,
+        "ci": cita.donante.documento_visible,
         "tipo": etiqueta_tipo(cita.tipo_cita),
         "estado": cita.estado,
         "donorId": cita.id_usuario,

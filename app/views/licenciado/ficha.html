@@ -43,7 +43,7 @@
       <div style="min-width:0;">
         <h1 style="margin:0;font-size:22px;font-weight:600;">{{ donante.nombre_completo }}</h1>
         <div class="row" style="margin-top:4px;gap:12px;">
-          <span class="muted">CI {{ donante.documento }}</span>
+          <span class="muted">CI {{ donante.documento_visible }}</span>
           {% if edad is not none %}<span style="color:var(--line);">|</span><span class="muted">{{ edad }} años</span>{% endif %}
           {% if donante.tipo_sangre %}<span style="color:var(--line);">|</span>{{ badge(donante.tipo_sangre.etiqueta, 'navy') }}{% endif %}
           {% if es_ausente %}{{ badge_cita('Ausente') }}{% endif %}
@@ -63,7 +63,7 @@
       <div class="data-grid">
         <div>
           <p class="data-label">Cédula de identidad</p>
-          <p class="data-value mono">{{ donante.documento }}</p>
+          <p class="data-value mono">{{ donante.documento_visible }}</p>
         </div>
         <div>
           <p class="data-label">Fecha de nacimiento</p>

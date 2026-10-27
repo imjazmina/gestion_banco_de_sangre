@@ -67,5 +67,4 @@ def guardar(cita_id):
     except ErrorJornada as exc:
         flash(str(exc), "error")
         return redirect(url_for("licenciado_cuestionario.ver", cita_id=cita_id))
-    flash("Parte B guardada.", "ok")
     return redirect(url_for("licenciado_evaluacion.ver", cita_id=cita_id))

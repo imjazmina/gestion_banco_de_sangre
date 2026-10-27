@@ -8,7 +8,7 @@
   {{ crumb(url_for('jefatura_diferimientos.lista'), 'Citaciones', 'Revisión') }}
   <div class="section-head">
     <h1>{{ donante.nombre_completo }}</h1>
-    <p>Documento {{ donante.documento }} · {{ badge_cita(citacion.estado) }}</p>
+    <p>Documento {{ donante.documento_visible }} · {{ badge_cita(citacion.estado) }}</p>
   </div>
   {% call alerta('info') %}La citación que ve el donante es genérica. El resultado no se le envía por la plataforma.{% endcall %}
 

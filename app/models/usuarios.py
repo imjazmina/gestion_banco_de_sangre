@@ -32,13 +32,14 @@ class Usuario(db.Model):
     __tablename__ = "usuario"
 
     id_usuario = db.Column(db.Integer, primary_key=True)
-    documento = db.Column(db.String(20), nullable=False, unique=True)
-    nombre = db.Column(db.String(80), nullable=False)
-    apellido = db.Column(db.String(80), nullable=False)
+    documento = db.Column(db.String(64), nullable=False, unique=True)
+    # Nulos cuando la cuenta fue suprimida.
+    nombre = db.Column(db.String(80))
+    apellido = db.Column(db.String(80))
     fecha_nacimiento = db.Column(db.Date, nullable=False)
     genero = db.Column(db.String(20), nullable=False)
     # Nula cuando la cuenta fue suprimida (CHECK ck_usuario_supresion).
-    contrasena = db.Column(db.String(255))
+    contrasena = db.Column(db.String(64))
     consentimiento_privacidad = db.Column(db.Boolean, nullable=False)
     estado = db.Column(db.Boolean, nullable=False, default=True)
     cuenta_suprimida = db.Column(db.Boolean, nullable=False, default=False)
@@ -57,7 +58,19 @@ class Usuario(db.Model):
 
     @property
     def nombre_completo(self):
-        return f"{self.nombre} {self.apellido}"
+        texto = " ".join(parte for parte in (self.nombre, self.apellido) if parte)
+        if texto:
+            return texto
+        if self.cuenta_suprimida:
+            return "Cuenta suprimida"
+        return ""
+
+    @property
+    def documento_visible(self):
+        """La cédula en claro. Tras la supresión no se muestra el hash."""
+        if self.cuenta_suprimida:
+            return "—"
+        return self.documento
 
     @property
     def correo_principal(self):

@@ -7,13 +7,17 @@ porque lo determina el laboratorio a partir de una extracción, no una
 declaración del donante.
 """
 import calendar
+import hashlib
 import re
 from datetime import date
 
 from sqlalchemy import func
 
 from app.controllers.portal.agenda import diferimiento_vigente
-from app.models import db, Usuario, Correo, Telefono, Auditoria, Cita
+from app.models import (
+    db, Usuario, Correo, Telefono, Auditoria, Cita, Solicitud,
+    Notificacion, Extraccion, Unidad,
+)
 
 _CORREO = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -26,6 +30,13 @@ INTERVALO_POR_DEFECTO = 4  # el más conservador, si el género no estuviera car
 
 class ErrorPerfil(Exception):
     """Los datos no pasan las validaciones. El mensaje se le muestra al usuario."""
+
+
+class ErrorSupresion(Exception):
+    """Hay citas, extracciones o solicitudes abiertas. No se tocó ningún registro."""
+
+    def __init__(self, operaciones):
+        self.operaciones = operaciones
 
 
 def validar(nombre, apellido, correo):
@@ -100,23 +111,85 @@ def actualizar(usuario, datos):
         raise
 
 
+def _documento_pseudonimo(id_usuario, documento):
+    """
+    Hash del documento. Incluye el id para que una segunda cuenta, creada
+    con la misma cédula y suprimida después, no choque con la clave única.
+    """
+    materia = f"{id_usuario}:{documento}".encode("utf-8")
+    return hashlib.sha256(materia).hexdigest()
+
+
+def operaciones_abiertas(usuario):
+    """
+    Citas sin atender, extracciones sin tipificar y solicitudes publicadas.
+
+    La tipificación la carga el laboratorio al salir de «En laboratorio».
+    «Registrada» es el instante previo y también queda pendiente.
+    """
+    citas = (Cita.query
+             .filter(Cita.id_usuario == usuario.id_usuario,
+                     Cita.estado.in_(Cita.ACTIVAS))
+             .all())
+    extracciones = (db.session.query(Extraccion, Unidad)
+                    .join(Unidad, Unidad.id_extraccion == Extraccion.id_extraccion)
+                    .filter(Unidad.id_donante == usuario.id_usuario,
+                            Unidad.estado.in_((Unidad.REGISTRADA,
+                                               Unidad.EN_LABORATORIO)))
+                    .all())
+    solicitudes = (Solicitud.query
+                   .filter_by(id_solicitante=usuario.id_usuario,
+                              estado=Solicitud.PUBLICADA)
+                   .all())
+    return {"citas": citas, "extracciones": extracciones,
+            "solicitudes": solicitudes}
+
+
+def hay_operaciones_abiertas(operaciones):
+    return bool(operaciones["citas"] or operaciones["extracciones"]
+                or operaciones["solicitudes"])
+
+
+def _quitar_avisos_operativos(usuario):
+    """Conserva la citación genérica del resultado reactivo."""
+    (Notificacion.query
+     .filter(Notificacion.id_usuario == usuario.id_usuario,
+             Notificacion.tipo != Notificacion.CITACION_GENERICA)
+     .delete(synchronize_session=False))
+
+
 def suprimir_cuenta(usuario):
     """
     Supresión de cuenta (Ley N.º 1682/01).
 
-    No se borra la fila: se anula el acceso y se conserva el rastro clínico,
-    que el banco de sangre está obligado a guardar. El CHECK
-    ck_usuario_supresion exige que la contraseña quede nula.
+    Si hay una cita activa, una extracción sin tipificar o una solicitud
+    publicada, no cambia nada. Si no las hay, la fila y el id_usuario quedan:
+    de ellos cuelgan extracción, unidad, diferimiento y la citación por
+    resultado reactivo. Se borran contacto,
+    nombre y credencial. El documento pasa a hash. Fecha de nacimiento,
+    género y tipo de sangre se mantienen para las métricas y el rastro
+    clínico. El CHECK ck_usuario_supresion exige contraseña nula.
     """
+    if usuario.cuenta_suprimida:
+        return
+    abiertas = operaciones_abiertas(usuario)
+    if hay_operaciones_abiertas(abiertas):
+        raise ErrorSupresion(abiertas)
     try:
-        usuario.cuenta_suprimida = True
-        usuario.estado = False
-        usuario.contrasena = None
+        _quitar_avisos_operativos(usuario)
 
-        for correo in usuario.correos:
+        for correo in list(usuario.correos):
             db.session.delete(correo)
-        for telefono in usuario.telefonos:
+        for telefono in list(usuario.telefonos):
             db.session.delete(telefono)
+
+        usuario.documento = _documento_pseudonimo(
+            usuario.id_usuario, usuario.documento)
+        usuario.nombre = None
+        usuario.apellido = None
+        usuario.contrasena = None
+        usuario.estado = False
+        usuario.cuenta_suprimida = True
 
         Auditoria.registrar(usuario.id_usuario, "USUARIO",
                             usuario.id_usuario, Auditoria.SUPRESION_CUENTA)

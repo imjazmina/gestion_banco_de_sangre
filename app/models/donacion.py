@@ -35,6 +35,18 @@ class Solicitud(db.Model):
     REVOCADA = "Revocada"
 
 
+class HistorialSolicitud(db.Model):
+    """Cada cambio de estado. No se actualiza ni se borra."""
+    __tablename__ = "historial_solicitud"
+
+    id_historial_solicitud = db.Column(db.Integer, primary_key=True)
+    id_solicitud = db.Column(
+        db.Integer, db.ForeignKey("solicitud.id_solicitud"), nullable=False)
+    estado_anterior = db.Column(db.String(120))
+    estado_nuevo = db.Column(db.String(120), nullable=False)
+    fecha_hora = db.Column(db.DateTime, nullable=False, default=datetime.now)
+
+
 class Cita(db.Model):
     """
     Turno de donación.
@@ -113,6 +125,31 @@ class Cita(db.Model):
     NO_APTO = "No apto"
 
     ACTIVAS = (PENDIENTE, CONFIRMADA)
+
+
+class HistorialCita(db.Model):
+    """Cada cambio de estado. No se actualiza ni se borra."""
+    __tablename__ = "historial_cita"
+
+    id_historial_cita = db.Column(db.Integer, primary_key=True)
+    id_cita = db.Column(
+        db.Integer, db.ForeignKey("cita.id_cita"), nullable=False)
+    estado_anterior = db.Column(db.String(120))
+    estado_nuevo = db.Column(db.String(120), nullable=False)
+    fecha_hora = db.Column(db.DateTime, nullable=False, default=datetime.now)
+
+
+class HistorialCitaConsejeria(db.Model):
+    """Cada cambio de estado de la citación. No se actualiza ni se borra."""
+    __tablename__ = "historial_cita_consejeria"
+
+    id_historial_cita_consejeria = db.Column(db.Integer, primary_key=True)
+    id_cita_consejeria = db.Column(
+        db.Integer, db.ForeignKey("citacion_consejeria.id_citacion"),
+        nullable=False)
+    estado_anterior = db.Column(db.String(120))
+    estado_nuevo = db.Column(db.String(120), nullable=False)
+    fecha_hora = db.Column(db.DateTime, nullable=False, default=datetime.now)
 
 
 class Cuestionario(db.Model):

@@ -24,7 +24,8 @@ from app.models.catalogos import (     # noqa: E402
     Diferimiento, HorarioDisponible, ContenidoPortal,
 )
 from app.models.donacion import (      # noqa: E402
-    Solicitud, Cita, Cuestionario, Medicion, RegistroDiferimiento,
+    Solicitud, HistorialSolicitud, Cita, HistorialCita, HistorialCitaConsejeria,
+    Cuestionario, Medicion, RegistroDiferimiento,
     Extraccion, Unidad, TransicionEstado, ResultadoLaboratorio,
     Asignacion, CitacionConsejeria, Derivacion,
 )
@@ -37,7 +38,8 @@ __all__ = [
     "Rol", "Usuario", "UsuarioRol", "PerfilPersonal", "Telefono", "Correo",
     "TipoSangre", "CompatibilidadAboRh", "TipoMedicion", "Pregunta",
     "Diferimiento", "HorarioDisponible", "ContenidoPortal",
-    "Solicitud", "Cita", "Cuestionario", "Medicion", "RegistroDiferimiento",
+    "Solicitud", "HistorialSolicitud", "Cita", "HistorialCita",
+    "HistorialCitaConsejeria", "Cuestionario", "Medicion", "RegistroDiferimiento",
     "Extraccion", "Unidad", "TransicionEstado", "ResultadoLaboratorio",
     "Asignacion", "CitacionConsejeria", "Derivacion",
     "Notificacion", "Buzon", "Auditoria",

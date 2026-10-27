@@ -10,7 +10,7 @@
   <div class="section-head">
     <div>
       <h1>Examen físico</h1>
-      <p>{{ cita.donante.nombre_completo }} · CI {{ cita.donante.documento }}</p>
+      <p>{{ cita.donante.nombre_completo }} · CI {{ cita.donante.documento_visible }}</p>
     </div>
   </div>
 
@@ -37,9 +37,7 @@
       {% endfor %}
     </div>
     <div class="mt-5">
-      {% if apto %}
-        {% call alerta('ok', 'Todos los signos dentro del rango apto') %}El donante puede proceder a extracción.{% endcall %}
-      {% else %}
+      {% if not apto %}
         {% call alerta('warn', 'Uno o más signos fuera de rango') %}No se puede realizar la extracción. Se debe registrar el motivo de diferimiento.{% endcall %}
       {% endif %}
     </div>

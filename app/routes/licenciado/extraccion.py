@@ -49,7 +49,6 @@ def ver(cita_id):
             unidad = jornada.registrar_extraccion(
                 cita, personal, _observacion(request.form))
             agendar_resultado(unidad.id_unidad)
-            flash("Extracción registrada. La unidad quedó en laboratorio.", "ok")
         except ErrorJornada as exc:
             flash(str(exc), "error")
         return redirect(url_for("licenciado_extraccion.ver", cita_id=cita_id))

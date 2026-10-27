@@ -49,7 +49,7 @@
       <table class="data" style="width:100%;">
         <tbody>
           <tr><td style="color:var(--ink2);">Nombre</td><td style="text-align:right; font-weight:600;">{{ usuario.nombre_completo }}</td></tr>
-          <tr><td style="color:var(--ink2);">Documento</td><td style="text-align:right; font-weight:600;">{{ usuario.documento }}</td></tr>
+          <tr><td style="color:var(--ink2);">Documento</td><td style="text-align:right; font-weight:600;">{{ usuario.documento_visible }}</td></tr>
           <tr><td style="color:var(--ink2);">Fecha de nacimiento</td><td style="text-align:right; font-weight:600;">{{ usuario.fecha_nacimiento.strftime('%d/%m/%Y') }}</td></tr>
           <tr><td style="color:var(--ink2);">Género</td><td style="text-align:right; font-weight:600;">{{ usuario.genero }}</td></tr>
           <tr><td style="color:var(--ink2);">Correo</td><td style="text-align:right; font-weight:600;">{{ correo or '—' }}</td></tr>

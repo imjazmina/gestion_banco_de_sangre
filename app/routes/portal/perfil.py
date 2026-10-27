@@ -34,13 +34,23 @@ def guardar():
 @perfil_bp.get("/suprimir")
 @requiere_login
 def confirmar_supresion():
-    return render_template("portal/perfil/suprimir.html")
+    usuario = usuario_actual()
+    operaciones = ctrl.operaciones_abiertas(usuario)
+    bloqueada = request.args.get("bloqueada") == "1"
+    return render_template(
+        "portal/perfil/suprimir.html",
+        operaciones=operaciones,
+        mostrar_modal=bloqueada and ctrl.hay_operaciones_abiertas(operaciones),
+    )
 
 
 @perfil_bp.post("/suprimir")
 @requiere_login
 def suprimir():
-    ctrl.suprimir_cuenta(usuario_actual())
+    try:
+        ctrl.suprimir_cuenta(usuario_actual())
+    except ctrl.ErrorSupresion:
+        return redirect(url_for("perfil.confirmar_supresion", bloqueada=1))
     cerrar_sesion()
     flash("Tu cuenta fue suprimida. Gracias por haber formado parte del portal.", "ok")
     return redirect(url_for("main.index"))

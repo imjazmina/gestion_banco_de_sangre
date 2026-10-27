@@ -10,7 +10,7 @@
   <div class="section-head">
     <div>
       <h1>Revisión del cuestionario</h1>
-      <p>{{ cita.donante.nombre_completo }} · CI {{ cita.donante.documento }}</p>
+      <p>{{ cita.donante.nombre_completo }} · CI {{ cita.donante.documento_visible }}</p>
     </div>
     {% if atencion_a %}
     {{ badge(atencion_a|length ~ ' respuesta' ~ ('s' if atencion_a|length != 1) ~ ' a revisar', 'warn', 'sm') }}

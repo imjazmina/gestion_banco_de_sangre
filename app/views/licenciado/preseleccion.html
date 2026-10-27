@@ -33,7 +33,7 @@
             {% for p in personas %}
             <tr class="{{ 'zebra' if loop.index0 is odd }}">
               <td><span style="font-weight:500;">{{ p.nombre_completo }}</span></td>
-              <td><span class="mono muted" style="font-size:12px;">{{ p.documento }}</span></td>
+              <td><span class="mono muted" style="font-size:12px;">{{ p.documento_visible }}</span></td>
               <td>{{ badge(p.tipo_sangre.etiqueta, 'teal') }}</td>
               <td style="text-align:right;">{{ btn('Ver ficha', 'ghost', 'sm', url_for('licenciado_ficha.ver', donor_id=p.id_usuario, de='inicio'), 'eye') }}</td>
             </tr>
