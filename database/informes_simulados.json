@@ -50,7 +50,6 @@
     "procesados": 87,
     "reactivos": 4,
     "no_reactivos": 83,
-    "en_investigacion": 2,
     "marcadores": [
       { "label": "VIH 1/2", "n": 10 },
       { "label": "HBsAg (Hepatitis B)", "n": 8 },

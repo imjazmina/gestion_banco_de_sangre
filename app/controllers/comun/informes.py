@@ -7,7 +7,7 @@ database/informes_simulados.json, porque el esquema no lo modela:
 
   - el detalle de marcadores serológicos: no hay columna de marcador, y
     resultado_laboratorio solo guarda Reactivo / No reactivo;
-  - el estado «En investigación», por el mismo CHECK;
+  - el estado «En laboratorio», por el mismo CHECK;
   - la hemovigilancia completa: no existe una tabla de eventos adversos
     con momento y severidad;
   - los hemocomponentes separados: unidad tiene CHECK componente =
@@ -333,6 +333,18 @@ def _diferidas(registros):
     return len({r.id_donante for r, _c in registros})
 
 
+def _en_laboratorio(desde, hasta):
+    """Unidades extraídas en el período que siguen en el paso En laboratorio."""
+    return (db.session.query(func.count(Unidad.id_unidad))
+            .join(Extraccion, Extraccion.id_extraccion == Unidad.id_extraccion)
+            .join(Cita, Cita.id_cita == Extraccion.id_cita)
+            .filter(func.date(Extraccion.fecha) >= desde,
+                    func.date(Extraccion.fecha) <= hasta,
+                    Cita.tipo_cita != Cita.COMPATIBILIDAD,
+                    Unidad.estado == Unidad.EN_LABORATORIO)
+            .scalar() or 0)
+
+
 def _serologia(desde, hasta):
     """Resultados de laboratorio de las unidades extraídas en el período."""
     filas = (db.session.query(ResultadoLaboratorio.resultado, func.count())
@@ -349,9 +361,9 @@ def _serologia(desde, hasta):
     return {"procesados": reactivos + no_reactivos,
             "reactivos": reactivos,
             "no_reactivos": no_reactivos,
-            # El CHECK de resultado_laboratorio solo admite los dos valores
-            # de arriba. «En investigación» no se puede representar.
-            "en_investigacion": _SIM["serologia"]["en_investigacion"]}
+            # «En investigación» de la maqueta es el paso En laboratorio
+            # (UNIDAD.estado), no un tercer valor de resultado.
+            "en_laboratorio": _en_laboratorio(desde, hasta)}
 
 
 def _solicitudes():
@@ -553,7 +565,7 @@ def presentacion(desde, hasta, error="", con_hemovigilancia=True):
             "filas": _filas(
                 [["Indicador", "Valor"], ["Volúmenes procesados", str(sero["procesados"])],
                  ["Reactivos", str(sero["reactivos"])], ["No reactivos", str(sero["no_reactivos"])],
-                 ["En investigación", str(sero["en_investigacion"])]],
+                 ["En laboratorio", str(sero["en_laboratorio"])]],
                 [["Marcador", "Reactivos"], *([f["label"], str(f["n"])] for f in serologia)],
             ),
         },
@@ -601,7 +613,7 @@ def presentacion(desde, hasta, error="", con_hemovigilancia=True):
         "procesados": sero["procesados"],
         "reactivos": sero["reactivos"],
         "no_reactivos": sero["no_reactivos"],
-        "investigacion": sero["en_investigacion"],
+        "en_laboratorio": sero["en_laboratorio"],
         "serologia": serologia,
         "extracciones": hemo["extracciones"],
         "eventos": eventos,

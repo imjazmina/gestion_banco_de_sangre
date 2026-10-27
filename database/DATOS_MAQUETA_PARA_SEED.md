@@ -442,7 +442,7 @@ Antes del seed hay que asegurar estas equivalencias de catálogo:
 - Volúmenes procesados: 87.
 - Reactivos: 4.
 - No reactivos: 83.
-- En investigación: 2.
+- En laboratorio (la maqueta lo llama «En investigación»): unidades con `estado` = `En laboratorio`. No es un valor de `resultado`.
 - Detalle visual de marcadores reactivos:
   - VIH 1/2: 10.
   - HBsAg (Hepatitis B): 8.
@@ -457,16 +457,15 @@ Antes del seed hay que asegurar estas equivalencias de catálogo:
 
 Limitaciones del esquema:
 
-- `resultado_laboratorio` solo admite `Reactivo` o `No reactivo`; no admite
-  `En investigación`.
+- `resultado_laboratorio` solo admite `Reactivo` o `No reactivo`.
+- «En investigación» de la maqueta es el paso `En laboratorio` de `UNIDAD`, no un resultado.
 - Solo existe un resultado por unidad.
 - No existe una tabla o columna de marcador serológico.
 - El detalle de marcadores suma 48, aunque el KPI indica 4 volúmenes reactivos.
 
 Por lo tanto, el seed puede crear 87 resultados binarios, 4 reactivos y 83 no
-reactivos, pero no puede producir el estado `En investigación` ni el detalle de
-marcadores. Esas dos visualizaciones deben seguir como series de presentación
-o requieren una ampliación acordada del esquema.
+reactivos. El KPI de laboratorio sale de `UNIDAD.estado`. El detalle de
+marcadores sigue como serie de presentación.
 
 ### 7.4 Hemovigilancia
 
@@ -600,7 +599,7 @@ El futuro script debe incluir consultas que permitan comprobar:
 3. Qué causa del catálogo usar para `Otro`.
 4. Reemplazar los documentos duplicados entre pacientes y donantes por unos nuevos.
 5. Si los indicadores no soportados por el esquema deben seguir simulados:
-   marcadores serológicos, investigación, hemovigilancia estructurada,
+   marcadores serológicos, hemovigilancia estructurada,
    hemocomponentes y evolución histórica del stock.
 6. Qué umbral define “próximo a vencer”.
 
