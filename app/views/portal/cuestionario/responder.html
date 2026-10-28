@@ -33,8 +33,7 @@
 
         {% for p in preguntas if p.seccion == seccion %}
           {% set elegido = formulario.get('p' ~ p.id_pregunta, '') if formulario else '' %}
-          {% set detalle_bruto = formulario.get('p' ~ p.id_pregunta ~ '_detalle', '') if formulario else '' %}
-          {% set detalle = '' if p.exige_detalle and elegido != 'Si' else detalle_bruto %}
+          {% set detalle = formulario.get('p' ~ p.id_pregunta ~ '_detalle', '') if formulario else '' %}
 
           <fieldset class="q-item">
             <legend><span class="q-num">{{ p.orden }}</span> {{ p.enunciado }}</legend>
@@ -51,19 +50,42 @@
             </div>
 
             {% if p.pide_detalle %}
-            <div class="q-complemento" {% if p.exige_detalle %}data-condicional="1"{% endif %}
-                 {% if p.exige_detalle and elegido != 'Si' %}hidden{% endif %}>
-              {% if p.exige_detalle %}
-              <label class="q-detalle-etiq" for="p{{ p.id_pregunta }}_detalle">{{ p.etiqueta_detalle }}</label>
-              {% endif %}
-              <input class="q-detalle" type="text" id="p{{ p.id_pregunta }}_detalle"
-                     name="p{{ p.id_pregunta }}_detalle"
-                     value="{{ detalle }}" maxlength="180"
-                     placeholder="{{ p.etiqueta_detalle }}{{ '' if p.exige_detalle else ' (opcional)' }}">
-            </div>
+            <input class="q-detalle" type="text" name="p{{ p.id_pregunta }}_detalle"
+                   value="{{ detalle }}" maxlength="180"
+                   placeholder="{{ p.etiqueta_detalle }} (opcional)">
             {% endif %}
           </fieldset>
         {% endfor %}
+
+        {# ---------- Declaración y consentimiento (solo en el último paso) ----------
+           Es informativa: se lee, se acepta y recién ahí se puede enviar. No
+           se guarda ningún registro de la aceptación.
+           TEXTO PENDIENTE DE VALIDACIÓN por la profesora y el personal de
+           blanco. Para cambiarlo, editá los párrafos de abajo. #}
+        {% if loop.index == pasos %}
+        <div class="q-consentimiento" style="margin-top:20px; padding:18px; border:1px solid var(--linea, #E6E7F0); border-radius:10px; background:var(--hero, #FFF7F7);">
+          <h2 class="q-seccion" style="margin-top:0;">Declaración y consentimiento del donante</h2>
+
+          <details class="q-consent-text" style="margin-bottom:14px;">
+            <summary style="cursor:pointer; font-weight:600; color:var(--marca, #120C61);">Leer la declaración completa</summary>
+            <div style="margin-top:12px; font-size:14px; line-height:1.6; color:var(--ink2, #3B3B54);">
+              <p style="margin:0 0 10px;">Dono voluntariamente mi sangre y consiento que se me extraiga la cantidad adecuada de sangre, que será estudiada y utilizada como el servicio de sangre considere apropiado.</p>
+              <p style="margin:0 0 10px;">Se me ha dado la oportunidad de realizar las preguntas que considero necesarias para comprender el procedimiento de la donación. Se me ha preguntado si me considero una persona con riesgo de transmitir VIH/SIDA u otras enfermedades.</p>
+              <p style="margin:0 0 10px;">Declaro que no he recibido dinero ni otra compensación por donar sangre y que he respondido sinceramente todas las preguntas que se me han realizado.</p>
+              <p style="margin:0 0 10px;">Consiento expresamente que se me efectúen las pruebas necesarias para el diagnóstico de anticuerpos del virus de la inmunodeficiencia humana (VIH) y para la detección de otras enfermedades infecciosas transmisibles por la sangre.</p>
+              <p style="margin:0;">Dejo constancia de que se me ha asegurado la confidencialidad de los resultados de los estudios y autorizo que se me cite para ser informado personalmente por los médicos en caso de detectarse alguna anomalía o resultado que requiera comunicación.</p>
+            </div>
+          </details>
+
+          <label class="check-row" style="display:flex; gap:10px; align-items:flex-start;">
+            <input type="checkbox" name="consentimiento" id="q-consent">
+            <span>Leí y acepto la declaración y consentimiento del donante.</span>
+          </label>
+          <p class="q-aviso-consent" hidden style="color:var(--danger, #C81E1E); font-size:13px; margin:8px 0 0;">
+            Tenés que aceptar la declaración para enviar el cuestionario.
+          </p>
+        </div>
+        {% endif %}
 
         <div class="q-acciones">
           {% if loop.index > 1 %}
@@ -112,38 +134,15 @@
     });
   }
 
-  function sincronizarComplemento(item) {
-    const bloque = item.querySelector('[data-condicional]');
-    if (!bloque) return;
-    const si = item.querySelector('input[type="radio"][value="Si"]');
-    const campo = bloque.querySelector('input');
-    const mostrar = !!(si && si.checked);
-    bloque.hidden = !mostrar;
-    if (!mostrar && campo) campo.value = '';
-  }
-
   function pasoCompleto(n) {
     const paso = pasos.find(function (p) { return Number(p.dataset.paso) === n; });
     if (!paso) return false;
     const nombres = new Set(Array.from(paso.querySelectorAll('input[type="radio"]')).map(function (i) {
       return i.name;
     }));
-    const radios = Array.from(nombres).every(function (nombre) {
+    return Array.from(nombres).every(function (nombre) {
       return paso.querySelector('input[name="' + nombre + '"]:checked');
     });
-    if (!radios) return false;
-    return Array.from(paso.querySelectorAll('[data-condicional]')).every(function (bloque) {
-      if (bloque.hidden) return true;
-      const campo = bloque.querySelector('input');
-      return campo && campo.value.trim() !== '';
-    });
-  }
-
-  function primerIncompleto() {
-    for (let n = 1; n <= pasos.length; n++) {
-      if (!pasoCompleto(n)) return n;
-    }
-    return 0;
   }
 
   function mostrar(n) {
@@ -179,21 +178,23 @@
     if (titulo) titulo.scrollIntoView({block: 'start'});
   });
 
-  form.addEventListener('change', function (e) {
-    const item = e.target.closest('.q-item');
-    if (item) sincronizarComplemento(item);
-    mostrar(actual);
-  });
+  form.addEventListener('change', function () { mostrar(actual); });
 
   form.addEventListener('submit', function (e) {
-    const incompleto = primerIncompleto();
-    if (incompleto) {
+    if (!pasoCompleto(actual)) {
       e.preventDefault();
-      mostrar(incompleto);
-      const paso = pasos.find(function (p) { return Number(p.dataset.paso) === incompleto; });
+      const paso = pasos.find(function (p) { return Number(p.dataset.paso) === actual; });
       const aviso = paso && paso.querySelector('.q-aviso');
       if (aviso) aviso.hidden = false;
-      if (paso) paso.scrollIntoView({block: 'start'});
+      return;
+    }
+    // La declaración es obligatoria: sin tildarla no se envía.
+    const consent = document.getElementById('q-consent');
+    if (consent && !consent.checked) {
+      e.preventDefault();
+      const aviso = form.querySelector('.q-aviso-consent');
+      if (aviso) aviso.hidden = false;
+      consent.focus();
       return;
     }
     salir = true;
@@ -220,7 +221,6 @@
     salir = true;
   });
 
-  form.querySelectorAll('.q-item').forEach(sincronizarComplemento);
   mostrar(actual);
 })();
 </script>

@@ -10,7 +10,8 @@ from flask import (Blueprint, render_template, request, redirect,
                    url_for, flash, abort)
 from sqlalchemy.exc import SQLAlchemyError
 
-from app.controllers.portal import agenda, solicitudes as ctrl_solicitudes
+from app.controllers.portal import (agenda, avisos, elegibilidad,
+                                    solicitudes as ctrl_solicitudes)
 from app.controllers.sesion import requiere_login, usuario_actual
 from app.models import db
 
@@ -27,8 +28,11 @@ def agendar():
     if vigente:
         return render_template("portal/donar.html", ya_tiene_cita=vigente)
 
-    # Con un diferimiento vigente no se agenda. Se avisa sin decir la causa.
-    diferimiento = agenda.diferimiento_vigente(usuario)
+    # La misma comprobación que hace agenda.crear() antes de grabar. Acá se
+    # usa para avisar de entrada, así la persona no completa los tres pasos
+    # para que recién al confirmar le digan que no puede.
+    estado = elegibilidad.habilitacion(usuario)
+    bloqueo = None if estado["apto"] else estado
     solicitud_abierta = agenda._solicitud_abierta(usuario)
 
     fecha = agenda.parsear_fecha(request.args.get("fecha"))
@@ -38,10 +42,6 @@ def agendar():
     sin_horarios = bool(fecha) and not any(f["libres"] > 0 for f in franjas)
 
     horario = agenda.franja_elegida(fecha, request.args.get("horario", type=int))
-
-    tipo = request.args.get("tipo")
-    if tipo not in agenda.TIPOS_VALIDOS or not horario:
-        tipo = None
 
     # La solicitud puede venir de la lista ("Donar para esta persona") o de
     # elegir el tipo solidario y después la persona.
@@ -54,27 +54,41 @@ def agendar():
             solicitud = None
             flash("No podés donar para tu propia solicitud.", "error")
 
-    if tipo in agenda.NECESITA_SOLICITUD:
+    # Entrar desde una solicitud ya define el tipo: elegir a la persona es
+    # elegir donación solidaria. Volver a preguntarlo sería pedir dos veces
+    # lo mismo, así que ese paso no se muestra.
+    desde_solicitud = solicitud is not None
+
+    tipo = agenda.SOLIDARIA if desde_solicitud else request.args.get("tipo")
+    if not desde_solicitud and (tipo not in agenda.TIPOS_VALIDOS or not horario):
+        tipo = None
+    if tipo not in agenda.NECESITA_SOLICITUD:
+        solicitud = None
+
+    # La lista para elegir destinatario solo hace falta cuando se llegó por
+    # el tipo; viniendo de la solicitud, ya está elegido.
+    disponibles = []
+    if tipo in agenda.NECESITA_SOLICITUD and not desde_solicitud:
         disponibles = [s for s in ctrl_solicitudes.activas()
                        if s.id_solicitante != usuario.id_usuario]
-    else:
-        disponibles = []
-        solicitud = None
 
     puede_confirmar = bool(
         horario and tipo and (tipo not in agenda.NECESITA_SOLICITUD or solicitud))
 
     return render_template(
         "portal/donar.html",
-        diferimiento=diferimiento,
+        bloqueo=bloqueo,
+        PERMANENTE=elegibilidad.PERMANENTE,
+        DIFERIMIENTO=elegibilidad.DIFERIMIENTO,
         solicitud_abierta=solicitud_abierta,
         dias=dias, fecha=fecha,
         franjas=franjas, sin_horarios=sin_horarios, horario=horario,
         tipos=agenda.TIPOS, tipo=tipo,
         etiqueta=agenda.etiqueta_tipo(tipo) if tipo else None,
-        pide_solicitud=tipo in agenda.NECESITA_SOLICITUD,
+        pide_solicitud=tipo in agenda.NECESITA_SOLICITUD and not desde_solicitud,
+        desde_solicitud=desde_solicitud,
         solicitudes=disponibles, solicitud=solicitud,
-        preseleccion=id_solicitud,
+        preseleccion=solicitud.id_solicitud if solicitud else None,
         puede_confirmar=puede_confirmar)
 
 
@@ -121,6 +135,12 @@ def confirmar():
         flash(agenda.mensaje_de_error(e), "error")
         return redirect(url_for("donar.agendar", fecha=fecha.isoformat(),
                                 horario=id_horario, tipo=tipo))
+
+    # La confirmación por correo va acá, con la cita ya grabada: adentro de
+    # crear() quedaría tomado el bloqueo de la franja mientras se espera al
+    # SMTP. Si el correo falla, la cita sigue confirmada y su aviso en el
+    # buzón ya está; solo queda registrado en el log.
+    avisos.enviar_confirmacion(cita, request.url_root.rstrip("/"))
 
     return redirect(url_for("donar.confirmada", id_cita=cita.id_cita))
 

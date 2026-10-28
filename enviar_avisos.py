@@ -1,8 +1,18 @@
 """
 Manda los avisos automáticos del portal.
 
-Hoy manda uno: el correo con el cuestionario previo, a quienes tienen una
-cita dentro de las próximas 3 horas y todavía no lo recibieron.
+Hace tres cosas:
+
+  · manda el correo con el cuestionario previo a quienes tienen una cita
+    dentro de las próximas 3 horas y todavía no lo recibieron;
+  · deja el recordatorio de la cita del día siguiente y el aviso de que el
+    donante volvió a estar habilitado;
+  · ejecuta las supresiones de cuenta cuyo plazo de gracia de 30 días
+    venció.
+
+Lo último es la parte que no puede faltar: la supresión definitiva no la
+dispara ninguna pantalla, así que si este script no corre, los datos que
+había que borrar quedan guardados.
 
     python enviar_avisos.py            manda lo que corresponda ahora
     python enviar_avisos.py --ver      muestra a quién le tocaría, sin enviar
@@ -94,7 +104,34 @@ def main():
                 print("\nNo hay ninguna cita agendada. Agendá una desde el")
                 print("portal y volvé a correr esto.")
 
-            print("\n(--ver: no se envió nada)")
+            # Solicitudes: a cuántos donantes compatibles les tocaría el
+            # aviso. Es de solo lectura, no se manda nada.
+            from app.controllers.portal import solicitudes as ctrl_sol
+            pendientes_sol = [(s, avisos.donantes_compatibles(s))
+                              for s in ctrl_sol.activas()]
+            pendientes_sol = [(s, d) for s, d in pendientes_sol if d]
+            if pendientes_sol:
+                print("\nSolicitudes con donantes compatibles por avisar:")
+                for s, d in pendientes_sol:
+                    print(f"  solicitud {s.id_solicitud} ({s.tipo_sangre.etiqueta}): "
+                          f"{len(d)} donante(s)")
+            else:
+                print("\nNo hay solicitudes con donantes nuevos por avisar.")
+
+            # Las supresiones vencidas se listan pero no se ejecutan: --ver
+            # no toca nada, y acá eso importa más que en el resto porque lo
+            # que haría es borrar datos.
+            from app.controllers.portal import supresion
+            vencidas = supresion.vencidas()
+            if vencidas:
+                print(f"\nSe suprimirían {len(vencidas)} cuenta(s):")
+                for u in vencidas:
+                    print(f"  usuario {u.id_usuario}: {u.nombre_completo}, "
+                          f"pedido el {supresion.fecha_del_pedido(u):%d/%m/%Y}")
+            else:
+                print("\nNo hay supresiones de cuenta con el plazo cumplido.")
+
+            print("\n(--ver: no se envió ni se borró nada)")
             return 0
 
         for linea in avisos.correr(url_base):

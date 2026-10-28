@@ -84,7 +84,8 @@
           <tr>
             <td style="color:var(--ink2);">Última donación</td>
             <td style="text-align:right; font-weight:600;">
-              {{ ultima_donacion.fecha_cita.strftime('%d/%m/%Y') if ultima_donacion else 'Todavía no donaste' }}
+              {# `ultima_donacion` es la fecha de la extracción, no la cita. #}
+              {{ ultima_donacion.strftime('%d/%m/%Y') if ultima_donacion else 'Todavía no donaste' }}
             </td>
           </tr>
         </tbody>
@@ -172,8 +173,8 @@
 
     <div class="card" style="margin-top:20px; border-top:3px solid var(--danger);">
       <h2 style="margin-bottom:6px;">Eliminar cuenta</h2>
-      <p class="sub" style="margin-bottom:16px;">Elimina tu acceso al portal y tus datos de contacto, conforme a la Ley N.º 1682/01. El historial de donaciones se conserva por obligación sanitaria, desvinculado de tus datos de contacto.</p>
-      <a class="btn btn-danger btn-sm" href="{{ url_for('perfil.confirmar_supresion') }}">{{ ico('trash') }} Suprimir mi cuenta</a>
+      <p class="sub" style="margin-bottom:16px;">Cierra tu acceso al portal. Tenés 30 días para cambiar de opinión antes de que se eliminen tu nombre, tu documento y tus datos de contacto, conforme a la Ley N.º 1682/01. El historial de donaciones se conserva por obligación sanitaria, sin tu nombre.</p>
+      <a class="btn btn-danger btn-sm" href="{{ url_for('perfil.confirmar_supresion') }}">{{ ico('trash') }} Eliminar mi cuenta</a>
     </div>
     {% endif %}
   </div>

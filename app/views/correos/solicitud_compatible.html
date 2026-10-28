@@ -1,0 +1,23 @@
+{% import "correos/_base.html" as correo %}
+{% call correo.marco(titulo='Tu sangre puede ayudar') %}
+  <p style="margin:0 0 14px; font-size:15px; line-height:1.55;">
+    Hola {{ nombre }}, se publicó una solicitud de sangre que tu grupo
+    ({{ grupo }}) puede ayudar a cubrir.
+  </p>
+
+  <p style="margin:0 0 6px; font-size:15px; line-height:1.55;">
+    Si querés y estás en condiciones de donar, entrá al portal para ver las
+    solicitudes abiertas y agendar una donación.
+  </p>
+
+  {{ correo.boton(enlace, 'Ver las solicitudes') }}
+
+  <p style="margin:0 0 14px; font-size:14px; color:#5B5B77; line-height:1.55;">
+    Donar es voluntario. La aptitud para donar la confirma el personal de
+    salud el día de la cita, con el cuestionario y las mediciones.
+  </p>
+
+  <p style="margin:0; font-size:12.5px; color:#8A8AA3; line-height:1.5; word-break:break-all;">
+    ¿No funciona el botón? Copiá esta dirección en tu navegador:<br>{{ enlace }}
+  </p>
+{% endcall %}

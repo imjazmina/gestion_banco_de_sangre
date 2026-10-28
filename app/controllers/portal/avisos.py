@@ -110,6 +110,48 @@ def enviar_cuestionario(cita, url_base):
     return True, ("enviado por correo" if salio else "escrito en la consola")
 
 
+def enviar_confirmacion(cita, url_base):
+    """
+    Manda el correo de confirmación de una cita recién agendada.
+
+    Se llama desde la ruta, DESPUÉS de que agenda.crear() grabó la cita, no
+    adentro: crear() retiene la franja con FOR UPDATE hasta el commit, y
+    mandar un correo ahí dejaría ese bloqueo tomado mientras se espera al
+    servidor SMTP. Para cuando esta función corre, la cita ya existe.
+
+    Por eso mismo un fallo del correo no vuelve atrás nada: la cita está
+    confirmada y su notificación en el buzón ya se guardó en crear(). El
+    problema se registra y se sigue. Devuelve (enviado, detalle).
+    """
+    destino = cita.donante.correo_principal
+    if destino is None:
+        return False, "el donante no tiene correo principal cargado"
+
+    cuerpo = render_template(
+        "correos/confirmacion_cita.html",
+        nombre=cita.donante.nombre,
+        fecha=cita.fecha_cita.strftime("%d/%m/%Y"),
+        hora_inicio=cita.horario.hora_inicio.strftime("%H:%M"),
+        hora_fin=cita.horario.hora_fin.strftime("%H:%M"),
+        tipo=_etiqueta_tipo(cita.tipo_cita),
+        donas_para=(cita.solicitud.solicitante.nombre_completo
+                    if cita.solicitud else None),
+        enlace_cita=f"{url_base}/mi-cita/")
+
+    try:
+        salio = correo.enviar(
+            destino.direccion, "Tu cita de donación quedó confirmada", cuerpo)
+    except correo.ErrorCorreo as e:
+        return False, str(e)
+    return True, ("enviado por correo" if salio else "escrito en la consola")
+
+
+def _etiqueta_tipo(tipo_cita):
+    """La etiqueta legible del tipo de cita, sin arrastrar el import arriba."""
+    from app.controllers.portal import agenda
+    return agenda.etiqueta_tipo(tipo_cita)
+
+
 def pendientes_de_recordatorio(ahora=None):
     """Citas activas que empiezan dentro de un día y todavía no tienen recordatorio."""
     ahora = ahora or datetime.now()
@@ -125,7 +167,15 @@ def pendientes_de_recordatorio(ahora=None):
             and ahora <= c.momento <= limite]
 
 
-def enviar_recordatorio(cita):
+def enviar_recordatorio(cita, url_base=None):
+    """
+    Deja el recordatorio de la cita en el buzón y, si hay correo, lo manda.
+
+    La notificación se guarda siempre: es la marca que impide repetir el
+    aviso en la próxima corrida. El correo es adicional; si falla, el
+    recordatorio igual quedó registrado. Devuelve (enviado, detalle), donde
+    enviado es None cuando no había a quién mandárselo.
+    """
     hora = cita.horario.hora_inicio.strftime("%H:%M")
     db.session.add(Notificacion(
         id_usuario=cita.id_usuario,
@@ -136,6 +186,26 @@ def enviar_recordatorio(cita):
         fecha_envio=datetime.now()))
     db.session.commit()
 
+    destino = cita.donante.correo_principal
+    if destino is None:
+        return None, "el donante no tiene correo principal cargado"
+
+    cuerpo = render_template(
+        "correos/recordatorio_cita.html",
+        nombre=cita.donante.nombre,
+        fecha=cita.fecha_cita.strftime("%d/%m/%Y"),
+        hora_inicio=hora,
+        hora_fin=cita.horario.hora_fin.strftime("%H:%M"),
+        enlace_cita=f"{(url_base or '').rstrip('/')}/mi-cita/")
+
+    try:
+        salio = correo.enviar(
+            destino.direccion,
+            "Recordatorio: tu cita de donación es mañana", cuerpo)
+    except correo.ErrorCorreo as e:
+        return False, str(e)
+    return True, ("enviado por correo" if salio else "escrito en la consola")
+
 
 def pendientes_de_habilitacion(ahora=None):
     """
@@ -143,7 +213,10 @@ def pendientes_de_habilitacion(ahora=None):
     la última extracción ya se cumplió, y todavía no recibieron el aviso.
     El texto no incluye la causa.
     """
-    from app.controllers.portal.perfil import habilitacion
+    # Antes este import iba acá adentro para esquivar una referencia
+    # circular con perfil.py. Ya no hace falta: la regla vive en
+    # elegibilidad.py, que no importa de nadie.
+    from app.controllers.portal.elegibilidad import habilitacion
     from app.models import RegistroDiferimiento, Usuario
 
     ahora = ahora or datetime.now()
@@ -179,6 +252,181 @@ def enviar_habilitacion(usuario):
     db.session.commit()
 
 
+# ------------------------------------------------------- supresión de cuenta
+def avisar_supresion_solicitada(usuario, enlace):
+    """
+    Le confirma por correo que el pedido de baja quedó registrado.
+
+    Es el aviso que más importa de los tres: es el que le dice que todavía
+    hay tiempo de volver, y el único lugar donde queda escrita la fecha
+    límite. Si el pedido no lo hizo la persona, este correo es la forma de
+    que se entere.
+    """
+    from app.controllers.portal import supresion
+
+    destino = usuario.correo_principal
+    if destino is None:
+        return False, "no tiene correo principal cargado"
+
+    cuerpo = render_template("correos/supresion_solicitada.html",
+                             nombre=usuario.nombre,
+                             limite=supresion.fecha_definitiva(usuario),
+                             enlace=enlace)
+    try:
+        salio = correo.enviar(destino.direccion,
+                              "Pediste eliminar tu cuenta del portal de donantes",
+                              cuerpo)
+    except correo.ErrorCorreo as e:
+        return False, str(e)
+    return True, ("enviado por correo" if salio else "escrito en la consola")
+
+
+def ejecutar_supresiones(ahora=None):
+    """
+    Ejecuta las supresiones cuyo plazo de gracia venció.
+
+    El correo de despedida se arma ANTES de suprimir: la supresión borra la
+    dirección, así que después ya no habría a dónde escribir. Y se manda
+    después del commit, para no avisar de algo que al final no se grabó.
+    """
+    from app.controllers.portal import supresion
+
+    lineas = []
+    hoy = (ahora or datetime.now()).date()
+    for usuario in supresion.vencidas(hoy):
+        etiqueta = f"usuario {usuario.id_usuario} ({usuario.nombre_completo})"
+        destino = usuario.correo_principal
+        direccion = destino.direccion if destino else None
+        nombre = usuario.nombre
+
+        try:
+            supresion.ejecutar(usuario)
+        except Exception as e:  # noqa: BLE001
+            db.session.rollback()
+            lineas.append(f"  supresión {etiqueta}: FALLÓ — {e}")
+            continue
+
+        lineas.append(f"  supresión {etiqueta}: ok")
+        if direccion is None:
+            lineas.append("      sin correo cargado, no se avisó")
+            continue
+        try:
+            cuerpo = render_template("correos/supresion_ejecutada.html",
+                                     nombre=nombre,
+                                     dias=supresion.DIAS_DE_GRACIA)
+            salio = correo.enviar(direccion, "Tu cuenta fue eliminada", cuerpo)
+            lineas.append("      aviso " + ("enviado" if salio else "a consola"))
+        except correo.ErrorCorreo as e:
+            # La supresión ya está hecha y no se deshace por un correo que no
+            # salió: queda anotado y sigue.
+            lineas.append(f"      aviso FALLÓ — {e}")
+    return lineas
+
+
+# ----------------------------------------- solicitudes compatibles (RF12)
+#
+# Cuando hay una solicitud publicada, se avisa a los donantes cuyo grupo
+# puede cubrirla. No lo dispara ninguna pantalla —el portal solo lista las
+# solicitudes, no las publica—, así que vive acá, en el proceso automático,
+# igual que el resto de los avisos. Funciona sin importar quién o desde
+# dónde haya publicado la solicitud.
+#
+# El esquema fija los tipos de notificación con un CHECK y no hay uno propio
+# para esto, así que se reutiliza CITACION_GENERICA ("Mensaje del banco de
+# sangre"). Que lleve `id_solicitud` es lo que distingue este aviso del que
+# usa el mismo tipo para la consejería (ese lleva `id_citacion`), y es la
+# marca que evita avisarle dos veces al mismo donante por la misma solicitud.
+def donantes_compatibles(solicitud):
+    """
+    Donantes a los que les corresponde el aviso de esta solicitud.
+
+    Son los que cumplen todo esto: su grupo puede donarle al de la
+    solicitud, hoy están en condiciones de donar (ni diferidos ni dentro del
+    intervalo), no tienen ya una cita agendada, no son el propio solicitante
+    (RN03) y todavía no recibieron el aviso de esta solicitud.
+
+    La compatibilidad va donante → receptor: el grupo de la solicitud es el
+    del paciente que recibe, y se buscan los grupos que pueden donarle.
+    """
+    from app.controllers.portal import agenda, elegibilidad
+    from app.models import CompatibilidadAboRh, Usuario
+
+    grupos = {c.id_tipo_donante for c in CompatibilidadAboRh.query
+              .filter_by(id_tipo_receptor=solicitud.id_tipo_sangre).all()}
+    if not grupos:
+        return []
+
+    ya_avisados = {
+        n.id_usuario for n in Notificacion.query
+        .filter(Notificacion.tipo == Notificacion.CITACION_GENERICA,
+                Notificacion.id_solicitud == solicitud.id_solicitud).all()
+    }
+
+    candidatos = (Usuario.query
+                  .filter(Usuario.estado.is_(True),
+                          Usuario.cuenta_suprimida.is_(False),
+                          Usuario.id_tipo_sangre.in_(grupos))
+                  .all())
+
+    listos = []
+    for donante in candidatos:
+        if donante.id_usuario in ya_avisados:
+            continue
+        if donante.id_usuario == solicitud.id_solicitante:
+            continue
+        if not donante.tiene_rol("DONANTE"):
+            continue
+        if not elegibilidad.habilitacion(donante)["apto"]:
+            continue
+        if agenda.cita_vigente(donante):
+            continue
+        listos.append(donante)
+    return listos
+
+
+def avisar_solicitud_compatible(solicitud, url_base):
+    """
+    Avisa a los donantes compatibles de una solicitud. Devuelve cuántos.
+
+    Primero se guardan todas las notificaciones y se confirma una sola vez;
+    después se mandan los correos. Si un correo falla, la notificación ya
+    quedó —es la que importa y la que evita repetir— y el fallo se registra.
+    """
+    donantes = donantes_compatibles(solicitud)
+    if not donantes:
+        return 0
+
+    mensaje = ("Hay una solicitud de sangre que tu grupo puede ayudar a "
+               "cubrir. Entrá a Solicitudes para ver los detalles y, si "
+               "querés y estás en condiciones, agendá una donación.")
+    for donante in donantes:
+        db.session.add(Notificacion(
+            id_usuario=donante.id_usuario,
+            id_solicitud=solicitud.id_solicitud,
+            tipo=Notificacion.CITACION_GENERICA,
+            mensaje=mensaje,
+            fecha_envio=datetime.now()))
+    db.session.commit()
+
+    enlace = f"{url_base.rstrip('/')}/solicitudes/"
+    for donante in donantes:
+        destino = donante.correo_principal
+        if destino is None:
+            continue
+        grupo = donante.tipo_sangre.etiqueta if donante.tipo_sangre else ""
+        try:
+            cuerpo = render_template("correos/solicitud_compatible.html",
+                                     nombre=donante.nombre, grupo=grupo,
+                                     enlace=enlace)
+            correo.enviar(destino.direccion,
+                          "Tu sangre puede ayudar: hay una solicitud compatible",
+                          cuerpo)
+        except correo.ErrorCorreo:
+            # El aviso ya está en el buzón; el correo es adicional.
+            pass
+    return len(donantes)
+
+
 def correr(url_base, ahora=None):
     """Manda todos los avisos que correspondan. Devuelve las líneas del informe."""
     lineas = []
@@ -196,9 +444,20 @@ def correr(url_base, ahora=None):
                       f"{cita.horario.hora_inicio.strftime('%H:%M')}): {estado} — {detalle}")
 
     for cita in pendientes_de_recordatorio(ahora):
-        enviar_recordatorio(cita)
-        lineas.append(f"  recordatorio cita {cita.id_cita}")
+        enviado, detalle = enviar_recordatorio(cita, url_base)
+        lineas.append(f"  recordatorio cita {cita.id_cita}: {detalle}")
     for usuario in pendientes_de_habilitacion(ahora):
         enviar_habilitacion(usuario)
         lineas.append(f"  habilitación usuario {usuario.id_usuario}")
+
+    from app.controllers.portal import solicitudes as ctrl_solicitudes
+    for solicitud in ctrl_solicitudes.activas():
+        n = avisar_solicitud_compatible(solicitud, url_base)
+        if n:
+            lineas.append(f"  solicitud {solicitud.id_solicitud}: "
+                          f"avisada a {n} donante(s) compatible(s)")
+
+    supresiones = ejecutar_supresiones(ahora)
+    if supresiones:
+        lineas.extend(supresiones)
     return lineas
