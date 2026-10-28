@@ -24,15 +24,6 @@
                    maxlength="80" required>
           </div>
         </div>
-        <div class="field">
-          <label for="correo">Correo electrónico *</label>
-          <input type="email" id="correo" name="correo" value="{{ correo }}" maxlength="120" required>
-        </div>
-        <div class="field">
-          <label for="telefono">Teléfono</label>
-          <input type="tel" id="telefono" name="telefono" value="{{ telefono }}" maxlength="30">
-          <div class="hint">Dejalo vacío si no querés registrar un número.</div>
-        </div>
         <div style="display:flex; gap:12px; flex-wrap:wrap;">
           <button class="btn btn-primary" type="submit">Guardar cambios</button>
           <a class="btn btn-ghost" href="{{ url_for('perfil.ver') }}">Cancelar</a>
@@ -52,11 +43,49 @@
           <tr><td style="color:var(--ink2);">Documento</td><td style="text-align:right; font-weight:600;">{{ usuario.documento_visible }}</td></tr>
           <tr><td style="color:var(--ink2);">Fecha de nacimiento</td><td style="text-align:right; font-weight:600;">{{ usuario.fecha_nacimiento.strftime('%d/%m/%Y') }}</td></tr>
           <tr><td style="color:var(--ink2);">Género</td><td style="text-align:right; font-weight:600;">{{ usuario.genero }}</td></tr>
-          <tr><td style="color:var(--ink2);">Correo</td><td style="text-align:right; font-weight:600;">{{ correo or '—' }}</td></tr>
-          <tr><td style="color:var(--ink2);">Teléfono</td><td style="text-align:right; font-weight:600;">{{ telefono or '—' }}</td></tr>
           <tr><td style="color:var(--ink2);">Rol</td><td style="text-align:right; font-weight:600;">{{ roles | join(', ') or '—' }}</td></tr>
         </tbody>
       </table>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+      <h2 style="margin-bottom:6px;">Correos</h2>
+      <p class="sub" style="margin-bottom:14px;">Con el principal iniciás sesión y recuperás la contraseña.</p>
+      {% for c in correos %}
+      <div class="divider" style="margin:14px 0;"></div>
+      <form method="post" action="{{ url_for('perfil.editar_correo', id_correo=c.id_correo) }}">
+        <div class="field" style="margin-bottom:10px;">
+          <label for="correo-{{ c.id_correo }}">
+            Correo
+            {% if c.es_principal %}<span class="badge badge-comp">Principal</span>{% endif %}
+          </label>
+          <input type="email" id="correo-{{ c.id_correo }}" name="direccion"
+                 value="{{ c.direccion }}" maxlength="120" required>
+        </div>
+        <button class="btn btn-ghost btn-sm" type="submit">Guardar</button>
+      </form>
+      {% if not c.es_principal %}
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+        <form method="post" action="{{ url_for('perfil.principal_correo', id_correo=c.id_correo) }}">
+          <button class="btn btn-ghost btn-sm" type="submit">Hacer principal</button>
+        </form>
+        <form method="post" action="{{ url_for('perfil.eliminar_correo', id_correo=c.id_correo) }}">
+          <button class="btn btn-danger btn-sm" type="submit">{{ ico('trash') }} Eliminar</button>
+        </form>
+      </div>
+      {% elif correos|length > 1 %}
+      <div class="hint">Para eliminarlo, primero elegí otro como principal.</div>
+      {% endif %}
+      {% endfor %}
+      <div class="divider" style="margin:16px 0;"></div>
+      <form method="post" action="{{ url_for('perfil.agregar_correo') }}">
+        <div class="field">
+          <label for="nuevo-correo">Agregar otro correo</label>
+          <input type="email" id="nuevo-correo" name="direccion" maxlength="120" required>
+          <div class="hint">No reemplaza al principal.</div>
+        </div>
+        <button class="btn btn-primary btn-sm" type="submit">Agregar</button>
+      </form>
     </div>
 
     <div class="card" style="margin-top:20px;">

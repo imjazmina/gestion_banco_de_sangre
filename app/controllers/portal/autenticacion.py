@@ -10,7 +10,7 @@ from datetime import date, datetime
 import bcrypt
 from sqlalchemy import func
 
-from app.models import db, Usuario, Rol, UsuarioRol, Correo, Telefono, Auditoria
+from app.models import db, Usuario, Rol, UsuarioRol, Correo, Auditoria
 
 EDAD_MINIMA = 18
 EDAD_MAXIMA = 65
@@ -153,11 +153,6 @@ def registrar_donante(datos, contrasena):
                                   id_rol=rol_donante.id_rol))
         db.session.add(Correo(id_usuario=usuario.id_usuario,
                               direccion=correo, es_principal=True))
-
-        telefono = (datos.get("telefono") or "").strip()
-        if telefono:
-            db.session.add(Telefono(id_usuario=usuario.id_usuario,
-                                    numero=telefono, es_principal=True))
 
         Auditoria.registrar(usuario.id_usuario, "USUARIO",
                             usuario.id_usuario, Auditoria.ALTA)

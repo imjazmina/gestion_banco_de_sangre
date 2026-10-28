@@ -12,6 +12,7 @@ import re
 from datetime import date
 
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 
 from app.controllers.portal.agenda import diferimiento_vigente
 from app.models import (
@@ -39,7 +40,7 @@ class ErrorSupresion(Exception):
         self.operaciones = operaciones
 
 
-def validar(nombre, apellido, correo):
+def validar(nombre, apellido):
     errores = []
     if not nombre:
         errores.append("Ingresá tu nombre.")
@@ -49,60 +50,148 @@ def validar(nombre, apellido, correo):
         errores.append("Ingresá tu apellido.")
     elif len(apellido) > 80:
         errores.append("El apellido es demasiado largo.")
-    if not _CORREO.match(correo or ""):
-        errores.append("Ingresá un correo electrónico válido.")
-    elif len(correo) > 120:
-        errores.append("El correo es demasiado largo.")
     return errores
 
 
-def actualizar(usuario, datos):
-    """
-    Guarda nombre, apellido, correo y teléfono principal en una transacción.
+def _direccion(texto):
+    return (texto or "").strip().lower()
 
-    Lanza ErrorPerfil si el correo ya pertenece a otra cuenta.
-    """
+
+def _error_direccion(direccion):
+    if not _CORREO.match(direccion or ""):
+        return "Ingresá un correo electrónico válido."
+    if len(direccion) > 120:
+        return "El correo es demasiado largo."
+    return None
+
+
+def _correo_propio(usuario, id_correo):
+    return next((c for c in usuario.correos if c.id_correo == id_correo), None)
+
+
+def _direccion_ocupada(direccion, id_correo=None):
+    """uq_correo_direccion es única en toda la tabla, no por usuario."""
+    consulta = Correo.query.filter(func.lower(Correo.direccion) == direccion)
+    if id_correo is not None:
+        consulta = consulta.filter(Correo.id_correo != id_correo)
+    return consulta.first() is not None
+
+
+def actualizar(usuario, datos):
+    """Guarda nombre y apellido. Los correos se gestionan aparte."""
     nombre = (datos.get("nombre") or "").strip()
     apellido = (datos.get("apellido") or "").strip()
-    correo = (datos.get("correo") or "").strip().lower()
-    telefono = (datos.get("telefono") or "").strip()
 
-    errores = validar(nombre, apellido, correo)
+    errores = validar(nombre, apellido)
     if errores:
         raise ErrorPerfil(errores)
-
-    # uq_correo_direccion es único en toda la tabla, no por usuario: el correo
-    # de otra cuenta no se puede reutilizar. Se comprueba acá para dar un
-    # mensaje claro en lugar de dejar que explote la restricción.
-    ocupado = (Correo.query
-               .filter(func.lower(Correo.direccion) == correo,
-                       Correo.id_usuario != usuario.id_usuario)
-               .first())
-    if ocupado:
-        raise ErrorPerfil(["Ese correo ya está registrado en otra cuenta."])
 
     try:
         usuario.nombre = nombre
         usuario.apellido = apellido
+        Auditoria.registrar(usuario.id_usuario, "USUARIO",
+                            usuario.id_usuario, Auditoria.MODIFICACION)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
 
-        principal = usuario.correo_principal
-        if principal:
-            principal.direccion = correo
-        else:
-            db.session.add(Correo(id_usuario=usuario.id_usuario,
-                                  direccion=correo, es_principal=True))
 
-        actual = usuario.telefono_principal
-        if telefono:
-            if actual:
-                actual.numero = telefono
-            else:
-                db.session.add(Telefono(id_usuario=usuario.id_usuario,
-                                        numero=telefono, es_principal=True))
-        elif actual:
-            # Sin número, la fila no tiene sentido: numero es NOT NULL.
-            db.session.delete(actual)
+def agregar_correo(usuario, direccion):
+    """Agrega un correo secundario. El de alta sigue siendo el principal."""
+    direccion = _direccion(direccion)
+    error = _error_direccion(direccion)
+    if error:
+        raise ErrorPerfil([error])
+    if _direccion_ocupada(direccion):
+        raise ErrorPerfil(["Ese correo ya está registrado."])
 
+    try:
+        db.session.add(Correo(
+            id_usuario=usuario.id_usuario,
+            direccion=direccion,
+            es_principal=not usuario.correos,
+        ))
+        Auditoria.registrar(usuario.id_usuario, "USUARIO",
+                            usuario.id_usuario, Auditoria.MODIFICACION)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ErrorPerfil(["Ese correo ya está registrado."])
+    except Exception:
+        db.session.rollback()
+        raise
+
+
+def editar_correo(usuario, id_correo, direccion):
+    """Cambia la dirección. Si es la principal, el login pasa a usar la nueva."""
+    fila = _correo_propio(usuario, id_correo)
+    if fila is None:
+        raise ErrorPerfil(["No encontramos ese correo."])
+
+    direccion = _direccion(direccion)
+    error = _error_direccion(direccion)
+    if error:
+        raise ErrorPerfil([error])
+    if direccion == fila.direccion:
+        return
+    if _direccion_ocupada(direccion, fila.id_correo):
+        raise ErrorPerfil(["Ese correo ya está registrado."])
+
+    try:
+        fila.direccion = direccion
+        Auditoria.registrar(usuario.id_usuario, "USUARIO",
+                            usuario.id_usuario, Auditoria.MODIFICACION)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ErrorPerfil(["Ese correo ya está registrado."])
+    except Exception:
+        db.session.rollback()
+        raise
+
+
+def hacer_principal(usuario, id_correo):
+    """
+    Deja un solo principal.
+
+    Primero se apaga el anterior y se hace flush: el índice parcial
+    uq_correo_principal no admite dos filas con es_principal a la vez.
+    """
+    fila = _correo_propio(usuario, id_correo)
+    if fila is None:
+        raise ErrorPerfil(["No encontramos ese correo."])
+    if fila.es_principal:
+        return
+
+    try:
+        for otro in usuario.correos:
+            if otro.es_principal:
+                otro.es_principal = False
+        db.session.flush()
+        fila.es_principal = True
+        Auditoria.registrar(usuario.id_usuario, "USUARIO",
+                            usuario.id_usuario, Auditoria.MODIFICACION)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ErrorPerfil(["No se pudo cambiar el correo principal. Intentá de nuevo."])
+    except Exception:
+        db.session.rollback()
+        raise
+
+
+def eliminar_correo(usuario, id_correo):
+    fila = _correo_propio(usuario, id_correo)
+    if fila is None:
+        raise ErrorPerfil(["No encontramos ese correo."])
+    if len(usuario.correos) <= 1:
+        raise ErrorPerfil(["Tenés que conservar al menos un correo."])
+    if fila.es_principal:
+        raise ErrorPerfil(["Elegí otro correo como principal antes de eliminar este."])
+
+    try:
+        db.session.delete(fila)
         Auditoria.registrar(usuario.id_usuario, "USUARIO",
                             usuario.id_usuario, Auditoria.MODIFICACION)
         db.session.commit()
@@ -303,8 +392,8 @@ def resumen(usuario):
     ultima = ultima_donacion(usuario)
     return {
         "usuario": usuario,
-        "correo": usuario.correo_principal.direccion if usuario.correo_principal else "",
-        "telefono": usuario.telefono_principal.numero if usuario.telefono_principal else "",
+        "correos": sorted(usuario.correos,
+                          key=lambda c: (not c.es_principal, c.direccion)),
         "grupo": usuario.tipo_sangre.etiqueta if usuario.tipo_sangre else None,
         "roles": [r.nombre for r in usuario.roles],
         "ultima_donacion": ultima,

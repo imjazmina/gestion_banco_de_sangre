@@ -10,7 +10,7 @@ from app.controllers.sesion import (iniciar_sesion, cerrar_sesion,
 auth_bp = Blueprint("auth", __name__)
 
 CAMPOS = ("documento", "nombre", "apellido", "fecha_nacimiento",
-          "genero", "correo", "telefono")
+          "genero", "correo")
 
 
 @auth_bp.route("/registro", methods=["GET", "POST"])

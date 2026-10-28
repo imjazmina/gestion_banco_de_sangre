@@ -31,6 +31,56 @@ def guardar():
     return redirect(url_for("perfil.ver"))
 
 
+def _volver_con_error(error):
+    for mensaje in error.args[0]:
+        flash(mensaje, "error")
+    return redirect(url_for("perfil.ver"))
+
+
+@perfil_bp.post("/correos")
+@requiere_login
+def agregar_correo():
+    try:
+        ctrl.agregar_correo(usuario_actual(), request.form.get("direccion"))
+    except ctrl.ErrorPerfil as e:
+        return _volver_con_error(e)
+    flash("Correo agregado.", "ok")
+    return redirect(url_for("perfil.ver"))
+
+
+@perfil_bp.post("/correos/<int:id_correo>")
+@requiere_login
+def editar_correo(id_correo):
+    try:
+        ctrl.editar_correo(usuario_actual(), id_correo, request.form.get("direccion"))
+    except ctrl.ErrorPerfil as e:
+        return _volver_con_error(e)
+    flash("Correo actualizado.", "ok")
+    return redirect(url_for("perfil.ver"))
+
+
+@perfil_bp.post("/correos/<int:id_correo>/principal")
+@requiere_login
+def principal_correo(id_correo):
+    try:
+        ctrl.hacer_principal(usuario_actual(), id_correo)
+    except ctrl.ErrorPerfil as e:
+        return _volver_con_error(e)
+    flash("Ese correo quedó como principal. Vas a entrar con él.", "ok")
+    return redirect(url_for("perfil.ver"))
+
+
+@perfil_bp.post("/correos/<int:id_correo>/eliminar")
+@requiere_login
+def eliminar_correo(id_correo):
+    try:
+        ctrl.eliminar_correo(usuario_actual(), id_correo)
+    except ctrl.ErrorPerfil as e:
+        return _volver_con_error(e)
+    flash("Correo eliminado.", "ok")
+    return redirect(url_for("perfil.ver"))
+
+
 @perfil_bp.get("/suprimir")
 @requiere_login
 def confirmar_supresion():
