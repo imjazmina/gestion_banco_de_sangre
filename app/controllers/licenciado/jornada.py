@@ -6,7 +6,7 @@ son los del CHECK de `cita`. «Diferido» de la maqueta queda como `No apto`
 más un `registro_diferimiento`. No se agregan columnas.
 """
 import secrets
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
@@ -20,6 +20,11 @@ from app.models import (
 )
 
 INSTITUCION_LOCAL = "Hospital Regional de Luque"
+
+# Días de vigencia de una unidad de sangre total desde la extracción (RF33).
+# 35 días es el estándar para sangre entera con anticoagulante CPDA-1. Es un
+# parámetro: conviene validarlo con el protocolo del servicio / la profesora.
+DIAS_VIGENCIA_UNIDAD = 35
 
 ETIQUETA_TIPO = {
     Cita.ALTRUISTA: "Altruista",
@@ -135,14 +140,10 @@ def marcar_ausente(cita, personal):
 
 
 def preguntas_parte_b():
-    """La parte B del catálogo. La aclaración no se lista como pregunta aparte."""
-    from app.controllers.portal.cuestionario import principales
-
-    filas = (Pregunta.query
-             .filter_by(parte=Pregunta.PARTE_PERSONAL)
-             .order_by(Pregunta.id_pregunta)
-             .all())
-    return principales(filas)
+    return (Pregunta.query
+            .filter_by(parte=Pregunta.PARTE_PERSONAL)
+            .order_by(Pregunta.id_pregunta)
+            .all())
 
 
 def respuestas_de(cita):
@@ -163,22 +164,12 @@ def guardar_parte_b(cita, personal, formulario):
     if not preguntas:
         raise ErrorJornada("No hay preguntas de la parte B en el catálogo.")
 
-    from app.controllers.portal.cuestionario import _valor
-
     ahora = datetime.now()
     existentes = respuestas_de(cita)
     for pregunta in preguntas:
         valor = (formulario.get(f"p{pregunta.id_pregunta}") or "").strip()
         if valor not in ("Si", "No"):
             raise ErrorJornada("Respondé todas las preguntas de la parte B.")
-        detalle = formulario.get(f"p{pregunta.id_pregunta}_detalle")
-        if getattr(pregunta, "exige_detalle", False) and valor != "Si":
-            detalle = ""
-        elif getattr(pregunta, "exige_detalle", False) and not (detalle or "").strip():
-            raise ErrorJornada(
-                "Completá la aclaración de las preguntas respondidas con sí.")
-        if getattr(pregunta, "exige_detalle", False):
-            valor = _valor(valor, detalle)
         fila_resp = existentes.get(pregunta.id_pregunta)
         if fila_resp is None:
             db.session.add(Cuestionario(
@@ -332,6 +323,10 @@ def registrar_extraccion(cita, personal, observacion):
         codigo=_codigo("UN"),
         componente="sangre_total",
         estado=Unidad.REGISTRADA,
+        # RF33: la vigencia se cuenta desde la extracción. Sin esto la unidad
+        # nacía con fecha_vencimiento en nulo y nunca entraba en "próximas a
+        # vencer" ni podía marcarse como vencida.
+        fecha_vencimiento=(extraccion.fecha + timedelta(days=DIAS_VIGENCIA_UNIDAD)).date(),
     )
     db.session.add(unidad)
     db.session.flush()
@@ -475,9 +470,7 @@ def ficha(id_usuario):
     citas = (Cita.query
              .filter_by(id_usuario=id_usuario)
              .order_by(Cita.fecha_hora_creacion.desc())
-             .filter(Cita.estado.in_([Cita.COMPLETADA, Cita.NO_APTO]))
-             .all()
-            )
+             .all())
     diferimientos = (RegistroDiferimiento.query
                      .filter_by(id_donante=id_usuario)
                      .order_by(RegistroDiferimiento.fecha_inicio.desc())
@@ -498,14 +491,20 @@ def ficha(id_usuario):
             id_unidad=unidad.id_unidad).first()
         if resultado is not None:
             resultados.append(resultado)
-    confirmada = (Cita.query
-                  .filter_by(id_usuario=id_usuario, estado=Cita.CONFIRMADA)
-                  .order_by(Cita.fecha_hora_creacion.desc())
-                  .first())
+    abierta = next((c for c in citas if c.estado in Cita.ACTIVAS), None)
+    cita_laboratorio = None
+    for unidad in unidades:
+        if unidad.estado != Unidad.EN_LABORATORIO:
+            continue
+        extraccion = db.session.get(Extraccion, unidad.id_extraccion)
+        if extraccion is not None:
+            cita_laboratorio = db.session.get(Cita, extraccion.id_cita)
+            break
     return {
         "donante": donante,
         "edad": edad_de(donante),
-        "cita_abierta": confirmada,
+        "cita_abierta": abierta,
+        "cita_laboratorio": cita_laboratorio,
         "citas": citas,
         "historial": historial(citas, diferimientos),
         "total_donaciones": len(completadas),
