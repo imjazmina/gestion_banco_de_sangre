@@ -169,13 +169,7 @@ def simular_resultado(id_unidad):
         text("SELECT pg_advisory_xact_lock(CAST(:clase AS integer), CAST(:donante AS integer))"),
         {"clase": 2, "donante": unidad.id_donante},
     )
-    tipo = Usuario.tipo_confirmado(unidad.id_donante)
-    if tipo is None:
-        tipos = TipoSangre.query.all()
-        if not tipos:
-            db.session.rollback()
-            raise ErrorSimulacion("Falta el catálogo de grupos sanguíneos.")
-        tipo = random.choice(tipos)
+    tipo = _tipo_de_laboratorio(unidad)
     if random.random() < PROBABILIDAD_REACTIVO:
         _reactivo(unidad, personal, extraccion, tipo)
     else:
@@ -269,12 +263,55 @@ def _reactivo(unidad, personal, extraccion, tipo):
     ))
 
 
-def _asignar_solicitud_de_la_cita(unidad, personal, tipo):
-    """Asigna solo si la cita de la extracción sigue dirigida a una solicitud."""
+def _cita_de_la_unidad(unidad):
     extraccion = db.session.get(Extraccion, unidad.id_extraccion)
     if extraccion is None:
-        return
-    cita = db.session.get(Cita, extraccion.id_cita)
+        return None
+    return db.session.get(Cita, extraccion.id_cita)
+
+
+def _tipo_de_laboratorio(unidad):
+    """
+    Reutiliza la primera tipificación del donante.
+
+    Si todavía no tiene, y la cita es para una solicitud, el sorteo elige
+    un grupo que pueda donarle a ese receptor. Así la unidad queda asociada
+    cuando el resultado no es reactivo y hay cupo. Sin solicitud, cualquier
+    grupo del catálogo.
+    """
+    tipo = Usuario.tipo_confirmado(unidad.id_donante)
+    if tipo is not None:
+        return tipo
+    tipos = TipoSangre.query.order_by(TipoSangre.id_tipo_sangre).all()
+    if not tipos:
+        db.session.rollback()
+        raise ErrorSimulacion("Falta el catálogo de grupos sanguíneos.")
+    cita = _cita_de_la_unidad(unidad)
+    solicitud = None
+    if cita is not None and cita.id_solicitud is not None:
+        solicitud = db.session.get(Solicitud, cita.id_solicitud)
+    if solicitud is not None:
+        admitidos = {
+            fila.id_tipo_donante
+            for fila in CompatibilidadAboRh.query.filter_by(
+                id_tipo_receptor=solicitud.id_tipo_sangre).all()
+        }
+        compatibles = [t for t in tipos if t.id_tipo_sangre in admitidos]
+        if compatibles:
+            return random.choice(compatibles)
+    return random.choice(tipos)
+
+
+def _cupo_libre(solicitud):
+    ocupadas = (Asignacion.query
+                .filter_by(id_solicitud=solicitud.id_solicitud)
+                .count())
+    return ocupadas < solicitud.unidades_requeridas
+
+
+def _asignar_solicitud_de_la_cita(unidad, personal, tipo):
+    """Asigna solo si la cita de la extracción sigue dirigida a una solicitud."""
+    cita = _cita_de_la_unidad(unidad)
     if cita is None or cita.id_solicitud is None:
         return
     solicitud = db.session.get(Solicitud, cita.id_solicitud)
@@ -286,7 +323,7 @@ def _asignar_solicitud_de_la_cita(unidad, personal, tipo):
                   .first())
     abierta = (solicitud.estado == Solicitud.PUBLICADA
                and solicitud.consentimiento_publicacion
-               and solicitud.unidades_asignadas < solicitud.unidades_requeridas)
+               and _cupo_libre(solicitud))
     if compatible is None or not abierta:
         cita.id_solicitud = None
         if cita.tipo_cita == Cita.SOLIDARIA:
@@ -299,7 +336,10 @@ def _asignar_solicitud_de_la_cita(unidad, personal, tipo):
     ))
     unidad.id_solicitud = solicitud.id_solicitud
     _transicion(unidad, personal, Unidad.ASIGNADA)
-    solicitud.unidades_asignadas += 1
+    db.session.flush()
+    solicitud.unidades_asignadas = (Asignacion.query
+                                    .filter_by(id_solicitud=solicitud.id_solicitud)
+                                    .count())
     db.session.add(Notificacion(
         id_usuario=solicitud.id_solicitante,
         id_solicitud=solicitud.id_solicitud,

@@ -54,6 +54,11 @@ def agendar():
             solicitud = None
             flash("No podés donar para tu propia solicitud.", "error")
 
+    # Con fecha, horario y solicitud, el tipo queda solidario si todavía
+    # no eligieron otro. Así la cita guarda id_solicitud.
+    if horario and tipo is None and solicitud is not None:
+        tipo = "Donacion solidaria"
+
     if tipo in agenda.NECESITA_SOLICITUD:
         disponibles = [s for s in ctrl_solicitudes.activas()
                        if s.id_solicitante != usuario.id_usuario]
