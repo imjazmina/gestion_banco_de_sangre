@@ -26,8 +26,9 @@ class Usuario(db.Model):
     Una sola tabla para donantes y personal: lo que distingue a uno de otro
     es el rol asignado en usuario_rol, no una tabla aparte.
 
-    id_tipo_sangre es nulo a propósito. El grupo sanguíneo no se declara al
-    registrarse: lo confirma el laboratorio a partir de una extracción.
+    El grupo no se declara al registrarse ni se guarda en esta tabla.
+    Lo confirma el laboratorio en resultado_laboratorio; tipo_sangre
+    es solo el catálogo.
     """
     __tablename__ = "usuario"
 
@@ -45,10 +46,7 @@ class Usuario(db.Model):
     cuenta_suprimida = db.Column(db.Boolean, nullable=False, default=False)
     # El schema no le pone DEFAULT now(): lo tiene que poner la aplicación.
     fecha_alta = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    id_tipo_sangre = db.Column(
-        db.Integer, db.ForeignKey("tipo_sangre.id_tipo_sangre"))
 
-    tipo_sangre = db.relationship("TipoSangre", lazy="joined")
     roles = db.relationship(
         "Rol", secondary="usuario_rol", lazy="selectin", viewonly=True)
     correos = db.relationship(
@@ -76,6 +74,27 @@ class Usuario(db.Model):
 
     def tiene_rol(self, codigo):
         return any(r.codigo == codigo for r in self.roles)
+
+    @staticmethod
+    def tipo_confirmado(id_usuario):
+        """Primera tipificación de laboratorio del donante. No se vuelve a sortear."""
+        from app.models.catalogos import TipoSangre
+        from app.models.donacion import ResultadoLaboratorio, Unidad
+
+        return (
+            TipoSangre.query
+            .join(ResultadoLaboratorio,
+                  ResultadoLaboratorio.id_tipo_sangre == TipoSangre.id_tipo_sangre)
+            .join(Unidad, Unidad.id_unidad == ResultadoLaboratorio.id_unidad)
+            .filter(Unidad.id_donante == id_usuario)
+            .order_by(ResultadoLaboratorio.fecha.asc(),
+                      ResultadoLaboratorio.id_resultado.asc())
+            .first()
+        )
+
+    @property
+    def tipo_sangre(self):
+        return Usuario.tipo_confirmado(self.id_usuario)
 
     def __repr__(self):
         return f"<Usuario {self.documento} {self.nombre_completo}>"

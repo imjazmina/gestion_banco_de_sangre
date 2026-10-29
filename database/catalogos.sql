@@ -306,9 +306,9 @@ BEGIN
   IF v_id IS NULL THEN
     INSERT INTO usuario (documento, nombre, apellido, fecha_nacimiento, genero,
                          contrasena, consentimiento_privacidad, estado,
-                         cuenta_suprimida, fecha_alta, id_tipo_sangre)
+                         cuenta_suprimida, fecha_alta)
     VALUES (p_doc, p_nom, p_ape, p_nac, p_gen, NULL, true, true, false,
-            timestamp '2023-01-01 08:00', maqueta_id_tipo(p_grupo))
+            timestamp '2023-01-01 08:00')
     RETURNING id_usuario INTO v_id;
   END IF;
   IF p_mail IS NOT NULL AND NOT EXISTS (SELECT 1 FROM correo c WHERE c.direccion = p_mail) THEN

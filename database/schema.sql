@@ -1,6 +1,7 @@
 -- Estructura de PostgreSQL del prototipo.
 -- Tablas, columnas, nulos, PK, FK, UK y catálogos: documentación del modelo de datos.
--- id_tipo_sangre en usuario es nulo: lo asigna el laboratorio (cardinalidad del diccionario y DER).
+-- usuario no referencia tipo_sangre: es un catálogo. La tipificación queda
+-- en resultado_laboratorio y se copia a unidad.
 -- historial_solicitud, historial_cita e historial_cita_consejeria registran
 -- cada cambio de estado. La columna estado de la fila padre es solo el vigente.
 
@@ -35,11 +36,9 @@ CREATE TABLE usuario (
     estado boolean NOT NULL DEFAULT true,
     cuenta_suprimida boolean NOT NULL DEFAULT false,
     fecha_alta timestamp NOT NULL,
-    id_tipo_sangre integer,
     CONSTRAINT uq_usuario_documento UNIQUE (documento),
     CONSTRAINT ck_usuario_genero CHECK (genero IN ('Masculino', 'Femenino')),
-    CONSTRAINT ck_usuario_supresion CHECK (cuenta_suprimida = false OR contrasena IS NULL),
-    CONSTRAINT fk_usuario_tipo_sangre FOREIGN KEY (id_tipo_sangre) REFERENCES tipo_sangre (id_tipo_sangre)
+    CONSTRAINT ck_usuario_supresion CHECK (cuenta_suprimida = false OR contrasena IS NULL)
 );
 
 CREATE TABLE usuario_rol (
@@ -467,7 +466,6 @@ CREATE UNIQUE INDEX uq_correo_principal
     ON correo (id_usuario)
     WHERE es_principal;
 
-CREATE INDEX idx_usuario_tipo_sangre ON usuario (id_tipo_sangre);
 CREATE INDEX idx_correo_usuario ON correo (id_usuario);
 CREATE INDEX idx_compatibilidad_donante ON compatibilidad_abo_rh (id_tipo_donante);
 CREATE INDEX idx_compatibilidad_receptor ON compatibilidad_abo_rh (id_tipo_receptor);

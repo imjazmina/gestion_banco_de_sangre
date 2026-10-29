@@ -165,11 +165,17 @@ def simular_resultado(id_unidad):
         db.session.rollback()
         raise ErrorSimulacion("La extracción no tiene personal para firmar la transición.")
 
-    tipos = TipoSangre.query.all()
-    if not tipos:
-        db.session.rollback()
-        raise ErrorSimulacion("Falta el catálogo de grupos sanguíneos.")
-    tipo = random.choice(tipos)
+    db.session.execute(
+        text("SELECT pg_advisory_xact_lock(CAST(:clase AS integer), CAST(:donante AS integer))"),
+        {"clase": 2, "donante": unidad.id_donante},
+    )
+    tipo = Usuario.tipo_confirmado(unidad.id_donante)
+    if tipo is None:
+        tipos = TipoSangre.query.all()
+        if not tipos:
+            db.session.rollback()
+            raise ErrorSimulacion("Falta el catálogo de grupos sanguíneos.")
+        tipo = random.choice(tipos)
     if random.random() < PROBABILIDAD_REACTIVO:
         _reactivo(unidad, personal, extraccion, tipo)
     else:
@@ -183,9 +189,6 @@ def simular_resultado(id_unidad):
 
 def _copiar_tipificacion(unidad, tipo):
     unidad.id_tipo_sangre = tipo.id_tipo_sangre
-    donante = db.session.get(Usuario, unidad.id_donante)
-    if donante is not None:
-        donante.id_tipo_sangre = tipo.id_tipo_sangre
 
 
 def _no_reactivo(unidad, personal, tipo):
@@ -342,8 +345,19 @@ def candidatos_de(solicitud):
         id_tipo_receptor=solicitud.id_tipo_sangre).all()]
     if not ids:
         return []
+    primera = (
+        db.session.query(Unidad.id_donante.label("id_donante"),
+                         ResultadoLaboratorio.id_tipo_sangre.label("id_tipo_sangre"))
+        .join(Unidad, Unidad.id_unidad == ResultadoLaboratorio.id_unidad)
+        .distinct(Unidad.id_donante)
+        .order_by(Unidad.id_donante,
+                  ResultadoLaboratorio.fecha.asc(),
+                  ResultadoLaboratorio.id_resultado.asc())
+        .subquery()
+    )
     return (Usuario.query
-            .filter(Usuario.id_tipo_sangre.in_(ids),
+            .join(primera, primera.c.id_donante == Usuario.id_usuario)
+            .filter(primera.c.id_tipo_sangre.in_(ids),
                     Usuario.estado.is_(True),
                     Usuario.cuenta_suprimida.is_(False),
                     Usuario.id_usuario != solicitud.id_solicitante)

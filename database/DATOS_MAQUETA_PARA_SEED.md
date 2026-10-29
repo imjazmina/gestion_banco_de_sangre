@@ -36,7 +36,7 @@ No es un script SQL. El script deberá respetar sin cambios
   la adaptación.
 - El esquema no guarda dirección. Ese dato de la maqueta no puede insertarse.
 - Correo se guarda en `correo`.
-- El grupo sanguíneo se referencia desde `usuario.id_tipo_sangre`.
+- El grupo del donante no va en `usuario`. Queda en `resultado_laboratorio.id_tipo_sangre` y se copia a `unidad`.
 - Una donación completada que deba aparecer en informes necesita, como mínimo:
   `cita` completada, `extraccion` y `unidad`.
 - Para que una unidad esté disponible en stock necesita además
