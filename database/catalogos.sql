@@ -127,7 +127,7 @@ SELECT * FROM (VALUES
   ('A', '¿Cuales?', true),
   ('A', '¿Está o estuvo embarazada o se encuentra en período de lactancia?', true),
   ('A', 'Si ha estado fuera del país, ¿se ha sentido enfermo/a días previos o posteriores a su regreso?', true),
-  ('A', '¿Ud. ha leído y comprendido este cuestionario y fueron aclaradas todas sus dudas?', true),
+  ('A', '¿Ud. ha leído y comprendido este cuestionario?', true),
   ('B', '¿Se siente Ud. bien y goza de buena salud?', true),
   ('B','¿Desayunaste hoy?',                                        true),
   ('B','¿Ha descansado o comido bien las últimas 24 horas?',       true),
@@ -135,7 +135,8 @@ SELECT * FROM (VALUES
   ('B','¿Estás tomando alguna medicación actualmente?',            true),
   ('B', '¿Por que?', true),
   ('B','¿Ha tomado aspirina los últimos 5 días?',                 true),
-  ('B', '¿Recibió dinero para realizar esta donación?', true)
+  ('B', '¿Recibió dinero para realizar esta donación?', true),
+  ('B', '¿Brazo sin lesiones de agujas?', true)
 ) AS p(parte, enunciado, excluye)
 WHERE NOT EXISTS (SELECT 1 FROM pregunta q WHERE q.enunciado = p.enunciado);
 
@@ -309,12 +310,6 @@ BEGIN
     VALUES (p_doc, p_nom, p_ape, p_nac, p_gen, NULL, true, true, false,
             timestamp '2023-01-01 08:00', maqueta_id_tipo(p_grupo))
     RETURNING id_usuario INTO v_id;
-  END IF;
-  IF p_tel IS NOT NULL AND NOT EXISTS (
-       SELECT 1 FROM telefono t WHERE t.id_usuario = v_id AND t.numero = p_tel) THEN
-    INSERT INTO telefono (id_usuario, numero, es_principal)
-    SELECT v_id, p_tel, NOT EXISTS (
-      SELECT 1 FROM telefono t WHERE t.id_usuario = v_id AND t.es_principal);
   END IF;
   IF p_mail IS NOT NULL AND NOT EXISTS (SELECT 1 FROM correo c WHERE c.direccion = p_mail) THEN
     INSERT INTO correo (id_usuario, direccion, es_principal)

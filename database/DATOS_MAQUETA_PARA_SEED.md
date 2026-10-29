@@ -35,7 +35,7 @@ No es un script SQL. El script deberá respetar sin cambios
   solicitud asociada; de lo contrario, `Donacion altruista` y dejar documentada
   la adaptación.
 - El esquema no guarda dirección. Ese dato de la maqueta no puede insertarse.
-- Teléfono y correo se guardan en `telefono` y `correo`.
+- Correo se guarda en `correo`.
 - El grupo sanguíneo se referencia desde `usuario.id_tipo_sangre`.
 - Una donación completada que deba aparecer en informes necesita, como mínimo:
   `cita` completada, `extraccion` y `unidad`.

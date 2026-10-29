@@ -78,9 +78,6 @@
                  name="p{{ p.id_pregunta }}_detalle" value="{{ detalle }}" maxlength="180">
         </div>
         {% endif %}
-        {% if p.preselecciona_exclusion %}
-        <p class="faint" style="font-size:12px;margin:4px 0 0 24px;">Un «sí» sugiere revisar diferimiento. No lo aplica solo.</p>
-        {% endif %}
       </div>
       {% else %}
       <p class="muted">No hay preguntas de la parte B cargadas.</p>
