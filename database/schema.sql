@@ -368,7 +368,13 @@ CREATE TABLE citacion_consejeria (
     CONSTRAINT fk_citacion_personal FOREIGN KEY (id_personal) REFERENCES usuario (id_usuario),
     CONSTRAINT fk_citacion_horario FOREIGN KEY (id_horario) REFERENCES horario_disponible (id_horario),
     CONSTRAINT fk_citacion_resultado FOREIGN KEY (id_resultado) REFERENCES resultado_laboratorio (id_resultado),
-    CONSTRAINT ck_citacion_estado CHECK (estado IN ('Pendiente', 'Realizada', 'Ausente'))
+    CONSTRAINT ck_citacion_estado CHECK (estado IN (
+        'Pendiente',
+        'Confirmada',
+        'Cancelada',
+        'Ausente',
+        'Completada'
+    ))
 );
 
 -- Historial inmutable. citacion_consejeria.estado es el vigente.
@@ -382,10 +388,22 @@ CREATE TABLE historial_cita_consejeria (
     CONSTRAINT fk_historial_cita_consejeria FOREIGN KEY (id_cita_consejeria) REFERENCES citacion_consejeria (id_citacion),
     CONSTRAINT ck_historial_cita_consejeria_anterior CHECK (
         estado_anterior IS NULL
-        OR estado_anterior IN ('Pendiente', 'Realizada', 'Ausente')
+        OR estado_anterior IN (
+            'Pendiente',
+            'Confirmada',
+            'Cancelada',
+            'Ausente',
+            'Completada'
+        )
     ),
     CONSTRAINT ck_historial_cita_consejeria_nuevo CHECK (
-        estado_nuevo IN ('Pendiente', 'Realizada', 'Ausente')
+        estado_nuevo IN (
+            'Pendiente',
+            'Confirmada',
+            'Cancelada',
+            'Ausente',
+            'Completada'
+        )
     )
 );
 

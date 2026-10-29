@@ -27,6 +27,8 @@ def lista():
         citas=filas,
         total=len(filas),
         pendientes=sum(1 for c in filas if c["estado"] == "Pendiente"),
-        realizadas=sum(1 for c in filas if c["estado"] == "Realizada"),
+        confirmadas=sum(1 for c in filas if c["estado"] == "Confirmada"),
+        completadas=sum(1 for c in filas if c["estado"] == "Completada"),
         ausentes=sum(1 for c in filas if c["estado"] == "Ausente"),
+        canceladas=sum(1 for c in filas if c["estado"] == "Cancelada"),
     )

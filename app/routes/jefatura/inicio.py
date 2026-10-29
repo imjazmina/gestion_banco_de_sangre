@@ -10,8 +10,10 @@ jefatura_inicio_bp = Blueprint("jefatura_inicio", __name__, url_prefix="/jefatur
 
 COLORES = {
     "Pendiente": "#2563EB",
-    "Realizada": "#059669",
+    "Confirmada": "#0891B2",
+    "Completada": "#059669",
     "Ausente": "#D97706",
+    "Cancelada": "#6B7280",
 }
 
 
@@ -19,7 +21,7 @@ COLORES = {
 @requiere("jef", "jefatura_auth.ingresar")
 def inicio():
     filas = consejeria.citaciones()
-    orden = ["Pendiente", "Realizada", "Ausente"]
+    orden = ["Pendiente", "Confirmada", "Completada", "Ausente", "Cancelada"]
     total = len(filas) or 1
     resumen = []
     for estado in orden:

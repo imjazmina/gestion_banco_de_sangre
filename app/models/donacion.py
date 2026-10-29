@@ -138,6 +138,8 @@ class HistorialCita(db.Model):
     estado_nuevo = db.Column(db.String(120), nullable=False)
     fecha_hora = db.Column(db.DateTime, nullable=False, default=datetime.now)
 
+    cita = db.relationship("Cita", foreign_keys=[id_cita])
+
 
 class HistorialCitaConsejeria(db.Model):
     """Cada cambio de estado de la citación. No se actualiza ni se borra."""
@@ -150,6 +152,9 @@ class HistorialCitaConsejeria(db.Model):
     estado_anterior = db.Column(db.String(120))
     estado_nuevo = db.Column(db.String(120), nullable=False)
     fecha_hora = db.Column(db.DateTime, nullable=False, default=datetime.now)
+
+    citacion = db.relationship(
+        "CitacionConsejeria", foreign_keys=[id_cita_consejeria])
 
 
 class Cuestionario(db.Model):
@@ -329,6 +334,13 @@ class CitacionConsejeria(db.Model):
     estado = db.Column(db.String(20), nullable=False, default="Pendiente")
     observaciones = db.Column(db.Text)
 
+    PENDIENTE = "Pendiente"
+    CONFIRMADA = "Confirmada"
+    CANCELADA = "Cancelada"
+    AUSENTE = "Ausente"
+    COMPLETADA = "Completada"
+    ABIERTAS = (PENDIENTE, CONFIRMADA)
+
 
 class Derivacion(db.Model):
     """Derivación del donante a otro establecimiento de salud."""
@@ -343,3 +355,11 @@ class Derivacion(db.Model):
     establecimiento_destino = db.Column(db.String(120), nullable=False)
     fecha = db.Column(db.Date, nullable=False)
     motivo_interno = db.Column(db.Text)
+
+
+from app.models.historial_estados import activar as _activar_historial  # noqa: E402
+
+_activar_historial(
+    Cita, HistorialCita, "cita",
+    CitacionConsejeria, HistorialCitaConsejeria, "citacion",
+)

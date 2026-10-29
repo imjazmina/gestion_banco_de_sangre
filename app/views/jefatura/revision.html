@@ -20,10 +20,14 @@
   </div>
   {% endif %}
 
-  {% if citacion.estado == 'Pendiente' %}
+  {% if citacion.estado in ('Pendiente', 'Confirmada') %}
   <form method="post" class="row mt-4">
-    <button class="btn btn-primary" name="estado" value="Realizada" type="submit">Marcar realizada</button>
+    {% if citacion.estado == 'Pendiente' %}
+    <button class="btn btn-primary" name="estado" value="Confirmada" type="submit">Confirmar</button>
+    {% endif %}
+    <button class="btn btn-primary" name="estado" value="Completada" type="submit">Marcar completada</button>
     <button class="btn btn-ghost" name="estado" value="Ausente" type="submit">Marcar ausente</button>
+    <button class="btn btn-ghost" name="estado" value="Cancelada" type="submit">Cancelar</button>
   </form>
   {% endif %}
 

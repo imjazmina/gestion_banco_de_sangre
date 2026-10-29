@@ -22,10 +22,14 @@ def citacion_por_id(id_citacion):
 
 
 def marcar(citacion, estado, personal):
-    if estado not in ("Realizada", "Ausente"):
+    if estado not in (
+            CitacionConsejeria.CONFIRMADA, CitacionConsejeria.CANCELADA,
+            CitacionConsejeria.AUSENTE, CitacionConsejeria.COMPLETADA):
         raise ErrorConsejeria("Ese estado no está en el catálogo de la citación.")
-    if citacion.estado != "Pendiente":
+    if citacion.estado not in CitacionConsejeria.ABIERTAS:
         raise ErrorConsejeria("Esa citación ya fue cerrada.")
+    if citacion.estado == estado:
+        raise ErrorConsejeria("La citación ya está en ese estado.")
     citacion.estado = estado
     citacion.id_personal = personal.id_usuario
     Auditoria.registrar(personal.id_usuario, "CITACION_CONSEJERIA",
