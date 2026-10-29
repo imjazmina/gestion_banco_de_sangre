@@ -77,47 +77,6 @@ def usuario_actual():
             .first())
 
 
-# --------------------------------------------- cuentas en período de gracia
-#
-# Quien pidió la baja de su cuenta tiene `estado` en falso, así que
-# `usuario_actual()` no lo devuelve y no puede entrar a ninguna pantalla del
-# portal: eso es justamente lo que se busca. Pero sí tiene que poder volver
-# para cancelar el pedido, y para eso hay una marca aparte.
-#
-# Va en otra clave a propósito. Si se guardara en "id_usuario", cualquier
-# descuido en un decorador dejaría entrar a una cuenta dada de baja; con
-# una clave distinta, todo lo que hoy exige sesión sigue exigiéndola, y la
-# única pantalla que mira esta marca es la de cuenta pendiente.
-CLAVE_GRACIA = "gracia_id"
-
-
-def marcar_en_gracia(usuario):
-    """Deja la marca que habilita solo la pantalla de cuenta pendiente."""
-    session.clear()
-    session[CLAVE_GRACIA] = usuario.id_usuario
-    session["visto"] = datetime.now().timestamp()
-
-
-def usuario_en_gracia():
-    """El Usuario con pedido de baja en curso de esta sesión, o None."""
-    id_usuario = session.get(CLAVE_GRACIA)
-    if not id_usuario:
-        return None
-
-    ahora = datetime.now().timestamp()
-    visto = session.get("visto")
-    if visto is None or ahora - visto > MINUTOS_INACTIVIDAD * 60:
-        cerrar_sesion()
-        return None
-    session["visto"] = ahora
-
-    from app.controllers.portal.supresion import en_gracia
-
-    usuario = Usuario.query.filter_by(id_usuario=id_usuario).first()
-    # Si el pedido ya se canceló o ya se ejecutó, la marca no sirve más.
-    return usuario if en_gracia(usuario) else None
-
-
 def requiere_login(vista):
     """Decorador: la vista solo se ve con sesión iniciada."""
     @wraps(vista)

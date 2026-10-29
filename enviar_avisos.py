@@ -1,18 +1,12 @@
 """
 Manda los avisos automáticos del portal.
 
-Hace tres cosas:
+Hace dos cosas:
 
   · manda el correo con el cuestionario previo a quienes tienen una cita
     dentro de las próximas 3 horas y todavía no lo recibieron;
   · deja el recordatorio de la cita del día siguiente y el aviso de que el
-    donante volvió a estar habilitado;
-  · ejecuta las supresiones de cuenta cuyo plazo de gracia de 30 días
-    venció.
-
-Lo último es la parte que no puede faltar: la supresión definitiva no la
-dispara ninguna pantalla, así que si este script no corre, los datos que
-había que borrar quedan guardados.
+    donante volvió a estar habilitado.
 
     python enviar_avisos.py            manda lo que corresponda ahora
     python enviar_avisos.py --ver      muestra a quién le tocaría, sin enviar
@@ -118,20 +112,7 @@ def main():
             else:
                 print("\nNo hay solicitudes con donantes nuevos por avisar.")
 
-            # Las supresiones vencidas se listan pero no se ejecutan: --ver
-            # no toca nada, y acá eso importa más que en el resto porque lo
-            # que haría es borrar datos.
-            from app.controllers.portal import supresion
-            vencidas = supresion.vencidas()
-            if vencidas:
-                print(f"\nSe suprimirían {len(vencidas)} cuenta(s):")
-                for u in vencidas:
-                    print(f"  usuario {u.id_usuario}: {u.nombre_completo}, "
-                          f"pedido el {supresion.fecha_del_pedido(u):%d/%m/%Y}")
-            else:
-                print("\nNo hay supresiones de cuenta con el plazo cumplido.")
-
-            print("\n(--ver: no se envió ni se borró nada)")
+            print("\n(--ver: no se envió nada)")
             return 0
 
         for linea in avisos.correr(url_base):

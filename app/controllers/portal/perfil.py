@@ -96,10 +96,30 @@ def actualizar(usuario, datos):
         raise
 
 
-# La supresión de cuenta vive en supresion.py. Antes se hacía acá y era
-# inmediata; ahora tiene un período de gracia de 30 días durante el cual se
-# puede dar marcha atrás, así que es un proceso con varios pasos y no una
-# función del perfil.
+def suprimir_cuenta(usuario):
+    """
+    Supresión de cuenta (Ley N.º 1682/01).
+
+    No se borra la fila: se anula el acceso y se conserva el rastro clínico,
+    que el banco de sangre está obligado a guardar. El CHECK
+    ck_usuario_supresion exige que la contraseña quede nula.
+    """
+    try:
+        usuario.cuenta_suprimida = True
+        usuario.estado = False
+        usuario.contrasena = None
+
+        for correo in usuario.correos:
+            db.session.delete(correo)
+        for telefono in usuario.telefonos:
+            db.session.delete(telefono)
+
+        Auditoria.registrar(usuario.id_usuario, "USUARIO",
+                            usuario.id_usuario, Auditoria.SUPRESION_CUENTA)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
 
 
 # _sumar_meses, _completadas, ultima_donacion y habilitacion se mudaron

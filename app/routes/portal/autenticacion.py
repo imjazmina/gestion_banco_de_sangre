@@ -3,11 +3,9 @@ from flask import (Blueprint, current_app, render_template, request, redirect,
                    url_for, flash)
 
 from app import correo
-from app.controllers.portal import (autenticacion, inicio, recuperacion,
-                                    supresion)
+from app.controllers.portal import autenticacion, inicio, recuperacion
 from app.controllers.sesion import (iniciar_sesion, cerrar_sesion,
-                                    usuario_actual, marcar_en_gracia,
-                                    usuario_en_gracia)
+                                    usuario_actual)
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -62,19 +60,10 @@ def ingresar():
     correo = ""
     if request.method == "POST":
         correo = request.form.get("correo", "").strip()
-        contrasena = request.form.get("contrasena", "")
-        usuario = autenticacion.autenticar(correo, contrasena)
+        usuario = autenticacion.autenticar(correo, request.form.get("contrasena", ""))
         if usuario:
             iniciar_sesion(usuario)
             return redirect(url_for("main.index"))
-
-        # Las credenciales de alguien que pidió la baja todavía sirven
-        # mientras corra el plazo, pero no para usar el portal: lo único que
-        # habilitan es la pantalla donde puede cancelar el pedido.
-        pendiente = supresion.autenticar_en_gracia(correo, contrasena)
-        if pendiente:
-            marcar_en_gracia(pendiente)
-            return redirect(url_for("auth.cuenta_pendiente"))
 
         # Un solo mensaje para "el correo no existe" y "la contraseña está
         # mal". Si fueran distintos, cualquiera podría averiguar qué correos
@@ -91,40 +80,6 @@ def ingresar():
 @auth_bp.get("/salir")
 def salir():
     cerrar_sesion()
-    return redirect(url_for("main.index"))
-
-
-# ------------------------------------------- cuenta con la baja pedida
-@auth_bp.get("/cuenta-pendiente")
-def cuenta_pendiente():
-    """
-    Lo que ve quien pidió la baja y vuelve a entrar dentro del plazo.
-
-    No es una pantalla del portal: no tiene menú de donante ni sesión
-    iniciada. Solo dice cuánto tiempo queda y ofrece recuperar la cuenta.
-    """
-    usuario = usuario_en_gracia()
-    if usuario is None:
-        return redirect(url_for("auth.ingresar"))
-    return render_template("portal/auth/cuenta_pendiente.html",
-                           **supresion.resumen(usuario))
-
-
-@auth_bp.post("/cuenta-pendiente")
-def recuperar_cuenta():
-    """Cancela el pedido de baja y devuelve el acceso de una vez."""
-    usuario = usuario_en_gracia()
-    if usuario is None:
-        return redirect(url_for("auth.ingresar"))
-
-    try:
-        supresion.cancelar(usuario)
-    except supresion.ErrorSupresion as e:
-        flash(str(e), "error")
-        return redirect(url_for("auth.ingresar"))
-
-    iniciar_sesion(usuario)
-    flash("Tu cuenta sigue activa. Cancelamos el pedido de eliminación.", "ok")
     return redirect(url_for("main.index"))
 
 

@@ -1,48 +1,30 @@
 {% extends "portal/layout.html" %}
 {% from "portal/_ui.html" import ico %}
 {% set activo = 'perfil' %}
-{% block titulo %}Eliminar cuenta · Banco de sangre{% endblock %}
+{% block titulo %}Suprimir cuenta · Banco de sangre{% endblock %}
 
 {% block contenido %}
 <section class="block" style="padding-top:32px;">
   <div class="wrap center-narrow">
     <a class="btn btn-ghost btn-sm" href="{{ url_for('perfil.ver') }}" style="margin-bottom:14px;">{{ ico('arrowLeft') }} Volver al perfil</a>
-    <div class="section-head">
-      <h1>Eliminar cuenta</h1>
-      <p class="sub" style="margin-top:4px;">Tenés {{ dias_de_gracia }} días para cambiar de opinión.</p>
-    </div>
+    <div class="section-head"><h1>Suprimir cuenta</h1></div>
 
     <div class="card" style="border-top:3px solid var(--danger);">
-      <h2 style="margin-bottom:6px;">Al confirmar, desde hoy</h2>
-      <ul class="req-list" style="margin-bottom:20px;">
-        <li class="req-no">{{ ico('x') }} Se cierra tu acceso al portal</li>
-        <li class="req-no">{{ ico('x') }} Dejás de recibir avisos y recordatorios</li>
-        <li class="req-no">{{ ico('x') }} Si tenés una cita agendada, no vas a poder gestionarla</li>
-      </ul>
-
-      {# El plazo es la parte que hay que explicar bien: sin esto la pantalla
-         parece decir que todo se borra en el momento, y no es así. #}
-      <div class="banner info" style="margin-bottom:16px;">
-        {{ ico('info') }}
-        <p><b>Durante los próximos {{ dias_de_gracia }} días podés recuperar tu cuenta</b>Entrá con tu correo y tu contraseña como siempre y elegí «Recuperar mi cuenta». Todo vuelve a quedar como estaba.</p>
-      </div>
-
-      <h2 style="margin-bottom:6px;">Pasados los {{ dias_de_gracia }} días</h2>
-      <p class="sub" style="margin-bottom:10px;">Se eliminan de forma definitiva los datos que te identifican:</p>
-      <ul class="req-list" style="margin-bottom:20px;">
-        <li class="req-no">{{ ico('x') }} Tu nombre y apellido</li>
-        <li class="req-no">{{ ico('x') }} Tu número de documento</li>
-        <li class="req-no">{{ ico('x') }} Tu correo y tu teléfono</li>
+      <p class="sub" style="margin-bottom:14px;">Esta acción es permanente y no se puede deshacer. Al confirmar:</p>
+      <ul class="req-list" style="margin-bottom:18px;">
+        <li class="req-no">{{ ico('x') }} Se elimina tu acceso al portal</li>
+        <li class="req-no">{{ ico('x') }} Se borran tu correo y tu teléfono del sistema</li>
+        <li class="req-no">{{ ico('x') }} Si tenés una cita agendada, dejás de poder gestionarla desde acá</li>
       </ul>
 
       <div class="banner info">
         {{ ico('shield') }}
-        <p><b>Tu historial sanitario se conserva sin tu nombre</b>El banco de sangre está obligado a mantener la trazabilidad de cada unidad de sangre: con qué grupo sanguíneo se registró, en qué fecha y con qué resultados. Esos registros quedan, pero dejan de estar asociados a una persona identificable.</p>
+        <p><b>Tu historial de donaciones se conserva</b>Queda desvinculado de tus datos de contacto. El banco de sangre está obligado a mantener la trazabilidad sanitaria de cada unidad.</p>
       </div>
 
       <form method="post" action="{{ url_for('perfil.suprimir') }}"
             style="display:flex; gap:12px; flex-wrap:wrap; margin-top:20px;">
-        <button class="btn btn-danger" type="submit">{{ ico('trash') }} Sí, eliminar mi cuenta</button>
+        <button class="btn btn-danger" type="submit">{{ ico('trash') }} Sí, suprimir mi cuenta</button>
         <a class="btn btn-ghost" href="{{ url_for('perfil.ver') }}">Cancelar</a>
       </form>
     </div>

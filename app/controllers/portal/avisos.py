@@ -252,77 +252,6 @@ def enviar_habilitacion(usuario):
     db.session.commit()
 
 
-# ------------------------------------------------------- supresión de cuenta
-def avisar_supresion_solicitada(usuario, enlace):
-    """
-    Le confirma por correo que el pedido de baja quedó registrado.
-
-    Es el aviso que más importa de los tres: es el que le dice que todavía
-    hay tiempo de volver, y el único lugar donde queda escrita la fecha
-    límite. Si el pedido no lo hizo la persona, este correo es la forma de
-    que se entere.
-    """
-    from app.controllers.portal import supresion
-
-    destino = usuario.correo_principal
-    if destino is None:
-        return False, "no tiene correo principal cargado"
-
-    cuerpo = render_template("correos/supresion_solicitada.html",
-                             nombre=usuario.nombre,
-                             limite=supresion.fecha_definitiva(usuario),
-                             enlace=enlace)
-    try:
-        salio = correo.enviar(destino.direccion,
-                              "Pediste eliminar tu cuenta del portal de donantes",
-                              cuerpo)
-    except correo.ErrorCorreo as e:
-        return False, str(e)
-    return True, ("enviado por correo" if salio else "escrito en la consola")
-
-
-def ejecutar_supresiones(ahora=None):
-    """
-    Ejecuta las supresiones cuyo plazo de gracia venció.
-
-    El correo de despedida se arma ANTES de suprimir: la supresión borra la
-    dirección, así que después ya no habría a dónde escribir. Y se manda
-    después del commit, para no avisar de algo que al final no se grabó.
-    """
-    from app.controllers.portal import supresion
-
-    lineas = []
-    hoy = (ahora or datetime.now()).date()
-    for usuario in supresion.vencidas(hoy):
-        etiqueta = f"usuario {usuario.id_usuario} ({usuario.nombre_completo})"
-        destino = usuario.correo_principal
-        direccion = destino.direccion if destino else None
-        nombre = usuario.nombre
-
-        try:
-            supresion.ejecutar(usuario)
-        except Exception as e:  # noqa: BLE001
-            db.session.rollback()
-            lineas.append(f"  supresión {etiqueta}: FALLÓ — {e}")
-            continue
-
-        lineas.append(f"  supresión {etiqueta}: ok")
-        if direccion is None:
-            lineas.append("      sin correo cargado, no se avisó")
-            continue
-        try:
-            cuerpo = render_template("correos/supresion_ejecutada.html",
-                                     nombre=nombre,
-                                     dias=supresion.DIAS_DE_GRACIA)
-            salio = correo.enviar(direccion, "Tu cuenta fue eliminada", cuerpo)
-            lineas.append("      aviso " + ("enviado" if salio else "a consola"))
-        except correo.ErrorCorreo as e:
-            # La supresión ya está hecha y no se deshace por un correo que no
-            # salió: queda anotado y sigue.
-            lineas.append(f"      aviso FALLÓ — {e}")
-    return lineas
-
-
 # ----------------------------------------- solicitudes compatibles (RF12)
 #
 # Cuando hay una solicitud publicada, se avisa a los donantes cuyo grupo
@@ -456,8 +385,4 @@ def correr(url_base, ahora=None):
         if n:
             lineas.append(f"  solicitud {solicitud.id_solicitud}: "
                           f"avisada a {n} donante(s) compatible(s)")
-
-    supresiones = ejecutar_supresiones(ahora)
-    if supresiones:
-        lineas.extend(supresiones)
     return lineas
