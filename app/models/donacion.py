@@ -243,7 +243,7 @@ class Unidad(db.Model):
     id_unidad = db.Column(db.Integer, primary_key=True)
     id_extraccion = db.Column(
         db.Integer, db.ForeignKey("extraccion.id_extraccion"),
-        nullable=False, unique=True)
+        nullable=False, index=True)
     id_donante = db.Column(
         db.Integer, db.ForeignKey("usuario.id_usuario"), nullable=False)
     id_solicitud = db.Column(db.Integer, db.ForeignKey("solicitud.id_solicitud"))
