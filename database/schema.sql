@@ -297,7 +297,6 @@ CREATE TABLE unidad (
     componente varchar(20) NOT NULL DEFAULT 'sangre_total',
     estado varchar(20) NOT NULL,
     fecha_vencimiento date,
-    CONSTRAINT uq_unidad_extraccion UNIQUE (id_extraccion),
     CONSTRAINT uq_unidad_codigo UNIQUE (codigo),
     CONSTRAINT fk_unidad_extraccion FOREIGN KEY (id_extraccion) REFERENCES extraccion (id_extraccion),
     CONSTRAINT fk_unidad_donante FOREIGN KEY (id_donante) REFERENCES usuario (id_usuario),
@@ -491,6 +490,7 @@ CREATE INDEX idx_registro_cita ON registro_diferimiento (id_cita);
 CREATE INDEX idx_registro_personal ON registro_diferimiento (id_personal);
 CREATE INDEX idx_registro_resultado ON registro_diferimiento (id_resultado);
 CREATE INDEX idx_extraccion_personal ON extraccion (id_personal);
+CREATE INDEX idx_unidad_extraccion ON unidad (id_extraccion);
 CREATE INDEX idx_unidad_donante ON unidad (id_donante);
 CREATE INDEX idx_unidad_solicitud ON unidad (id_solicitud);
 CREATE INDEX idx_unidad_tipo_sangre ON unidad (id_tipo_sangre);

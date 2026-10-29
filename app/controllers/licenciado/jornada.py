@@ -6,7 +6,7 @@ son los del CHECK de `cita`. «Diferido» de la maqueta queda como `No apto`
 más un `registro_diferimiento`. No se agregan columnas.
 """
 import secrets
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
@@ -295,14 +295,22 @@ def extraccion_de(cita):
     return Extraccion.query.filter_by(id_cita=cita.id_cita).first()
 
 
-def unidad_de(cita):
+def unidades_de(cita):
     extraccion = extraccion_de(cita)
     if extraccion is None:
-        return None
-    return Unidad.query.filter_by(id_extraccion=extraccion.id_extraccion).first()
+        return []
+    return (Unidad.query
+            .filter_by(id_extraccion=extraccion.id_extraccion)
+            .order_by(Unidad.id_unidad)
+            .all())
 
 
-def registrar_extraccion(cita, personal, observacion):
+def registrar_extraccion(cita, personal, observacion, n_unidades=0):
+    """
+    Cierra la cita y deja la extracción.
+    Cada unidad completada pasa a laboratorio, con vencimiento a 30 días.
+    Si no se completó ninguna, no hay fila en unidad ni código de unidad.
+    """
     _exigir_ajeno(cita, personal)
     if extraccion_de(cita) is not None:
         raise ErrorJornada("Esta cita ya tiene una extracción.")
@@ -311,54 +319,64 @@ def registrar_extraccion(cita, personal, observacion):
             "No se extrae si falta una medición o alguna no es apta.")
     if cita.estado not in (Cita.PENDIENTE, Cita.CONFIRMADA):
         raise ErrorJornada("Esta cita ya está cerrada.")
+    if n_unidades < 0:
+        raise ErrorJornada("La cantidad de unidades no es válida.")
 
     observacion = (observacion or "").strip()
     if not observacion:
         observacion = "Sin incidentes."
 
+    fecha = datetime.now()
     extraccion = Extraccion(
         id_cita=cita.id_cita,
         id_personal=personal.id_usuario,
         codigo_unico=_codigo("EX"),
-        fecha=datetime.now(),
+        fecha=fecha,
         observacion=observacion,
     )
     db.session.add(extraccion)
     db.session.flush()
 
-    unidad = Unidad(
-        id_extraccion=extraccion.id_extraccion,
-        id_donante=cita.id_usuario,
-        codigo=_codigo("UN"),
-        componente="sangre_total",
-        estado=Unidad.REGISTRADA,
-    )
-    db.session.add(unidad)
-    db.session.flush()
+    unidades = []
+    vencimiento = fecha.date() + timedelta(days=30)
+    for _ in range(n_unidades):
+        unidad = Unidad(
+            id_extraccion=extraccion.id_extraccion,
+            id_donante=cita.id_usuario,
+            codigo=_codigo("UN"),
+            componente="sangre_total",
+            estado=Unidad.REGISTRADA,
+            fecha_vencimiento=vencimiento,
+        )
+        db.session.add(unidad)
+        db.session.flush()
+        db.session.add(TransicionEstado(
+            id_unidad=unidad.id_unidad,
+            id_personal=personal.id_usuario,
+            estado_origen=Unidad.REGISTRADA,
+            estado_destino=Unidad.EN_LABORATORIO,
+            fecha=fecha,
+        ))
+        unidad.estado = Unidad.EN_LABORATORIO
+        Auditoria.registrar(personal.id_usuario, "UNIDAD", unidad.id_unidad,
+                            Auditoria.CAMBIO_ESTADO)
+        unidades.append(unidad)
 
-    # La base solo admite la transición Registrada → En laboratorio.
-    # El alta es la fila en Registrada; no hay una fila con origen «Alta».
-    db.session.add(TransicionEstado(
-        id_unidad=unidad.id_unidad,
-        id_personal=personal.id_usuario,
-        estado_origen=Unidad.REGISTRADA,
-        estado_destino=Unidad.EN_LABORATORIO,
-        fecha=datetime.now(),
-    ))
-    unidad.estado = Unidad.EN_LABORATORIO
+    if unidades:
+        db.session.add(Notificacion(
+            id_usuario=cita.id_usuario,
+            id_cita=cita.id_cita,
+            tipo=Notificacion.AGRADECIMIENTO,
+            mensaje="Gracias por donar. Tu extracción quedó registrada en el banco de sangre.",
+        ))
+
     cita.estado = Cita.COMPLETADA
     cita.id_personal = personal.id_usuario
-
-    db.session.add(Notificacion(
-        id_usuario=cita.id_usuario,
-        id_cita=cita.id_cita,
-        tipo=Notificacion.AGRADECIMIENTO,
-        mensaje="Gracias por donar. Tu extracción quedó registrada en el banco de sangre.",
-    ))
-    Auditoria.registrar(personal.id_usuario, "UNIDAD", unidad.id_unidad,
-                        Auditoria.CAMBIO_ESTADO)
+    if not unidades:
+        Auditoria.registrar(personal.id_usuario, "CITA", cita.id_cita,
+                            Auditoria.CAMBIO_ESTADO)
     _commit()
-    return unidad
+    return unidades
 
 
 def buscar_donante(documento):
