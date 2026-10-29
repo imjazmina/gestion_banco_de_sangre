@@ -1,8 +1,12 @@
 """
 Manda los avisos automáticos del portal.
 
-Hoy manda uno: el correo con el cuestionario previo, a quienes tienen una
-cita dentro de las próximas 3 horas y todavía no lo recibieron.
+Hace dos cosas:
+
+  · manda el correo con el cuestionario previo a quienes tienen una cita
+    dentro de las próximas 3 horas y todavía no lo recibieron;
+  · deja el recordatorio de la cita del día siguiente y el aviso de que el
+    donante volvió a estar habilitado.
 
     python enviar_avisos.py            manda lo que corresponda ahora
     python enviar_avisos.py --ver      muestra a quién le tocaría, sin enviar
@@ -93,6 +97,20 @@ def main():
             else:
                 print("\nNo hay ninguna cita agendada. Agendá una desde el")
                 print("portal y volvé a correr esto.")
+
+            # Solicitudes: a cuántos donantes compatibles les tocaría el
+            # aviso. Es de solo lectura, no se manda nada.
+            from app.controllers.portal import solicitudes as ctrl_sol
+            pendientes_sol = [(s, avisos.donantes_compatibles(s))
+                              for s in ctrl_sol.activas()]
+            pendientes_sol = [(s, d) for s, d in pendientes_sol if d]
+            if pendientes_sol:
+                print("\nSolicitudes con donantes compatibles por avisar:")
+                for s, d in pendientes_sol:
+                    print(f"  solicitud {s.id_solicitud} ({s.tipo_sangre.etiqueta}): "
+                          f"{len(d)} donante(s)")
+            else:
+                print("\nNo hay solicitudes con donantes nuevos por avisar.")
 
             print("\n(--ver: no se envió nada)")
             return 0

@@ -29,19 +29,38 @@
     </div>
     {% endif %}
 
-    {# ---------- diferimiento vigente: nunca se muestra la causa ---------- #}
-    {% if diferimiento %}
+    {# ---------- no puede agendar ----------
+       Dos motivos distintos y se explican distinto. El diferimiento lo
+       decide el personal de salud y nunca se dice la causa clínica (RF09).
+       El intervalo entre donaciones no es información clínica: es el
+       calendario, así que se explica con todas las letras. #}
+    {% if bloqueo %}
     <div class="card" style="border-top:3px solid var(--warn); margin-bottom:20px;">
       <div style="display:flex; gap:14px; align-items:flex-start;">
         <div class="ico" style="background:#FEF3E2; color:var(--warn); width:44px; height:44px; box-shadow:inset 0 0 0 1.5px currentColor;">{{ ico('info') }}</div>
         <div style="flex:1;">
           <h2 style="margin-bottom:6px;">Agendamiento no disponible</h2>
+
+          {% if bloqueo.motivo in (PERMANENTE, DIFERIMIENTO) %}
           <p class="sub" style="margin-bottom:12px;">El banco de sangre registró una condición que impide agendar una cita por ahora. Para conocer los detalles, comunicate con el banco de sangre.</p>
           <p class="meta" style="margin-bottom:2px;">Fecha estimada de habilitación</p>
           <p style="font-weight:600; margin-bottom:12px;">
-            {{ diferimiento.fecha_fin.strftime('%d/%m/%Y') if diferimiento.fecha_fin else 'A definir por el personal de salud' }}
+            {{ bloqueo.fecha.strftime('%d/%m/%Y') if bloqueo.fecha else 'A definir por el personal de salud' }}
             <span class="meta" style="font-weight:400;">(orientativa)</span>
           </p>
+          {% else %}
+          <p class="sub" style="margin-bottom:12px;">
+            Todavía no pasó el tiempo mínimo entre donaciones. Es una medida de
+            cuidado para vos: el organismo necesita reponer lo que se extrae
+            antes de una nueva donación.
+          </p>
+          <p class="meta" style="margin-bottom:2px;">Vas a poder agendar desde</p>
+          <p style="font-weight:600; margin-bottom:12px;">
+            {{ bloqueo.fecha.strftime('%d/%m/%Y') }}
+            {% if bloqueo.dias %}<span class="meta" style="font-weight:400;">(faltan {{ bloqueo.dias }} días)</span>{% endif %}
+          </p>
+          {% endif %}
+
           <div class="banner info" style="margin-bottom:12px;">
             {{ ico('info') }}
             <p><b>Dato orientativo</b>Esta fecha es estimada y no garantiza la habilitación. La aptitud para donar la determina el personal de salud en la evaluación presencial.</p>
@@ -52,7 +71,7 @@
     </div>
     {% endif %}
 
-    <div class="{{ 'form-locked' if diferimiento or solicitud_abierta }}" {% if diferimiento or solicitud_abierta %}aria-disabled="true"{% endif %}>
+    <div class="{{ 'form-locked' if bloqueo or solicitud_abierta }}" {% if bloqueo or solicitud_abierta %}aria-disabled="true"{% endif %}>
 
       {# ---------- pasos 1 y 2 ---------- #}
       <div class="card" style="margin-bottom:20px;">
@@ -65,8 +84,33 @@
         {% endif %}
       </div>
 
-      {# ---------- paso 3: tipo ---------- #}
-      {% if horario %}
+      {# ---------- paso 3: tipo ----------
+         Viniendo desde una solicitud el tipo ya está decidido, así que en
+         lugar de las tarjetas se muestra a quién se dona, con la opción de
+         volver a la lista si se equivocó de persona. #}
+      {% if desde_solicitud %}
+      <div class="card" style="margin-bottom:20px;">
+        {# El enlace saca la solicitud de la URL y deja fecha y horario. Así
+           vuelve al paso normal con las tres opciones, y si elige solidaria
+           otra vez puede cambiar también de paciente. #}
+        <div class="flex-between" style="margin-bottom:12px;">
+          <h2>3. Donás para</h2>
+          <a class="btn btn-ghost btn-sm"
+             href="{{ url_for('donar.agendar',
+                              fecha=fecha.isoformat() if fecha else none,
+                              horario=horario.id_horario if horario else none) }}">
+            {{ ico('edit') }} Cambiar tipo
+          </a>
+        </div>
+        <div class="banner info" style="margin:0;">
+          {{ ico('users') }}
+          <p><b>{{ solicitud.solicitante.nombre_completo }}</b>Donación solidaria ·
+            necesita {{ solicitud.tipo_sangre.etiqueta }} ·
+            {{ solicitud.unidades_asignadas }} de {{ solicitud.unidades_requeridas }} unidades cubiertas</p>
+        </div>
+      </div>
+
+      {% elif horario %}
       <div class="card" style="margin-bottom:20px;">
         <h2 style="margin-bottom:14px;">3. Tipo de donación</h2>
         <div class="type-grid">

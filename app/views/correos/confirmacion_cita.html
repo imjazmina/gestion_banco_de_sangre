@@ -1,0 +1,62 @@
+{% import "correos/_base.html" as correo %}
+{% call correo.marco(titulo='Tu cita quedó confirmada') %}
+  <p style="margin:0 0 16px; font-size:15px; line-height:1.55;">
+    Hola {{ nombre }}, registramos tu cita de donación. Estos son los datos:
+  </p>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+         style="background:#F6F7FB; border:1px solid #E6E7F0; border-radius:6px; margin-bottom:18px;">
+    <tr><td style="padding:16px 18px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="font-size:14px; color:#1A1A2E;">
+        <tr>
+          <td style="padding:4px 0; color:#5B5B77;">Fecha</td>
+          <td style="padding:4px 0; text-align:right; font-weight:600;">{{ fecha }}</td>
+        </tr>
+        <tr>
+          <td style="padding:4px 0; color:#5B5B77;">Horario</td>
+          <td style="padding:4px 0; text-align:right; font-weight:600;">{{ hora_inicio }} a {{ hora_fin }}</td>
+        </tr>
+        <tr>
+          <td style="padding:4px 0; color:#5B5B77;">Tipo</td>
+          <td style="padding:4px 0; text-align:right; font-weight:600;">{{ tipo }}</td>
+        </tr>
+        {% if donas_para %}
+        <tr>
+          <td style="padding:4px 0; color:#5B5B77;">Donás para</td>
+          <td style="padding:4px 0; text-align:right; font-weight:600;">{{ donas_para }}</td>
+        </tr>
+        {% endif %}
+        <tr>
+          <td style="padding:4px 0; color:#5B5B77;">Lugar</td>
+          <td style="padding:4px 0; text-align:right; font-weight:600;">Banco de sangre, Hospital Regional de Luque</td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0"
+         style="background:#FFF7F7; border:1px solid #F3DADA; border-radius:6px; margin-bottom:18px;">
+    <tr><td style="padding:16px 18px;">
+      <p style="margin:0 0 8px; font-size:14px; font-weight:600; color:#120C61;">Para que te tomen sin demoras</p>
+      <p style="margin:0; font-size:14px; color:#3B3B54; line-height:1.7;">
+        · Traé tu documento de identidad<br>
+        · Comé algo liviano antes de venir, no vengas en ayunas<br>
+        · Tomá bastante agua<br>
+        · Evitá el alcohol en las 12 horas previas
+      </p>
+    </td></tr>
+  </table>
+
+  <p style="margin:0 0 14px; font-size:14px; color:#5B5B77; line-height:1.55;">
+    El día de la cita, el personal de salud te hace el cuestionario y las
+    mediciones que determinan si podés donar. Unas horas antes vas a recibir
+    otro correo para que respondas el cuestionario desde el celular y llegues
+    sin ese trámite.
+  </p>
+
+  <p style="margin:0 0 14px; font-size:14px; color:#5B5B77; line-height:1.55;">
+    ¿No vas a poder venir? Reprogramá o cancelá desde
+    <a href="{{ enlace_cita }}" style="color:#120C61; font-weight:600;">Mi cita</a>,
+    así el turno queda libre para otra persona.
+  </p>
+{% endcall %}

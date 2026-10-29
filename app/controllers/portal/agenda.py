@@ -20,6 +20,10 @@ from datetime import date, datetime
 from sqlalchemy import func, text
 
 from app import calendario
+from app.controllers.portal import elegibilidad
+# Se vuelve a exportar: el panel de enfermería y el perfil lo importan
+# desde acá desde antes de que la regla se mudara a elegibilidad.py.
+from app.controllers.portal.elegibilidad import diferimiento_vigente  # noqa: F401
 from app.models import (db, Cita, HorarioDisponible, Notificacion,
                         RegistroDiferimiento, Solicitud, Usuario)
 
@@ -45,6 +49,10 @@ TIPOS_VALIDOS = {clave for clave, _, _, _ in TIPOS}
 NECESITA_SOLICITUD = {clave for clave, _, _, necesita in TIPOS if necesita}
 ETIQUETA = {clave: etiqueta for clave, etiqueta, _, _ in TIPOS}
 
+# El tipo que queda implícito cuando se entra desde una solicitud: elegir a
+# la persona ya es elegir el tipo.
+SOLIDARIA = "Donacion solidaria"
+
 DOW_CORTO = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
 
 
@@ -57,19 +65,7 @@ def etiqueta_tipo(clave):
 
 
 # ------------------------------------------------------------------ estado
-def diferimiento_vigente(usuario):
-    """
-    El diferimiento activo del donante, o None.
-
-    Nunca se muestra la causa clínica en el portal: solo que hay una
-    condición registrada y, si corresponde, hasta cuándo.
-    """
-    return (RegistroDiferimiento.query
-            .filter(RegistroDiferimiento.id_donante == usuario.id_usuario,
-                    (RegistroDiferimiento.fecha_fin.is_(None)) |
-                    (RegistroDiferimiento.fecha_fin > date.today()))
-            .order_by(RegistroDiferimiento.fecha_inicio.desc())
-            .first())
+# diferimiento_vigente() se define en elegibilidad.py y se importa arriba.
 
 
 def _citas_de(usuario, activas):
@@ -231,9 +227,13 @@ def crear(usuario, fecha, id_horario, tipo, id_solicitud=None):
     segundo cuentan las dos "hay lugar" y entran las dos; con él, la
     segunda espera a que la primera termine y ve el cupo ya consumido.
     """
-    if diferimiento_vigente(usuario):
-        raise ErrorAgenda("No podés agendar mientras tengas una condición "
-                          "registrada por el personal de salud.")
+    # Una sola comprobación cubre el diferimiento y el intervalo mínimo
+    # entre donaciones. Va acá y no solo en la pantalla porque la pantalla
+    # se puede saltear: alcanza con enviar el formulario a mano.
+    estado = elegibilidad.habilitacion(usuario)
+    if not estado["apto"]:
+        raise ErrorAgenda(elegibilidad.motivo_del_impedimento(estado))
+
     if _solicitud_abierta(usuario):
         raise ErrorAgenda("No podés agendar mientras tengas una solicitud abierta.")
     if cita_vigente(usuario):

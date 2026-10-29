@@ -84,7 +84,8 @@
           <tr>
             <td style="color:var(--ink2);">Última donación</td>
             <td style="text-align:right; font-weight:600;">
-              {{ ultima_donacion.fecha_cita.strftime('%d/%m/%Y') if ultima_donacion else 'Todavía no donaste' }}
+              {# `ultima_donacion` es la fecha de la extracción, no la cita. #}
+              {{ ultima_donacion.strftime('%d/%m/%Y') if ultima_donacion else 'Todavía no donaste' }}
             </td>
           </tr>
         </tbody>
