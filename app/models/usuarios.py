@@ -51,8 +51,6 @@ class Usuario(db.Model):
     tipo_sangre = db.relationship("TipoSangre", lazy="joined")
     roles = db.relationship(
         "Rol", secondary="usuario_rol", lazy="selectin", viewonly=True)
-    telefonos = db.relationship(
-        "Telefono", back_populates="usuario", lazy="selectin")
     correos = db.relationship(
         "Correo", back_populates="usuario", lazy="selectin")
 
@@ -75,10 +73,6 @@ class Usuario(db.Model):
     @property
     def correo_principal(self):
         return next((c for c in self.correos if c.es_principal), None)
-
-    @property
-    def telefono_principal(self):
-        return next((t for t in self.telefonos if t.es_principal), None)
 
     def tiene_rol(self, codigo):
         return any(r.codigo == codigo for r in self.roles)
@@ -111,19 +105,6 @@ class PerfilPersonal(db.Model):
 
     usuario = db.relationship("Usuario", lazy="joined")
 
-
-class Telefono(db.Model):
-    __tablename__ = "telefono"
-
-    id_telefono = db.Column(db.Integer, primary_key=True)
-    id_usuario = db.Column(
-        db.Integer, db.ForeignKey("usuario.id_usuario"), nullable=False)
-    numero = db.Column(db.String(30), nullable=False)
-    # Un solo principal por usuario: lo garantiza el índice parcial
-    # uq_telefono_principal, no este modelo.
-    es_principal = db.Column(db.Boolean, nullable=False, default=False)
-
-    usuario = db.relationship("Usuario", back_populates="telefonos")
 
 
 class Correo(db.Model):

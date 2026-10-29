@@ -16,7 +16,7 @@ from sqlalchemy.exc import IntegrityError
 
 from app.controllers.portal.agenda import diferimiento_vigente
 from app.models import (
-    db, Usuario, Correo, Telefono, Auditoria, Cita, Solicitud,
+    db, Usuario, Correo, Auditoria, Cita, Solicitud,
     Notificacion, Extraccion, Unidad,
 )
 
@@ -269,8 +269,6 @@ def suprimir_cuenta(usuario):
 
         for correo in list(usuario.correos):
             db.session.delete(correo)
-        for telefono in list(usuario.telefonos):
-            db.session.delete(telefono)
 
         usuario.documento = _documento_pseudonimo(
             usuario.id_usuario, usuario.documento)
