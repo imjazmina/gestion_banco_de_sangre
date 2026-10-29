@@ -85,9 +85,7 @@ INSERT INTO diferimiento (nombre, tipo, dias_rehabilitacion) VALUES
   ('Chagas (T. cruzi)',                  'Permanente',  NULL),
   ('HTLV I/II',                          'Permanente',  NULL),
   ('Anti-HBc (Hepatitis B)',            'Permanente',  NULL),
-  ('HBsAg(Hepatitis B)',                 'Permanente',  NULL),
-  ('CMV',                                'Permanente',  NULL),
-  ('Anti-HCV(Hepatitis C)',              'Permanente',  NULL)
+  ('CMV',                                'Permanente',  NULL)
 ON CONFLICT (nombre) DO NOTHING;
 
 -- ---------- Cuestionario ----------
@@ -261,7 +259,7 @@ SELECT * FROM (VALUES
 ) AS c(titulo, cuerpo, vigente)
 WHERE NOT EXISTS (SELECT 1 FROM contenido_portal p WHERE p.titulo = c.titulo);
 
--- ---------- Funciones auxiliares de la maqueta (se eliminan al final) ----------
+-- ---------- Funciones auxiliares de la carga (idempotentes) ----------
 CREATE OR REPLACE FUNCTION maqueta_id_tipo(p_etiqueta text)
 RETURNS integer
 LANGUAGE sql
@@ -402,10 +400,26 @@ DECLARE
   v_don integer;
   v_dif integer;
   v_pers integer;
+  v_resultado integer;
 BEGIN
   SELECT id_usuario INTO v_don FROM usuario WHERE documento = p_doc;
   SELECT id_diferimiento INTO v_dif FROM diferimiento WHERE nombre = p_causa;
   SELECT id_usuario INTO v_pers FROM usuario WHERE documento = '10000001';
+  v_resultado := NULL;
+  IF p_origen = 'LABORATORIO' THEN
+    SELECT r.id_resultado INTO v_resultado
+      FROM resultado_laboratorio r
+      JOIN unidad u ON u.id_unidad = r.id_unidad
+      JOIN extraccion e ON e.id_extraccion = u.id_extraccion
+     WHERE e.id_cita = p_cita
+       AND u.id_donante = v_don
+       AND r.resultado = 'Reactivo'
+     ORDER BY r.id_resultado
+     LIMIT 1;
+    IF v_resultado IS NULL THEN
+      RAISE EXCEPTION 'diferimiento de laboratorio sin resultado reactivo: %', p_doc;
+    END IF;
+  END IF;
   SELECT r.id_registro INTO v_id
     FROM registro_diferimiento r
    WHERE r.id_donante = v_don
@@ -417,8 +431,9 @@ BEGIN
   END IF;
   INSERT INTO registro_diferimiento (
       id_donante, id_diferimiento, id_cita, id_personal, origen,
-      institucion_diagnostico, fecha_inicio, fecha_fin)
-  VALUES (v_don, v_dif, p_cita, v_pers, p_origen, p_institucion, p_inicio, p_fin)
+      institucion_diagnostico, fecha_inicio, fecha_fin, id_resultado)
+  VALUES (v_don, v_dif, p_cita, v_pers, p_origen, p_institucion, p_inicio, p_fin,
+          v_resultado)
   RETURNING id_registro INTO v_id;
   RETURN v_id;
 END;
@@ -961,21 +976,6 @@ SELECT maqueta_diferimiento('90000002', 'Chagas (T. cruzi)', (SELECT c.id_cita F
 SELECT maqueta_diferimiento('90000003', 'HTLV I/II', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000003' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-03') LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2026-09-03', NULL);
 SELECT maqueta_diferimiento('90000004', 'CMV', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000004' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-04') LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2026-09-04', NULL);
 
--- Cada resultado reactivo apunta a los diferimientos de laboratorio de esa extracción.
-UPDATE registro_diferimiento rd
-   SET id_resultado = r.id_resultado
-  FROM resultado_laboratorio r
-  JOIN unidad u ON u.id_unidad = r.id_unidad
-  JOIN extraccion e ON e.id_extraccion = u.id_extraccion
- WHERE rd.id_donante = u.id_donante
-   AND rd.id_cita = e.id_cita
-   AND rd.origen = 'LABORATORIO'
-   AND r.resultado = 'Reactivo'
-   AND rd.id_resultado IS NULL
-   AND rd.id_diferimiento IN (
-        SELECT d.id_diferimiento FROM diferimiento d WHERE d.tipo = 'Permanente'
-   );
-
 -- Citaciones de consejería (solo permanentes con resultado)
 
 
@@ -1004,15 +1004,6 @@ SELECT don.id_usuario,
  WHERE NOT EXISTS (SELECT 1 FROM citacion_consejeria c WHERE c.id_resultado = r.id_resultado);
 
 
-DROP FUNCTION IF EXISTS maqueta_donacion(varchar, varchar, date, time, varchar, varchar, varchar, varchar, date, text, varchar);
-DROP FUNCTION IF EXISTS maqueta_solicitud(varchar, varchar, varchar, integer, integer, varchar, timestamp);
-DROP FUNCTION IF EXISTS maqueta_diferimiento(varchar, varchar, integer, varchar, varchar, date, date);
-DROP FUNCTION IF EXISTS maqueta_medicion(integer, varchar, numeric, timestamp);
-DROP FUNCTION IF EXISTS maqueta_cita(varchar, varchar, date, time, varchar, varchar, varchar);
-DROP FUNCTION IF EXISTS maqueta_usuario(varchar, varchar, varchar, date, varchar, varchar, varchar, varchar);
-DROP FUNCTION IF EXISTS maqueta_reserva(date);
-DROP FUNCTION IF EXISTS maqueta_id_horario(date, time);
-DROP FUNCTION IF EXISTS maqueta_id_tipo(text);
 
 COMMIT;
 
