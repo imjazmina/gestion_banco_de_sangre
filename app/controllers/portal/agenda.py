@@ -261,7 +261,7 @@ def crear(usuario, fecha, id_horario, tipo, id_solicitud=None):
             id_cita=cita.id_cita,
             id_solicitud=id_solicitud,
             tipo=Notificacion.CONFIRMACION_CITA,
-            mensaje=f"Tu cita de donación quedó confirmada para el "
+            mensaje=f"Tu cita de donación quedó {cita.estado} para el "
                     f"{fecha.strftime('%d/%m/%Y')} a las "
                     f"{franja.hora_inicio.strftime('%H:%M')}."))
         db.session.commit()
@@ -316,7 +316,8 @@ def reprogramar(cita, fecha, id_horario):
             id_cita=cita.id_cita,
             tipo=Notificacion.CONFIRMACION_CITA,
             mensaje=f"Reprogramaste tu cita para el {fecha.strftime('%d/%m/%Y')} "
-                    f"a las {franja.hora_inicio.strftime('%H:%M')}."))
+                    f"a las {franja.hora_inicio.strftime('%H:%M')}. "
+                    f"El estado sigue siendo {cita.estado}."))
         db.session.commit()
     except Exception:
         db.session.rollback()

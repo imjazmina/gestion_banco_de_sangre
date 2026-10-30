@@ -1,14 +1,14 @@
 {% extends "portal/layout.html" %}
 {% from "portal/_ui.html" import ico %}
 {% set activo = 'mi-cita' %}
-{% block titulo %}Cita confirmada · Banco de sangre{% endblock %}
+{% block titulo %}Cita {{ cita.estado }} · Banco de sangre{% endblock %}
 
 {% block contenido %}
 <section class="block" style="padding-top:48px;">
   <div class="wrap center-narrow">
     <div class="card" style="text-align:center; padding:40px 28px;">
       <div class="ico" style="background:#E7F6EF; color:var(--ok); margin:0 auto 18px; width:56px; height:56px;">{{ ico('check') }}</div>
-      <h1 style="margin-bottom:8px;">Cita confirmada</h1>
+      <h1 style="margin-bottom:8px;">Cita {{ cita.estado }}</h1>
       <p class="sub" style="margin-bottom:24px;">Tu cita fue registrada. Te esperamos.</p>
 
       <div class="card" style="text-align:left; margin-bottom:20px;">
@@ -16,7 +16,7 @@
           <tbody>
             <tr><td style="color:var(--ink2);">Fecha</td><td style="text-align:right; font-weight:600;">{{ cita.fecha_cita.strftime('%d/%m/%Y') }}</td></tr>
             <tr><td style="color:var(--ink2);">Horario</td><td style="text-align:right; font-weight:600;">{{ cita.horario.hora_inicio.strftime('%H:%M') }} a {{ cita.horario.hora_fin.strftime('%H:%M') }}</td></tr>
-            <tr><td style="color:var(--ink2);">Estado</td><td style="text-align:right;"><span class="badge badge-conf"><span class="badge-dot"></span>{{ cita.estado }}</span></td></tr>
+            <tr><td style="color:var(--ink2);">Estado</td><td style="text-align:right;"><span class="badge {{ 'badge-conf' if cita.estado == 'Confirmada' else 'badge-pend' }}"><span class="badge-dot"></span>{{ cita.estado }}</span></td></tr>
             <tr><td style="color:var(--ink2);">Tipo</td><td style="text-align:right; font-weight:600;">{{ etiqueta }}</td></tr>
             {% if cita.solicitud %}
             <tr><td style="color:var(--ink2);">Donás para</td><td style="text-align:right; font-weight:600;">{{ cita.solicitud.solicitante.nombre_completo }}</td></tr>

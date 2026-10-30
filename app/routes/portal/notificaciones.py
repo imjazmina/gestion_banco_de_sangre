@@ -9,7 +9,7 @@ columna es uno de los puntos a decidir con el módulo de administración
 from flask import Blueprint, render_template
 
 from app.controllers.sesion import requiere_login, usuario_actual
-from app.models import Notificacion
+from app.models import Cita, Notificacion
 
 notificaciones_bp = Blueprint("notificaciones", __name__)
 
@@ -45,5 +45,11 @@ def listar():
               .filter_by(id_usuario=usuario.id_usuario)
               .order_by(Notificacion.fecha_envio.desc())
               .all())
+    ids = {a.id_cita for a in avisos if a.id_cita}
+    citas = {}
+    if ids:
+        citas = {c.id_cita: c.estado for c in
+                 Cita.query.filter(Cita.id_cita.in_(ids)).all()}
     return render_template("portal/notificaciones.html",
-                           avisos=avisos, estilos=ESTILOS, titulos=TITULOS)
+                           avisos=avisos, estilos=ESTILOS, titulos=TITULOS,
+                           citas=citas)

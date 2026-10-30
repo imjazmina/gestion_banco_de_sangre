@@ -18,7 +18,7 @@
         <div class="notif-row">
           <div class="notif-ico" style="background:{{ e[1] }}; color:{{ e[2] }};">{{ ico(e[0]) }}</div>
           <div class="notif-body">
-            <b>{{ titulos.get(a.tipo, 'Notificación') }}</b>
+            <b>{% if a.tipo == 'CONFIRMACION_CITA' and citas.get(a.id_cita) %}Cita {{ citas[a.id_cita] }}{% else %}{{ titulos.get(a.tipo, 'Notificación') }}{% endif %}</b>
             <p>{{ a.mensaje }}</p>
             <p class="meta">{{ a.fecha_envio.strftime('%d/%m/%Y · %H:%M') }}</p>
           </div>
