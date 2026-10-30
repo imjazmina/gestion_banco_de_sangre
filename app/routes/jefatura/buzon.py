@@ -16,6 +16,8 @@ def lista():
         filas.append({
             "fecha": mensaje.fecha,
             "autor": autor.nombre_completo if autor else "—",
+            "tipo": mensaje.tipo or "—",
+            "estado": mensaje.estado or "—",
             "mensaje": mensaje.mensaje,
         })
     return pintar("jefatura/buzon.html", mensajes=filas)

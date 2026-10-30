@@ -55,12 +55,13 @@ def enviar():
         flash(f"El mensaje es demasiado largo (máximo {LARGO_MAXIMO} caracteres).", "error")
         return redirect(url_for("buzon.formulario", tipo=tipo))
 
-    # La tabla no tiene columna "tipo", así que el tipo va al principio del
-    # texto. Es la forma de conservarlo sin cambiar el esquema, que es
-    # compartido con el módulo de administración.
     try:
-        mensaje_buzon = Buzon(id_usuario=usuario.id_usuario,
-                              mensaje=f"[{tipo}] {mensaje}")
+        mensaje_buzon = Buzon(
+            id_usuario=usuario.id_usuario,
+            tipo=tipo,
+            mensaje=mensaje,
+            estado=Buzon.RECIBIDO,
+        )
         db.session.add(mensaje_buzon)
         db.session.flush()
         Auditoria.registrar(usuario.id_usuario, "BUZON",

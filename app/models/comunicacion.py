@@ -49,8 +49,12 @@ class Buzon(db.Model):
     id_mensaje = db.Column(db.Integer, primary_key=True)
     id_usuario = db.Column(
         db.Integer, db.ForeignKey("usuario.id_usuario"), nullable=False)
+    tipo = db.Column(db.String(40))
     mensaje = db.Column(db.Text, nullable=False)
     fecha = db.Column(db.DateTime, nullable=False, default=datetime.now)
+    estado = db.Column(db.String(20))
+
+    RECIBIDO = "Recibido"
 
 
 class Auditoria(db.Model):
