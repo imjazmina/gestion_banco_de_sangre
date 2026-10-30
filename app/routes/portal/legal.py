@@ -16,9 +16,8 @@ def privacidad():
     return render_template(
         "portal/legal.html",
         titulo="Política de privacidad y seguridad del sistema",
-        secciones=contenido.PRIVACIDAD,
-        otra_url="terminos",
-        otra_texto="Ver también los Términos y condiciones de uso")
+        secciones=contenido.PRIVACIDAD
+    )
 
 
 @legal_bp.get("/terminos")
@@ -26,6 +25,14 @@ def terminos():
     return render_template(
         "portal/legal.html",
         titulo="Términos y condiciones de uso",
-        secciones=contenido.TERMINOS,
-        otra_url="privacidad",
-        otra_texto="Ver también la Política de privacidad")
+        secciones=contenido.TERMINOS
+    )
+
+
+@legal_bp.get("/declaracion-donante")
+def declaracion_donante():
+    return render_template(
+        "portal/legal.html",
+        titulo="Declaración y consentimiento del donante",
+        secciones=contenido.DECLARACION_DONANTE
+    )

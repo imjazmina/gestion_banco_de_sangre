@@ -52,6 +52,18 @@
   </div>
   {% endfor %}
 
+  {% if consentimiento == 'Si' %}
+  <div class="mb-4">
+    <p class="kicker" style="margin-bottom:8px;">Declaración y consentimiento del donante</p>
+    <div class="card q">
+      <div class="q-top">
+        <p style="margin:0;flex:1;min-width:0;">He leído y acepto la declaración y consentimiento del donante</p>
+        {{ badge('Sí', 'navy') }}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="mb-4">
     <p class="kicker" style="margin-bottom:8px;">Parte B · condiciones del día</p>
     <form method="post" id="parte-b" class="q-grid">

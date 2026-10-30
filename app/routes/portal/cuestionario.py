@@ -78,4 +78,5 @@ def _paso(cita, formulario=None, paso=1):
 
 def _resumen(cita):
     filas, atencion = ctrl.resumen(cita)
-    return {"filas": filas, "atencion": atencion}
+    return {"filas": filas, "atencion": atencion,
+            "consentimiento": ctrl.consentimiento_aceptado(cita)}

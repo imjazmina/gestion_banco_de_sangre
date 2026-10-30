@@ -38,6 +38,7 @@ def ver(cita_id):
         secciones_a=secciones_a,
         atencion_a=atencion,
         parte_a_completa=parte_a.completo(cita),
+        consentimiento=parte_a.consentimiento_aceptado(cita),
         preguntas=jornada.preguntas_parte_b(),
         respuestas=jornada.respuestas_de(cita),
         causas=jornada.catalogo_diferimientos(),

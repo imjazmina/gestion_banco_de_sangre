@@ -41,6 +41,9 @@
         </li>
         {% endfor %}
       </ul>
+      {% if consentimiento == 'Si' %}
+      <p class="sub" style="margin-top:14px;">Aceptaste la declaración y consentimiento del donante.</p>
+      {% endif %}
     </div>
 
     <div style="margin-top:18px; display:flex; gap:10px; flex-wrap:wrap;">

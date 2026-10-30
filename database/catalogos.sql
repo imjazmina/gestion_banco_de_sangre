@@ -126,6 +126,7 @@ SELECT * FROM (VALUES
   ('A', '¿Está o estuvo embarazada o se encuentra en período de lactancia?', true),
   ('A', 'Si ha estado fuera del país, ¿se ha sentido enfermo/a días previos o posteriores a su regreso?', true),
   ('A', '¿Ud. ha leído y comprendido este cuestionario?', true),
+  ('A', 'He leído y acepto la declaración y consentimiento del donante', false),
   ('B', '¿Se siente Ud. bien y goza de buena salud?', true),
   ('B','¿Desayunaste hoy?',                                        true),
   ('B','¿Ha descansado o comido bien las últimas 24 horas?',       true),

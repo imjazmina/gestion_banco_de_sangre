@@ -12,13 +12,10 @@
     <div class="card">
       {% for s in secciones %}
       <div class="legal-section">
-        <h2>{{ s.titulo }}</h2>
+        {% if s.titulo %}<h2>{{ s.titulo }}</h2>{% endif %}
         {% for parrafo in s.cuerpo.split('\n\n') %}<p>{{ parrafo }}</p>{% endfor %}
       </div>
       {% endfor %}
-    </div>
-    <div style="text-align:center; margin-top:24px;">
-      <a class="muted-link link-arrow" href="{{ url_for('legal.' ~ otra_url) }}">{{ otra_texto }} {{ ico('chevronRight') }}</a>
     </div>
   </div>
 </section>
