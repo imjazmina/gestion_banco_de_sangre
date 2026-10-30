@@ -15,42 +15,11 @@
   </div>
 
   {% if mediciones %}
-  {# Ya registrado: lo apto/no apto lo decidió la base, acá solo se muestra. #}
-  <div class="card card-pad">
-    <div class="mb-4">
-      <h3 style="margin:0;font-size:14px;font-weight:600;">Signos vitales</h3>
-      <p class="muted" style="margin:0;font-size:12px;">Valores registrados. El estado apto/no apto lo calculó el sistema contra el rango de cada medición.</p>
-    </div>
-    <div class="vital-grid">
-      {% for m in mediciones %}
-      <div class="vital{% if not m.apto %} bad{% endif %}">
-        <div class="split" style="align-items:flex-start;">
-          <div style="min-width:0;">
-            <p style="margin:0;font-weight:600;">{{ m.tipo.nombre }}</p>
-            <p class="faint" style="margin:0;font-size:12px;">Rango: {{ m.tipo.valor_minimo|float }}–{{ m.tipo.valor_maximo|float }} {{ m.tipo.unidad }}</p>
-          </div>
-          {% if m.apto %}<span class="apto">{{ ico('check-circle', 13) }} Apto</span>
-          {% else %}<span class="noapto">{{ ico('x-circle', 13) }} No apto</span>{% endif %}
-        </div>
-        <p style="margin:0;font-size:22px;font-weight:600;color:{{ 'var(--danger)' if not m.apto else 'var(--ink)' }};">{{ m.valor|float }} <span class="muted" style="font-size:12px;font-weight:400;">{{ m.tipo.unidad }}</span></p>
-      </div>
-      {% endfor %}
-    </div>
-    <div class="mt-5">
-      {% if not apto %}
-        {% call alerta('warn', 'Uno o más signos fuera de rango') %}No se puede realizar la extracción. Se debe registrar el motivo de diferimiento.{% endcall %}
-      {% endif %}
-    </div>
-  </div>
+  {# No apto: no se muestran los valores. Solo el diferimiento. #}
+  {% call alerta('warn', 'Uno o más signos fuera de rango') %}No se puede realizar la extracción. Se debe registrar el motivo de diferimiento.{% endcall %}
 
   <div class="row-end mt-5">
-    {% if apto %}
-      {% if cita.estado in ('Pendiente', 'Confirmada') %}
-      {{ btn('Siguiente', 'teal', 'md', url_for('licenciado_extraccion.ver', cita_id=cita.id_cita)) }}
-      {% else %}
-      {{ btn('Volver a la ficha', 'secondary', 'md', url_for('licenciado_ficha.ver', donor_id=cita.id_usuario, cita=cita.id_cita)) }}
-      {% endif %}
-    {% elif cita.estado in ('Pendiente', 'Confirmada') %}
+    {% if cita.estado in ('Pendiente', 'Confirmada') %}
       <button type="button" class="btn btn-danger" data-abrir="modal-diferir">{{ ico('alert', 14) }} Diferir</button>
     {% else %}
       {{ btn('Volver a la ficha', 'secondary', 'md', url_for('licenciado_ficha.ver', donor_id=cita.id_usuario, cita=cita.id_cita)) }}

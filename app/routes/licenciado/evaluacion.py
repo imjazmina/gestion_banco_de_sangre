@@ -31,9 +31,14 @@ def ver(cita_id):
                 return redirect(url_for("licenciado_ficha.ver",
                                         donor_id=cita.id_usuario, cita=cita.id_cita))
             jornada.guardar_mediciones(cita, personal, request.form)
+            if jornada.mediciones_aptas(cita):
+                return redirect(url_for(
+                    "licenciado_extraccion.ver", cita_id=cita_id))
         except ErrorJornada as exc:
             flash(str(exc), "error")
         return redirect(url_for("licenciado_evaluacion.ver", cita_id=cita_id))
+    if jornada.mediciones_de(cita) and jornada.mediciones_aptas(cita):
+        return redirect(url_for("licenciado_extraccion.ver", cita_id=cita_id))
     return pintar(
         "licenciado/evaluacion.html",
         cita=cita,
