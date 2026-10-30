@@ -176,13 +176,16 @@ def _copiar_tipificacion(unidad, tipo):
 
 
 def _no_reactivo(unidad, personal, tipo):
-    db.session.add(ResultadoLaboratorio(
+    resultado = ResultadoLaboratorio(
         id_unidad=unidad.id_unidad,
         id_tipo_sangre=tipo.id_tipo_sangre,
         resultado=ResultadoLaboratorio.NO_REACTIVO,
         fecha=datetime.now(),
-    ))
+    )
+    db.session.add(resultado)
     db.session.flush()
+    Auditoria.registrar(personal.id_usuario, "RESULTADO_LABORATORIO",
+                        resultado.id_resultado, Auditoria.ALTA)
     _transicion(unidad, personal, Unidad.EN_STOCK)
     _copiar_tipificacion(unidad, tipo)
     _asignar_solicitud_de_la_cita(unidad, personal, tipo)
@@ -211,8 +214,11 @@ def _reactivo(unidad, personal, extraccion, tipo):
     )
     db.session.add(resultado)
     db.session.flush()
+    Auditoria.registrar(personal.id_usuario, "RESULTADO_LABORATORIO",
+                        resultado.id_resultado, Auditoria.ALTA)
+    registros = []
     for causa in elegidas:
-        db.session.add(RegistroDiferimiento(
+        registro = RegistroDiferimiento(
             id_donante=unidad.id_donante,
             id_diferimiento=causa.id_diferimiento,
             id_cita=extraccion.id_cita,
@@ -221,8 +227,13 @@ def _reactivo(unidad, personal, extraccion, tipo):
             institucion_diagnostico=INSTITUCION_LOCAL,
             fecha_inicio=date.today(),
             id_resultado=resultado.id_resultado,
-        ))
+        )
+        db.session.add(registro)
+        registros.append(registro)
     db.session.flush()
+    for registro in registros:
+        Auditoria.registrar(personal.id_usuario, "REGISTRO_DIFERIMIENTO",
+                            registro.id_registro, Auditoria.ALTA)
     _copiar_tipificacion(unidad, tipo)
     _transicion(
         unidad, personal, Unidad.DESCARTADA,
@@ -303,15 +314,20 @@ def _asignar_solicitud_de_la_cita(unidad, personal, tipo):
         cita.id_solicitud = None
         if cita.tipo_cita == Cita.SOLIDARIA:
             cita.tipo_cita = Cita.ALTRUISTA
+        Auditoria.registrar(personal.id_usuario, "CITA", cita.id_cita,
+                            Auditoria.MODIFICACION)
         return
-    db.session.add(Asignacion(
+    asignacion = Asignacion(
         id_unidad=unidad.id_unidad,
         id_solicitud=solicitud.id_solicitud,
         fecha=datetime.now(),
-    ))
+    )
+    db.session.add(asignacion)
+    db.session.flush()
+    Auditoria.registrar(personal.id_usuario, "ASIGNACION",
+                        asignacion.id_asignacion, Auditoria.ALTA)
     unidad.id_solicitud = solicitud.id_solicitud
     _transicion(unidad, personal, Unidad.ASIGNADA)
-    db.session.flush()
     solicitud.unidades_asignadas = (Asignacion.query
                                     .filter_by(id_solicitud=solicitud.id_solicitud)
                                     .count())
@@ -323,7 +339,9 @@ def _asignar_solicitud_de_la_cita(unidad, personal, tipo):
     ))
     if solicitud.unidades_asignadas >= solicitud.unidades_requeridas:
         solicitud.estado = Solicitud.COMPLETA
-        _soltar_citas(solicitud)
+        Auditoria.registrar(personal.id_usuario, "SOLICITUD",
+                            solicitud.id_solicitud, Auditoria.CAMBIO_ESTADO)
+        _soltar_citas(solicitud, personal)
         db.session.add(Notificacion(
             id_usuario=solicitud.id_solicitante,
             id_solicitud=solicitud.id_solicitud,
@@ -332,7 +350,7 @@ def _asignar_solicitud_de_la_cita(unidad, personal, tipo):
         ))
 
 
-def _soltar_citas(solicitud):
+def _soltar_citas(solicitud, personal):
     """RN08: las citas dirigidas activas dejan de apuntar a la solicitud."""
     citas = (Cita.query
              .filter(Cita.id_solicitud == solicitud.id_solicitud,
@@ -342,6 +360,8 @@ def _soltar_citas(solicitud):
         cita.id_solicitud = None
         if cita.tipo_cita == Cita.SOLIDARIA:
             cita.tipo_cita = Cita.ALTRUISTA
+        Auditoria.registrar(personal.id_usuario, "CITA", cita.id_cita,
+                            Auditoria.MODIFICACION)
 
 
 def solicitudes_publicadas():

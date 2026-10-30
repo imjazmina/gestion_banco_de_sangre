@@ -293,7 +293,7 @@ def registrar_diferimiento(cita, personal, id_diferimiento, origen, institucion)
     if cita.estado not in (Cita.PENDIENTE, Cita.CONFIRMADA):
         raise ErrorJornada("Esta cita ya está cerrada.")
 
-    db.session.add(RegistroDiferimiento(
+    registro = RegistroDiferimiento(
         id_donante=cita.id_usuario,
         id_diferimiento=causa.id_diferimiento,
         id_cita=cita.id_cita,
@@ -301,9 +301,13 @@ def registrar_diferimiento(cita, personal, id_diferimiento, origen, institucion)
         origen=origen,
         institucion_diagnostico=institucion,
         fecha_inicio=date.today(),
-    ))
+    )
+    db.session.add(registro)
+    db.session.flush()
     cita.estado = Cita.NO_APTO
     cita.id_personal = personal.id_usuario
+    Auditoria.registrar(personal.id_usuario, "REGISTRO_DIFERIMIENTO",
+                        registro.id_registro, Auditoria.ALTA)
     Auditoria.registrar(personal.id_usuario, "CITA", cita.id_cita,
                         Auditoria.CAMBIO_ESTADO)
     _commit()
@@ -359,6 +363,8 @@ def registrar_extraccion(cita, personal, observacion, n_unidades=0):
     )
     db.session.add(extraccion)
     db.session.flush()
+    Auditoria.registrar(personal.id_usuario, "EXTRACCION",
+                        extraccion.id_extraccion, Auditoria.ALTA)
 
     unidades = []
     vencimiento = fecha.date() + timedelta(days=30)
@@ -395,9 +401,8 @@ def registrar_extraccion(cita, personal, observacion, n_unidades=0):
 
     cita.estado = Cita.COMPLETADA
     cita.id_personal = personal.id_usuario
-    if not unidades:
-        Auditoria.registrar(personal.id_usuario, "CITA", cita.id_cita,
-                            Auditoria.CAMBIO_ESTADO)
+    Auditoria.registrar(personal.id_usuario, "CITA", cita.id_cita,
+                        Auditoria.CAMBIO_ESTADO)
     _commit()
     return unidades
 
@@ -451,6 +456,8 @@ def abrir_espontanea(donante, personal):
     )
     db.session.add(cita)
     db.session.flush()
+    Auditoria.registrar(personal.id_usuario, "CITA", cita.id_cita,
+                        Auditoria.ALTA)
     db.session.add(Notificacion(
         id_usuario=donante.id_usuario,
         id_cita=cita.id_cita,

@@ -318,6 +318,8 @@ def reprogramar(cita, fecha, id_horario):
             mensaje=f"Reprogramaste tu cita para el {fecha.strftime('%d/%m/%Y')} "
                     f"a las {franja.hora_inicio.strftime('%H:%M')}. "
                     f"El estado sigue siendo {cita.estado}."))
+        Auditoria.registrar(cita.id_usuario, "CITA", cita.id_cita,
+                            Auditoria.MODIFICACION)
         db.session.commit()
     except Exception:
         db.session.rollback()
