@@ -1,4 +1,6 @@
-"""Cierra una citación y, si corresponde, registra la derivación."""
+"""Cierra una citación el día de atención y muestra su historial."""
+from datetime import date
+
 from flask import Blueprint, flash, redirect, request, url_for
 
 from app.controllers.comun.acceso import operador_actual, pintar, requiere
@@ -19,29 +21,29 @@ def ver(cita_id):
     personal = operador_actual()["usuario"]
     if request.method == "POST":
         try:
-            if request.form.get("accion") == "derivar":
-                registro = consejeria.registro_para_derivar(
-                    consejeria.registros_de(citacion))
-                consejeria.derivar(
-                    registro, personal,
-                    request.form.get("establecimiento"),
-                    request.form.get("motivo"),
-                )
-                flash("Derivación registrada.", "ok")
-            else:
-                consejeria.marcar(citacion, request.form.get("estado"), personal)
-                flash("Citación actualizada.", "ok")
+            consejeria.marcar(citacion, request.form.get("estado"), personal)
+            flash("Citación actualizada.", "ok")
         except ErrorConsejeria as exc:
             flash(str(exc), "error")
         return redirect(url_for("jefatura_revision.ver", cita_id=cita_id))
 
     donante = db.session.get(Usuario, citacion.id_donante)
-    registros = consejeria.registros_de(citacion)
-    externo = consejeria.registro_para_derivar(registros)
+    dia = citacion.fecha_hora.date() if citacion.fecha_hora else None
+    hoy = date.today()
+    estados, acciones = consejeria.evolucion(citacion)
+    responsables = {
+        accion.id_usuario: db.session.get(Usuario, accion.id_usuario)
+        for accion in acciones
+    }
     return pintar(
         "jefatura/revision.html",
         citacion=citacion,
         donante=donante,
-        registros=registros,
-        puede_derivar=externo is not None,
+        registros=consejeria.registros_de(citacion),
+        puede_cerrar=(
+            citacion.estado in ("Pendiente", "Confirmada")
+            and dia is not None and dia <= hoy),
+        estados=estados,
+        acciones=acciones,
+        responsables=responsables,
     )

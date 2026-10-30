@@ -17,7 +17,8 @@ def lista():
         donante = db.session.get(Usuario, citacion.id_donante)
         filas.append({
             "id": citacion.id_citacion,
-            "hora": citacion.horario.hora_inicio.strftime("%H:%M") if citacion.horario else "—",
+            "hora": citacion.fecha_hora.strftime("%d/%m %H:%M") if citacion.fecha_hora else (
+                citacion.horario.hora_inicio.strftime("%H:%M") if citacion.horario else "—"),
             "donante": donante.nombre_completo if donante else "—",
             "ci": donante.documento if donante else "",
             "estado": citacion.estado,

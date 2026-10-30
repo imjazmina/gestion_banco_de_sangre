@@ -20,32 +20,43 @@
   </div>
   {% endif %}
 
-  {% if citacion.estado in ('Pendiente', 'Confirmada') %}
+  <p class="muted mt-4">
+    {% if citacion.fecha_hora %}Atención {{ citacion.fecha_hora.strftime('%d/%m/%Y %H:%M') }}.{% endif %}
+    Jefatura no agenda, no reprograma, no cancela y no confirma. Desde el día de atención marca ausente o completada. La confirmación la hace el donante ese día.
+  </p>
+  {% if puede_cerrar %}
   <form method="post" class="row mt-4">
-    {% if citacion.estado == 'Pendiente' %}
-    <button class="btn btn-primary" name="estado" value="Confirmada" type="submit">Confirmar</button>
-    {% endif %}
     <button class="btn btn-primary" name="estado" value="Completada" type="submit">Marcar completada</button>
     <button class="btn btn-ghost" name="estado" value="Ausente" type="submit">Marcar ausente</button>
-    <button class="btn btn-ghost" name="estado" value="Cancelada" type="submit">Cancelar</button>
   </form>
   {% endif %}
 
-  {% if puede_derivar %}
-  <form method="post" class="card card-pad mt-4">
-    <h2 class="kicker">Derivación</h2>
-    <p class="muted">El diagnóstico no es de este banco. No hay integración con el otro establecimiento.</p>
-    <input type="hidden" name="accion" value="derivar">
-    <div class="field">
-      <label>Establecimiento de destino</label>
-      <input class="control" name="establecimiento" required>
-    </div>
-    <div class="field">
-      <label>Motivo interno</label>
-      <textarea class="control" name="motivo" rows="3"></textarea>
-    </div>
-    <button class="btn btn-primary" type="submit">Registrar derivación</button>
-  </form>
-  {% endif %}
+  <div class="card card-pad mt-4">
+    <h2 class="kicker">Estados</h2>
+    <p class="muted">Cada cambio queda en el historial. No se pisa ni se borra. El esquema no guarda motivo ni la franja anterior.</p>
+    {% if estados %}
+    <ul>
+      {% for fila in estados %}
+      <li>{{ fila.fecha_hora.strftime('%d/%m/%Y %H:%M') }} · {{ fila.estado_anterior or 'Alta' }} → {{ fila.estado_nuevo }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">Esta citación no tiene filas de historial.</p>
+    {% endif %}
+  </div>
+
+  <div class="card card-pad mt-4">
+    <h2 class="kicker">Auditoría</h2>
+    <p class="muted">Usuario, acción y momento. Una reprogramación figura como modificación y no cambia el estado.</p>
+    {% if acciones %}
+    <ul>
+      {% for fila in acciones %}
+      <li>{{ fila.fecha.strftime('%d/%m/%Y %H:%M') }} · {{ fila.accion }} · {{ responsables[fila.id_usuario].nombre_completo if responsables[fila.id_usuario] else fila.id_usuario }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">Todavía no hay auditoría de esta citación.</p>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}

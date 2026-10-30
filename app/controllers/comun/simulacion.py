@@ -19,10 +19,10 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.models import (
-    Asignacion, Auditoria, Cita, CitacionConsejeria, CompatibilidadAboRh,
-    Diferimiento, Extraccion, HorarioDisponible, Notificacion,
-    RegistroDiferimiento, ResultadoLaboratorio, Rol, Solicitud, TipoSangre,
-    TransicionEstado, Unidad, Usuario, UsuarioRol, db,
+    Asignacion, Auditoria, Cita, CompatibilidadAboRh,
+    Diferimiento, Extraccion, Notificacion,
+    RegistroDiferimiento, ResultadoLaboratorio, Solicitud, TipoSangre,
+    TransicionEstado, Unidad, Usuario, db,
 )
 
 logger = logging.getLogger(__name__)
@@ -88,16 +88,6 @@ def _transicion(unidad, personal, destino, motivo=None):
     db.session.flush()
     Auditoria.registrar(personal.id_usuario, "UNIDAD", unidad.id_unidad,
                         Auditoria.CAMBIO_ESTADO)
-
-
-def _jefatura():
-    return (Usuario.query
-            .join(UsuarioRol, UsuarioRol.id_usuario == Usuario.id_usuario)
-            .join(Rol, Rol.id_rol == UsuarioRol.id_rol)
-            .filter(Rol.codigo == Rol.JEFATURA,
-                    Usuario.estado.is_(True),
-                    Usuario.contrasena.isnot(None))
-            .first())
 
 
 def agendar_resultado(id_unidad):
@@ -212,12 +202,6 @@ def _reactivo(unidad, personal, extraccion, tipo):
     causas = _causas_serologicas()
     cantidad = random.randint(1, min(3, len(causas)))
     elegidas = random.sample(causas, cantidad)
-    jefatura = _jefatura()
-    if jefatura is None:
-        raise ErrorSimulacion("No hay una cuenta de jefatura para firmar la citación.")
-    franja = HorarioDisponible.query.filter_by(disponible=True).first()
-    if franja is None:
-        raise ErrorSimulacion("No hay franjas horarias para citar a consejería.")
 
     resultado = ResultadoLaboratorio(
         id_unidad=unidad.id_unidad,
@@ -245,21 +229,12 @@ def _reactivo(unidad, personal, extraccion, tipo):
         motivo="Resultado reactivo: " + ", ".join(causa.nombre for causa in elegidas) + ".",
     )
 
-    citacion = CitacionConsejeria(
-        id_donante=unidad.id_donante,
-        id_personal=jefatura.id_usuario,
-        id_horario=franja.id_horario,
-        id_resultado=resultado.id_resultado,
-        estado="Pendiente",
-    )
-    db.session.add(citacion)
-    db.session.flush()
     db.session.add(Notificacion(
         id_usuario=unidad.id_donante,
-        id_citacion=citacion.id_citacion,
         tipo=Notificacion.CITACION_GENERICA,
-        mensaje=("El banco de sangre te cita a una consejería presencial. "
-                 "Acercate al servicio para coordinar el horario."),
+        mensaje=("El banco de sangre te pide agendar una consejería presencial. "
+                 "Entrá a Consejería en el portal y elegí día y horario. "
+                 "El motivo se conversa en el servicio."),
     ))
 
 

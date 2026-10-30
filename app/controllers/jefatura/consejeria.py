@@ -1,10 +1,9 @@
-"""Citaciones a consejería y derivación a otro establecimiento."""
+"""Citaciones a consejería: cierre del día y consulta del historial."""
 from datetime import date
 
-from app.controllers.comun.simulacion import INSTITUCION_LOCAL
 from app.models import (
-    Auditoria, Buzon, CitacionConsejeria, Derivacion, RegistroDiferimiento,
-    Usuario, db,
+    Auditoria, Buzon, CitacionConsejeria, HistorialCitaConsejeria,
+    RegistroDiferimiento, Usuario, db,
 )
 
 
@@ -22,19 +21,37 @@ def citacion_por_id(id_citacion):
 
 
 def marcar(citacion, estado, personal):
+    """Desde el día de atención marca ausente o completada. No confirma ni cancela."""
     if estado not in (
-            CitacionConsejeria.CONFIRMADA, CitacionConsejeria.CANCELADA,
             CitacionConsejeria.AUSENTE, CitacionConsejeria.COMPLETADA):
-        raise ErrorConsejeria("Ese estado no está en el catálogo de la citación.")
+        raise ErrorConsejeria(
+            "La confirmación la hace el donante. Jefatura marca ausente o completada.")
     if citacion.estado not in CitacionConsejeria.ABIERTAS:
         raise ErrorConsejeria("Esa citación ya fue cerrada.")
     if citacion.estado == estado:
         raise ErrorConsejeria("La citación ya está en ese estado.")
+    if citacion.fecha_hora is None or citacion.fecha_hora.date() > date.today():
+        raise ErrorConsejeria("Ese estado se registra el día de atención, no antes.")
     citacion.estado = estado
     citacion.id_personal = personal.id_usuario
     Auditoria.registrar(personal.id_usuario, "CITACION_CONSEJERIA",
                         citacion.id_citacion, Auditoria.CAMBIO_ESTADO)
     db.session.commit()
+
+
+def evolucion(citacion):
+    """Estados inmutables y auditoría. La reprogramación solo está en auditoría."""
+    estados = (HistorialCitaConsejeria.query
+               .filter_by(id_cita_consejeria=citacion.id_citacion)
+               .order_by(HistorialCitaConsejeria.fecha_hora,
+                         HistorialCitaConsejeria.id_historial_cita_consejeria)
+               .all())
+    acciones = (Auditoria.query
+                .filter_by(entidad="CITACION_CONSEJERIA",
+                           id_entidad=citacion.id_citacion)
+                .order_by(Auditoria.fecha, Auditoria.id_auditoria)
+                .all())
+    return estados, acciones
 
 
 def registros_de(citacion):
@@ -45,38 +62,6 @@ def registros_de(citacion):
             .filter_by(id_resultado=citacion.id_resultado)
             .order_by(RegistroDiferimiento.id_registro)
             .all())
-
-
-def registro_para_derivar(registros):
-    for registro in registros:
-        if puede_derivar(registro):
-            return registro
-    return None
-
-
-def puede_derivar(registro):
-    if registro is None:
-        return False
-    return registro.institucion_diagnostico.strip().lower() != INSTITUCION_LOCAL.lower()
-
-
-def derivar(registro, personal, establecimiento, motivo):
-    if not puede_derivar(registro):
-        raise ErrorConsejeria(
-            "La derivación solo se registra si el diagnóstico no es de este banco.")
-    if Derivacion.query.filter_by(id_registro_diferimiento=registro.id_registro).first():
-        raise ErrorConsejeria("Ese diferimiento ya tiene una derivación.")
-    establecimiento = (establecimiento or "").strip()
-    if not establecimiento:
-        raise ErrorConsejeria("Indicá el establecimiento de destino.")
-    db.session.add(Derivacion(
-        id_registro_diferimiento=registro.id_registro,
-        id_personal=personal.id_usuario,
-        establecimiento_destino=establecimiento,
-        fecha=date.today(),
-        motivo_interno=(motivo or "").strip() or None,
-    ))
-    db.session.commit()
 
 
 def mensajes():
