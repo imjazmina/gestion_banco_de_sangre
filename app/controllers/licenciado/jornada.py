@@ -166,7 +166,10 @@ def guardar_parte_b(cita, personal, formulario):
     from app.controllers.portal.cuestionario import _valor
 
     ahora = datetime.now()
+    estado_anterior = cita.estado
     existentes = respuestas_de(cita)
+    nuevas = []
+    modificadas = []
     for pregunta in preguntas:
         valor = (formulario.get(f"p{pregunta.id_pregunta}") or "").strip()
         if valor not in ("Si", "No"):
@@ -181,20 +184,33 @@ def guardar_parte_b(cita, personal, formulario):
             valor = _valor(valor, detalle)
         fila_resp = existentes.get(pregunta.id_pregunta)
         if fila_resp is None:
-            db.session.add(Cuestionario(
+            fila_resp = Cuestionario(
                 id_cita=cita.id_cita,
                 id_pregunta=pregunta.id_pregunta,
                 id_donante=cita.id_usuario,
                 id_personal=personal.id_usuario,
                 valor=valor,
                 fecha=ahora,
-            ))
+            )
+            db.session.add(fila_resp)
+            nuevas.append(fila_resp)
         else:
             fila_resp.valor = valor
             fila_resp.id_personal = personal.id_usuario
             fila_resp.fecha = ahora
+            modificadas.append(fila_resp)
     cita.estado = Cita.CONFIRMADA
     cita.id_personal = personal.id_usuario
+    db.session.flush()
+    for fila in nuevas:
+        Auditoria.registrar(personal.id_usuario, "CUESTIONARIO",
+                            fila.id_cuestionario, Auditoria.ALTA)
+    for fila in modificadas:
+        Auditoria.registrar(personal.id_usuario, "CUESTIONARIO",
+                            fila.id_cuestionario, Auditoria.MODIFICACION)
+    if estado_anterior != Cita.CONFIRMADA:
+        Auditoria.registrar(personal.id_usuario, "CITA", cita.id_cita,
+                            Auditoria.CAMBIO_ESTADO)
     _commit()
 
 
@@ -224,21 +240,28 @@ def guardar_mediciones(cita, personal, formulario):
 
     tipos = tipos_medicion()
     ahora = datetime.now()
+    filas = []
     for tipo in tipos:
         texto = (formulario.get(tipo.codigo) or "").strip().replace(",", ".")
         try:
             valor = float(texto)
         except ValueError:
             raise ErrorJornada(f"Ingresá un número para {tipo.nombre}.")
-        db.session.add(Medicion(
+        fila = Medicion(
             id_cita=cita.id_cita,
             id_personal=personal.id_usuario,
             id_tipo_medicion=tipo.id_tipo_medicion,
             valor=valor,
             apto=False,
             fecha=ahora,
-        ))
+        )
+        db.session.add(fila)
+        filas.append(fila)
     cita.id_personal = personal.id_usuario
+    db.session.flush()
+    for fila in filas:
+        Auditoria.registrar(personal.id_usuario, "MEDICION",
+                            fila.id_medicion, Auditoria.ALTA)
     _commit()
 
 

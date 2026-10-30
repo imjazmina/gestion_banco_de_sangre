@@ -20,7 +20,7 @@ from datetime import date, datetime
 from sqlalchemy import func, text
 
 from app import calendario
-from app.models import (db, Cita, HorarioDisponible, Notificacion,
+from app.models import (db, Auditoria, Cita, HorarioDisponible, Notificacion,
                         RegistroDiferimiento, Solicitud, Usuario)
 
 # Documento del usuario de servicio «Personal de turno». `cita.id_personal`
@@ -253,6 +253,8 @@ def crear(usuario, fecha, id_horario, tipo, id_solicitud=None):
                     estado=Cita.PENDIENTE)
         db.session.add(cita)
         db.session.flush()
+        Auditoria.registrar(usuario.id_usuario, "CITA", cita.id_cita,
+                            Auditoria.ALTA)
 
         db.session.add(Notificacion(
             id_usuario=usuario.id_usuario,
@@ -323,6 +325,8 @@ def reprogramar(cita, fecha, id_horario):
 
 def cancelar(cita):
     cita.estado = Cita.CANCELADA
+    Auditoria.registrar(cita.id_usuario, "CITA", cita.id_cita,
+                        Auditoria.CAMBIO_ESTADO)
     db.session.commit()
 
 

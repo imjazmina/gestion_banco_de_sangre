@@ -23,7 +23,7 @@ from datetime import date, datetime
 from flask import current_app
 
 from app.controllers.portal import preguntas as catalogo
-from app.models import Cita, Cuestionario, Pregunta, db
+from app.models import Auditoria, Cita, Cuestionario, Pregunta, db
 
 SECCIONES = catalogo.SECCIONES
 
@@ -208,12 +208,23 @@ def enviar(cita, usuario, formulario):
             "Este cuestionario ya fue enviado y no se puede modificar.")
 
     ahora = datetime.now()
+    estado_anterior = cita.estado
     try:
+        filas = []
         for pregunta, valor in cambios:
-            db.session.add(Cuestionario(
+            fila = Cuestionario(
                 id_cita=cita.id_cita, id_pregunta=pregunta.id_pregunta,
-                id_donante=usuario.id_usuario, valor=valor, fecha=ahora))
+                id_donante=usuario.id_usuario, valor=valor, fecha=ahora)
+            db.session.add(fila)
+            filas.append(fila)
         cita.estado = Cita.CONFIRMADA
+        db.session.flush()
+        for fila in filas:
+            Auditoria.registrar(usuario.id_usuario, "CUESTIONARIO",
+                                fila.id_cuestionario, Auditoria.ALTA)
+        if estado_anterior != Cita.CONFIRMADA:
+            Auditoria.registrar(usuario.id_usuario, "CITA", cita.id_cita,
+                                Auditoria.CAMBIO_ESTADO)
         db.session.commit()
     except Exception:
         db.session.rollback()
