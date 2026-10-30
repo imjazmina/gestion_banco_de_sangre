@@ -6,9 +6,11 @@ lo que lo identifica en el banco de sangre; el grupo sanguíneo tampoco,
 porque lo determina el laboratorio a partir de una extracción, no una
 declaración del donante.
 """
+import base64
 import calendar
 import hashlib
 import re
+import secrets
 from datetime import date
 
 from sqlalchemy import func
@@ -200,13 +202,38 @@ def eliminar_correo(usuario, id_correo):
         raise
 
 
-def _documento_pseudonimo(id_usuario, documento):
+# 16 bytes de sal + digest SHA-256 (32). En base64 ocupan 64 caracteres,
+# el largo de usuario.documento.
+_SALT_BYTES = 16
+_DIGEST_BYTES = 32
+
+
+def _documento_pseudonimo(documento):
     """
-    Hash del documento. Incluye el id para que una segunda cuenta, creada
-    con la misma cédula y suprimida después, no choque con la clave única.
+    SHA-256 del documento con sal aleatoria.
+
+    La sal se guarda delante del hash. No entra el id ni ningún otro dato.
+    Cada supresión sale distinta, así la clave única no choca si la misma
+    cédula vuelve a registrarse.
     """
-    materia = f"{id_usuario}:{documento}".encode("utf-8")
-    return hashlib.sha256(materia).hexdigest()
+    salt = secrets.token_bytes(_SALT_BYTES)
+    digest = hashlib.sha256(salt + documento.encode("utf-8")).digest()
+    return base64.b64encode(salt + digest).decode("ascii")
+
+
+def verificar_documento(documento, almacenado):
+    """True si el documento es el que originó el hash guardado con su sal."""
+    if not documento or not almacenado:
+        return False
+    try:
+        crudo = base64.b64decode(almacenado, validate=True)
+    except (ValueError, TypeError):
+        return False
+    if len(crudo) != _SALT_BYTES + _DIGEST_BYTES:
+        return False
+    salt, digest = crudo[:_SALT_BYTES], crudo[_SALT_BYTES:]
+    calculado = hashlib.sha256(salt + documento.encode("utf-8")).digest()
+    return secrets.compare_digest(calculado, digest)
 
 
 def operaciones_abiertas(usuario):
@@ -270,8 +297,7 @@ def suprimir_cuenta(usuario):
         for correo in list(usuario.correos):
             db.session.delete(correo)
 
-        usuario.documento = _documento_pseudonimo(
-            usuario.id_usuario, usuario.documento)
+        usuario.documento = _documento_pseudonimo(usuario.documento)
         usuario.nombre = None
         usuario.apellido = None
         usuario.contrasena = None
