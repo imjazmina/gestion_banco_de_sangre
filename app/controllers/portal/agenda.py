@@ -20,8 +20,8 @@ from datetime import date, datetime
 from sqlalchemy import func, text
 
 from app import calendario
-from app.models import (db, Auditoria, Cita, HorarioDisponible, Notificacion,
-                        RegistroDiferimiento, Solicitud, Usuario)
+from app.models import (db, Auditoria, Cita, HorarioDisponible, MuestraCompatibilidad,
+                        Notificacion, RegistroDiferimiento, Solicitud, Usuario)
 
 # Documento del usuario de servicio «Personal de turno». `cita.id_personal`
 # es NOT NULL y al reservar todavía no se sabe quién va a atender, así que
@@ -44,6 +44,8 @@ TIPOS = [
 TIPOS_VALIDOS = {clave for clave, _, _, _ in TIPOS}
 NECESITA_SOLICITUD = {clave for clave, _, _, necesita in TIPOS if necesita}
 ETIQUETA = {clave: etiqueta for clave, etiqueta, _, _ in TIPOS}
+TIPO_MUESTRA = Cita.MUESTRA
+ETIQUETA[TIPO_MUESTRA] = "Extracción de muestra"
 
 DOW_CORTO = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
 
@@ -196,12 +198,30 @@ def franja_elegida(fecha, id_horario, ahora=None):
                  if f["id_horario"] == id_horario and f["libres"] > 0), None)
 
 
-def _solicitud_abierta(usuario):
-    """RN23: no se agenda una donación si el usuario tiene una solicitud abierta."""
+def solicitud_abierta(usuario):
+    """RN23: Creada o Publicada impide agendar una donación."""
+    return (Solicitud.query
+            .filter(Solicitud.id_solicitante == usuario.id_usuario,
+                    Solicitud.estado.in_(Solicitud.ABIERTAS))
+            .order_by(Solicitud.fecha_creacion.desc())
+            .first())
+
+
+def solicitud_creada(usuario):
+    """Solo una solicitud Creada habilita la extracción de muestra."""
     return (Solicitud.query
             .filter_by(id_solicitante=usuario.id_usuario,
-                       estado=Solicitud.PUBLICADA)
+                       estado=Solicitud.CREADA)
+            .order_by(Solicitud.fecha_creacion.desc())
             .first())
+
+
+def tiene_muestra(solicitud):
+    if solicitud is None:
+        return False
+    return (MuestraCompatibilidad.query
+            .filter_by(id_solicitud=solicitud.id_solicitud)
+            .first() is not None)
 
 
 def personal_de_turno():
@@ -222,7 +242,8 @@ def personal_de_turno():
 
 
 # --------------------------------------------------------------- escritura
-def crear(usuario, fecha, id_horario, tipo, id_solicitud=None):
+def crear(usuario, fecha, id_horario, tipo, id_solicitud=None,
+         consentimiento_publicacion=None):
     """
     Registra la cita y su notificación, en una sola transacción.
 
@@ -234,11 +255,30 @@ def crear(usuario, fecha, id_horario, tipo, id_solicitud=None):
     if diferimiento_vigente(usuario):
         raise ErrorAgenda("No podés agendar mientras tengas una condición "
                           "registrada por el personal de salud.")
-    if _solicitud_abierta(usuario):
-        raise ErrorAgenda("No podés agendar mientras tengas una solicitud abierta.")
     if cita_vigente(usuario):
         raise ErrorAgenda("Ya tenés una cita agendada. "
                           "Gestionala antes de crear otra.")
+
+    if tipo == TIPO_MUESTRA:
+        solicitud = solicitud_creada(usuario)
+        if solicitud is None:
+            raise ErrorAgenda(
+                "Solo podés agendar la extracción de muestra "
+                "con una solicitud creada.")
+        if tiene_muestra(solicitud):
+            raise ErrorAgenda(
+                "Esta solicitud ya tiene una extracción de muestra.")
+        if consentimiento_publicacion is None:
+            raise ErrorAgenda(
+                "Indicá si autorizás publicar la solicitud.")
+        solicitud.consentimiento_publicacion = bool(consentimiento_publicacion)
+        # La cita no apunta a la solicitud propia: lo impide RN03.
+        # El vínculo queda en muestra_compatibilidad.
+        id_solicitud = None
+    elif solicitud_abierta(usuario):
+        raise ErrorAgenda("No podés agendar mientras tengas una solicitud abierta.")
+    elif tipo not in TIPOS_VALIDOS:
+        raise ErrorAgenda("Ese tipo de cita no está disponible.")
 
     responsable = personal_de_turno()
 
@@ -256,12 +296,16 @@ def crear(usuario, fecha, id_horario, tipo, id_solicitud=None):
         Auditoria.registrar(usuario.id_usuario, "CITA", cita.id_cita,
                             Auditoria.ALTA)
 
+        if tipo == TIPO_MUESTRA:
+            texto = "Tu extracción de muestra"
+        else:
+            texto = "Tu cita de donación"
         db.session.add(Notificacion(
             id_usuario=usuario.id_usuario,
             id_cita=cita.id_cita,
             id_solicitud=id_solicitud,
             tipo=Notificacion.CONFIRMACION_CITA,
-            mensaje=f"Tu cita de donación quedó {cita.estado} para el "
+            mensaje=f"{texto} quedó {cita.estado} para el "
                     f"{fecha.strftime('%d/%m/%Y')} a las "
                     f"{franja.hora_inicio.strftime('%H:%M')}."))
         db.session.commit()

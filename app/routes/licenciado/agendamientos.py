@@ -9,7 +9,8 @@ licenciado_agendamientos_bp = Blueprint(
     "licenciado_agendamientos", __name__, url_prefix="/licenciado")
 
 
-TIPOS_AGENDAMIENTO = ["Donación", "Extracción de compatibilidad"]
+TIPOS_AGENDAMIENTO = [
+    "Donación", "Extracción de compatibilidad", "Extracción de muestra"]
 ESTADOS = ["Pendiente", "Confirmada", "Completada", "Ausente", "No apto"]
 
 

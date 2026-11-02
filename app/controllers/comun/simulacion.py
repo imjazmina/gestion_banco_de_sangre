@@ -20,8 +20,9 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.models import (
     Asignacion, Auditoria, Cita, CompatibilidadAboRh,
-    Diferimiento, Extraccion, Notificacion,
-    RegistroDiferimiento, ResultadoLaboratorio, Solicitud, TipoSangre,
+    Diferimiento, Extraccion, HistorialSolicitud, MuestraCompatibilidad,
+    Notificacion, RegistroDiferimiento, ResultadoCompatibilidad,
+    ResultadoLaboratorio, Solicitud, TipoSangre,
     TransicionEstado, Unidad, Usuario, db,
 )
 
@@ -116,6 +117,9 @@ def reponer_laboratorio():
     ]
     for id_unidad in identificadores:
         agendar_resultado(id_unidad)
+    for fila in (MuestraCompatibilidad.query.all()):
+        if ResultadoCompatibilidad.query.filter_by(id_muestra=fila.id_muestra).first() is None:
+            agendar_compatibilidad(fila.id_muestra)
 
 
 def _tarea_laboratorio(app, id_unidad):
@@ -303,19 +307,17 @@ def _asignar_solicitud_de_la_cita(unidad, personal, tipo):
     solicitud = db.session.get(Solicitud, cita.id_solicitud)
     if solicitud is None:
         return
+    if solicitud.estado not in Solicitud.ABIERTAS:
+        _soltar_vinculo(cita, personal)
+        return
+    if solicitud.id_tipo_sangre is None:
+        return
     compatible = (CompatibilidadAboRh.query
                   .filter_by(id_tipo_donante=tipo.id_tipo_sangre,
                              id_tipo_receptor=solicitud.id_tipo_sangre)
                   .first())
-    abierta = (solicitud.estado == Solicitud.PUBLICADA
-               and solicitud.consentimiento_publicacion
-               and _cupo_libre(solicitud))
-    if compatible is None or not abierta:
-        cita.id_solicitud = None
-        if cita.tipo_cita == Cita.SOLIDARIA:
-            cita.tipo_cita = Cita.ALTRUISTA
-        Auditoria.registrar(personal.id_usuario, "CITA", cita.id_cita,
-                            Auditoria.MODIFICACION)
+    if compatible is None or not _cupo_libre(solicitud):
+        _soltar_vinculo(cita, personal)
         return
     asignacion = Asignacion(
         id_unidad=unidad.id_unidad,
@@ -338,9 +340,7 @@ def _asignar_solicitud_de_la_cita(unidad, personal, tipo):
         mensaje="Se asignó una unidad a tu solicitud.",
     ))
     if solicitud.unidades_asignadas >= solicitud.unidades_requeridas:
-        solicitud.estado = Solicitud.COMPLETA
-        Auditoria.registrar(personal.id_usuario, "SOLICITUD",
-                            solicitud.id_solicitud, Auditoria.CAMBIO_ESTADO)
+        _cambiar_estado(solicitud, Solicitud.CERRADA, personal)
         _soltar_citas(solicitud, personal)
         db.session.add(Notificacion(
             id_usuario=solicitud.id_solicitante,
@@ -348,6 +348,29 @@ def _asignar_solicitud_de_la_cita(unidad, personal, tipo):
             tipo=Notificacion.META_COMPLETA,
             mensaje="La cantidad publicada de tu solicitud ya se completó.",
         ))
+
+
+def _soltar_vinculo(cita, personal):
+    cita.id_solicitud = None
+    if cita.tipo_cita == Cita.SOLIDARIA:
+        cita.tipo_cita = Cita.ALTRUISTA
+    Auditoria.registrar(personal.id_usuario, "CITA", cita.id_cita,
+                        Auditoria.MODIFICACION)
+
+
+def _cambiar_estado(solicitud, destino, personal):
+    anterior = solicitud.estado
+    if anterior == destino:
+        return
+    solicitud.estado = destino
+    db.session.add(HistorialSolicitud(
+        id_solicitud=solicitud.id_solicitud,
+        estado_anterior=anterior,
+        estado_nuevo=destino,
+        fecha_hora=datetime.now(),
+    ))
+    Auditoria.registrar(personal.id_usuario, "SOLICITUD",
+                        solicitud.id_solicitud, Auditoria.CAMBIO_ESTADO)
 
 
 def _soltar_citas(solicitud, personal):
@@ -453,6 +476,129 @@ def asegurar_publicadas():
     except SQLAlchemyError as exc:
         db.session.rollback()
         raise ErrorSimulacion(str(getattr(exc, "orig", exc)).splitlines()[0])
+
+
+def agendar_compatibilidad(id_muestra):
+    """Encola la tipificación y el PAI de una muestra, sin crear unidades."""
+    app = current_app._get_current_object()
+    clave = ("muestra", id_muestra)
+    with _en_curso_lock:
+        if clave in _en_curso:
+            return
+        _en_curso.add(clave)
+    threading.Thread(
+        target=_tarea_compatibilidad,
+        args=(app, id_muestra),
+        name=f"compatibilidad-{id_muestra}",
+        daemon=True,
+    ).start()
+
+
+def _tarea_compatibilidad(app, id_muestra):
+    try:
+        time.sleep(DEMORA_LABORATORIO_SEGUNDOS)
+        with app.app_context():
+            simular_compatibilidad(id_muestra)
+    except Exception:
+        logger.exception("No se pudo simular la muestra %s", id_muestra)
+        db.session.rollback()
+    finally:
+        with _en_curso_lock:
+            _en_curso.discard(("muestra", id_muestra))
+
+
+def simular_compatibilidad(id_muestra):
+    """
+    Tipifica la muestra y registra el PAI.
+
+    Si el paciente ya tiene tipificación, se reutiliza y no se pisa.
+    El PAI positivo difiere y abre consejería. No cambia el consentimiento
+    ni descarta unidades. Publica solo con consentimiento y resultado.
+    """
+    db.session.execute(
+        text("SELECT pg_advisory_xact_lock(:clave)"),
+        {"clave": 1_000_000 + id_muestra},
+    )
+    muestra = db.session.get(MuestraCompatibilidad, id_muestra)
+    if muestra is None:
+        db.session.rollback()
+        return
+    if ResultadoCompatibilidad.query.filter_by(id_muestra=muestra.id_muestra).first():
+        db.session.rollback()
+        return
+
+    extraccion = db.session.get(Extraccion, muestra.id_extraccion)
+    cita = db.session.get(Cita, extraccion.id_cita) if extraccion else None
+    personal = db.session.get(Usuario, extraccion.id_personal) if extraccion else None
+    solicitud = db.session.get(Solicitud, muestra.id_solicitud)
+    if cita is None or personal is None or solicitud is None:
+        db.session.rollback()
+        raise ErrorSimulacion("La muestra no tiene extracción, personal o solicitud.")
+
+    db.session.execute(
+        text("SELECT pg_advisory_xact_lock(CAST(:clase AS integer), CAST(:donante AS integer))"),
+        {"clase": 2, "donante": cita.id_usuario},
+    )
+    tipo = Usuario.tipo_confirmado(cita.id_usuario)
+    if tipo is None:
+        tipos = TipoSangre.query.order_by(TipoSangre.id_tipo_sangre).all()
+        if not tipos:
+            db.session.rollback()
+            raise ErrorSimulacion("Falta el catálogo de grupos sanguíneos.")
+        tipo = random.choice(tipos)
+
+    positivo = random.random() < PROBABILIDAD_REACTIVO
+    nombre = (ResultadoCompatibilidad.PAI_POSITIVO if positivo
+              else ResultadoCompatibilidad.PAI_NEGATIVO)
+    causa = Diferimiento.query.filter_by(nombre=nombre).first()
+    if causa is None:
+        db.session.rollback()
+        raise ErrorSimulacion("Falta el PAI en el catálogo de diferimientos.")
+
+    resultado = ResultadoCompatibilidad(
+        id_muestra=muestra.id_muestra,
+        id_tipo_sangre=tipo.id_tipo_sangre,
+        id_diferimiento=causa.id_diferimiento,
+        fecha=datetime.now(),
+    )
+    db.session.add(resultado)
+    db.session.flush()
+    Auditoria.registrar(personal.id_usuario, "RESULTADO_COMPATIBILIDAD",
+                        resultado.id_resultado_compatibilidad, Auditoria.ALTA)
+
+    if solicitud.id_tipo_sangre is None:
+        solicitud.id_tipo_sangre = tipo.id_tipo_sangre
+    if (solicitud.consentimiento_publicacion
+            and solicitud.estado == Solicitud.CREADA):
+        _cambiar_estado(solicitud, Solicitud.PUBLICADA, personal)
+
+    if positivo:
+        registro = RegistroDiferimiento(
+            id_donante=cita.id_usuario,
+            id_diferimiento=causa.id_diferimiento,
+            id_cita=cita.id_cita,
+            id_personal=None,
+            origen=RegistroDiferimiento.LABORATORIO,
+            institucion_diagnostico=INSTITUCION_LOCAL,
+            fecha_inicio=date.today(),
+            id_resultado_compatibilidad=resultado.id_resultado_compatibilidad,
+        )
+        db.session.add(registro)
+        db.session.flush()
+        Auditoria.registrar(personal.id_usuario, "REGISTRO_DIFERIMIENTO",
+                            registro.id_registro, Auditoria.ALTA)
+        db.session.add(Notificacion(
+            id_usuario=cita.id_usuario,
+            tipo=Notificacion.CITACION_GENERICA,
+            mensaje=("El banco de sangre te pide agendar una consejería presencial. "
+                     "Entrá a Consejería en el portal y elegí día y horario. "
+                     "El motivo se conversa en el servicio."),
+        ))
+    try:
+        db.session.commit()
+    except SQLAlchemyError as exc:
+        db.session.rollback()
+        raise ErrorSimulacion(str(getattr(exc, "orig", exc)).splitlines()[0]) from exc
 
 
 def marcar_vencidas(personal):

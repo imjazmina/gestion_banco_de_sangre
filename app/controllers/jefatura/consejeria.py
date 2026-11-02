@@ -56,12 +56,17 @@ def evolucion(citacion):
 
 def registros_de(citacion):
     """Diferimientos de laboratorio asociados a ese resultado. Puede haber varios."""
-    if citacion.id_resultado is None:
-        return []
-    return (RegistroDiferimiento.query
-            .filter_by(id_resultado=citacion.id_resultado)
-            .order_by(RegistroDiferimiento.id_registro)
-            .all())
+    if citacion.id_resultado is not None:
+        return (RegistroDiferimiento.query
+                .filter_by(id_resultado=citacion.id_resultado)
+                .order_by(RegistroDiferimiento.id_registro)
+                .all())
+    if citacion.id_resultado_compatibilidad is not None:
+        return (RegistroDiferimiento.query
+                .filter_by(id_resultado_compatibilidad=citacion.id_resultado_compatibilidad)
+                .order_by(RegistroDiferimiento.id_registro)
+                .all())
+    return []
 
 
 def mensajes():

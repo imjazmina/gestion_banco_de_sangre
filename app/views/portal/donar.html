@@ -22,7 +22,12 @@
       <p class="sub" style="margin-top:4px;">Elegí fecha, horario y tipo de donación.</p>
     </div>
 
-    {% if solicitud_abierta %}
+    {% if solo_muestra %}
+    <div class="banner info" style="margin-bottom:20px;">
+      {{ ico('info') }}
+      <p><b>Solicitud abierta</b>No podés agendar una donación. Podés reservar la extracción de muestra para compatibilidad.</p>
+    </div>
+    {% elif solicitud_abierta %}
     <div class="card" style="border-top:3px solid var(--warn); margin-bottom:20px;">
       <h2 style="margin-bottom:6px;">Agendamiento no disponible</h2>
       <p class="sub">Tenés una solicitud abierta. No podés reservar una donación al mismo tiempo.</p>
@@ -52,7 +57,7 @@
     </div>
     {% endif %}
 
-    <div class="{{ 'form-locked' if diferimiento or solicitud_abierta }}" {% if diferimiento or solicitud_abierta %}aria-disabled="true"{% endif %}>
+    <div class="{{ 'form-locked' if diferimiento or (solicitud_abierta and not solo_muestra) }}" {% if diferimiento or (solicitud_abierta and not solo_muestra) %}aria-disabled="true"{% endif %}>
 
       {# ---------- pasos 1 y 2 ---------- #}
       <div class="card" style="margin-bottom:20px;">
@@ -84,6 +89,33 @@
         <div class="divider"></div>
         <h2 style="margin-bottom:4px;">¿Para quién donás?</h2>
         <p class="sub" style="margin-bottom:14px;">Elegí una de las solicitudes publicadas por el banco de sangre.</p>
+
+        <form method="get" action="{{ url_for('donar.agendar') }}" style="margin-bottom:14px;">
+          <input type="hidden" name="fecha" value="{{ fecha.isoformat() }}">
+          <input type="hidden" name="horario" value="{{ horario.id_horario }}">
+          <input type="hidden" name="tipo" value="{{ tipo }}">
+          <div class="field" style="margin-bottom:0;">
+            <label for="cedula">Cédula del paciente, si la solicitud es privada</label>
+            <div style="display:flex; gap:8px;">
+              <input type="text" id="cedula" name="cedula" value="{{ cedula or '' }}" inputmode="numeric" placeholder="Número de cédula">
+              <button class="btn btn-secondary" type="submit">Buscar</button>
+            </div>
+          </div>
+        </form>
+
+        {% if solicitud and not solicitud.consentimiento_publicacion %}
+        <a class="type-card selected" style="margin-bottom:12px;"
+           href="{{ url_for('donar.agendar', fecha=fecha.isoformat(), horario=horario.id_horario, tipo=tipo, solicitud=solicitud.id_solicitud, cedula=cedula) }}">
+          <div class="type-check">{{ ico('check') }}</div>
+          <div class="flex-between" style="gap:12px;">
+            <div>
+              <h3>{{ solicitud.solicitante.nombre_completo }}</h3>
+              <p>Solicitud privada · {{ solicitud.unidades_asignadas }} de {{ solicitud.unidades_requeridas }} unidades</p>
+            </div>
+            <span class="blood-tag">{{ solicitud.tipo_sangre.etiqueta if solicitud.tipo_sangre else 'Sin tipificar' }}</span>
+          </div>
+        </a>
+        {% endif %}
 
         {% if solicitudes %}
         <div class="type-grid" style="grid-template-columns:1fr;">
@@ -143,6 +175,14 @@
             {{ ico('info') }}
             <p><b>Evaluación presencial</b>El día de la cita, el personal de salud realiza el cuestionario y las mediciones que determinan la aptitud para donar.</p>
           </div>
+
+          {% if solo_muestra %}
+          <fieldset style="border:0; padding:0; margin:0 0 18px;">
+            <legend style="font-weight:600; margin-bottom:8px;">Publicación de tu solicitud</legend>
+            <label class="check-row"><input type="radio" name="publicar" value="si" required> Autorizo publicar la solicitud en la web después del resultado de laboratorio.</label>
+            <label class="check-row"><input type="radio" name="publicar" value="no" required> No autorizo la publicación. La solicitud queda privada.</label>
+          </fieldset>
+          {% endif %}
 
           <label class="check-row" style="margin-bottom:18px;">
             <input type="checkbox" name="consentimiento" required checked>

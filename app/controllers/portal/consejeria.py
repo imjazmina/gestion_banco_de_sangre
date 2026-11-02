@@ -18,9 +18,25 @@ from app.controllers.portal.agenda import (
     DOW_CORTO, ErrorAgenda, personal_de_turno, parsear_fecha,
 )
 from app.models import (
-    Auditoria, CitacionConsejeria, HorarioDisponible, Notificacion,
-    ResultadoLaboratorio, Rol, Unidad, db,
+    Auditoria, Cita, CitacionConsejeria, Diferimiento, Extraccion,
+    HorarioDisponible, MuestraCompatibilidad, Notificacion,
+    ResultadoCompatibilidad, ResultadoLaboratorio, Rol, Unidad, db,
 )
+
+
+class Caso:
+    """Un resultado que habilita consejería, de unidad o de muestra."""
+
+    def __init__(self, resultado, citacion, muestra=False):
+        self.resultado = resultado
+        self.citacion = citacion
+        self.muestra = muestra
+
+    @property
+    def id_agenda(self):
+        if self.muestra:
+            return self.resultado.id_resultado_compatibilidad
+        return self.resultado.id_resultado
 
 
 class ErrorConsejeria(Exception):
@@ -34,8 +50,8 @@ def _exigir_donante(usuario):
 
 
 def casos(usuario):
-    """Resultados reactivos del donante y la citación de cada uno, si existe."""
-    return (
+    """Resultados que abren consejería: serología reactiva o PAI positivo."""
+    laboratorio = (
         db.session.query(ResultadoLaboratorio, CitacionConsejeria)
         .join(Unidad, Unidad.id_unidad == ResultadoLaboratorio.id_unidad)
         .outerjoin(
@@ -46,12 +62,34 @@ def casos(usuario):
         .order_by(ResultadoLaboratorio.fecha.desc())
         .all()
     )
+    muestras = (
+        db.session.query(ResultadoCompatibilidad, CitacionConsejeria)
+        .join(MuestraCompatibilidad,
+              MuestraCompatibilidad.id_muestra == ResultadoCompatibilidad.id_muestra)
+        .join(Extraccion,
+              Extraccion.id_extraccion == MuestraCompatibilidad.id_extraccion)
+        .join(Cita, Cita.id_cita == Extraccion.id_cita)
+        .join(Diferimiento,
+              Diferimiento.id_diferimiento == ResultadoCompatibilidad.id_diferimiento)
+        .outerjoin(
+            CitacionConsejeria,
+            CitacionConsejeria.id_resultado_compatibilidad
+            == ResultadoCompatibilidad.id_resultado_compatibilidad)
+        .filter(Cita.id_usuario == usuario.id_usuario,
+                Diferimiento.nombre == ResultadoCompatibilidad.PAI_POSITIVO)
+        .order_by(ResultadoCompatibilidad.fecha.desc())
+        .all()
+    )
+    pares = [Caso(resultado, citacion) for resultado, citacion in laboratorio]
+    pares.extend(Caso(resultado, citacion, muestra=True)
+                 for resultado, citacion in muestras)
+    return pares
 
 
-def caso_de(usuario, id_resultado):
-    for resultado, citacion in casos(usuario):
-        if resultado.id_resultado == id_resultado:
-            return resultado, citacion
+def caso_de(usuario, id_resultado, muestra=False):
+    for caso in casos(usuario):
+        if caso.muestra == muestra and caso.id_agenda == id_resultado:
+            return caso.resultado, caso.citacion
     return None, None
 
 
@@ -165,10 +203,10 @@ def _momento(fecha, franja):
     return datetime.combine(fecha, franja.hora_inicio)
 
 
-def agendar(usuario, id_resultado, fecha, id_horario):
+def agendar(usuario, id_resultado, fecha, id_horario, muestra=False):
     """Crea la citación o reabre la cancelada del mismo resultado."""
     _exigir_donante(usuario)
-    resultado, citacion = caso_de(usuario, id_resultado)
+    resultado, citacion = caso_de(usuario, id_resultado, muestra)
     if resultado is None:
         raise ErrorConsejeria("No tenés una consejería pendiente de agendar.")
     if citacion is not None and citacion.estado in CitacionConsejeria.ABIERTAS:
@@ -185,7 +223,9 @@ def agendar(usuario, id_resultado, fecha, id_horario):
                 id_donante=usuario.id_usuario,
                 id_personal=responsable.id_usuario,
                 id_horario=id_horario,
-                id_resultado=resultado.id_resultado,
+                id_resultado=None if muestra else resultado.id_resultado,
+                id_resultado_compatibilidad=(
+                    resultado.id_resultado_compatibilidad if muestra else None),
                 fecha_hora=momento,
                 estado=CitacionConsejeria.PENDIENTE,
             )

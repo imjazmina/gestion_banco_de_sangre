@@ -192,6 +192,8 @@ def ver(cita_id):
     if cita is None:
         flash("No existe esa cita.", "error")
         return redirect(url_for("licenciado_agendamientos.lista"))
+    if cita.tipo_cita == jornada.Cita.MUESTRA:
+        return redirect(url_for("licenciado_muestra.ver", cita_id=cita_id))
     personal = operador_actual()["usuario"]
     if request.method == "POST":
         try:

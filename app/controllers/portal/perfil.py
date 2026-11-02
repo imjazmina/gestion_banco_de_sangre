@@ -254,8 +254,8 @@ def operaciones_abiertas(usuario):
                                                Unidad.EN_LABORATORIO)))
                     .all())
     solicitudes = (Solicitud.query
-                   .filter_by(id_solicitante=usuario.id_usuario,
-                              estado=Solicitud.PUBLICADA)
+                   .filter(Solicitud.id_solicitante == usuario.id_usuario,
+                           Solicitud.estado.in_(Solicitud.ABIERTAS))
                    .all())
     return {"citas": citas, "extracciones": extracciones,
             "solicitudes": solicitudes}

@@ -11,7 +11,7 @@ from app.models import db
 consejeria_bp = Blueprint("consejeria", __name__, url_prefix="/consejeria")
 
 
-def _pantalla(usuario, id_resultado=None, id_citacion=None):
+def _pantalla(usuario, id_resultado=None, id_citacion=None, muestra=False):
     fecha = consejeria.parsear_fecha(request.args.get("fecha"))
     excepto = id_citacion
     dias = consejeria.dias(fecha, excepto_id=excepto)
@@ -24,6 +24,7 @@ def _pantalla(usuario, id_resultado=None, id_citacion=None):
         pares=consejeria.casos(usuario),
         id_resultado=id_resultado,
         id_citacion=id_citacion,
+        muestra=muestra,
         dias=dias,
         fecha=fecha,
         franjas=franjas,
@@ -43,7 +44,7 @@ def ver():
 @requiere_login
 def agendar(id_resultado):
     usuario = usuario_actual()
-    resultado, citacion = consejeria.caso_de(usuario, id_resultado)
+    resultado, citacion = consejeria.caso_de(usuario, id_resultado, muestra=False)
     if resultado is None:
         flash("No tenés esa consejería.", "error")
         return redirect(url_for("consejeria.ver"))
@@ -67,11 +68,46 @@ def agendar_confirmar(id_resultado):
         flash("Elegí una fecha y un horario.", "error")
         return redirect(url_for("consejeria.agendar", id_resultado=id_resultado))
     try:
-        consejeria.agendar(usuario, id_resultado, fecha, id_horario)
+        consejeria.agendar(usuario, id_resultado, fecha, id_horario, muestra=False)
     except (consejeria.ErrorConsejeria, consejeria.ErrorAgenda, SQLAlchemyError) as exc:
         db.session.rollback()
         flash(consejeria.mensaje_de_error(exc), "error")
         return redirect(url_for("consejeria.agendar", id_resultado=id_resultado,
+                                fecha=fecha.isoformat()))
+    flash("Tu consejería quedó agendada.", "ok")
+    return redirect(url_for("consejeria.ver"))
+
+
+@consejeria_bp.get("/agendar/muestra/<int:id_resultado>")
+@requiere_login
+def agendar_muestra(id_resultado):
+    usuario = usuario_actual()
+    resultado, citacion = consejeria.caso_de(usuario, id_resultado, muestra=True)
+    if resultado is None:
+        flash("No tenés esa consejería.", "error")
+        return redirect(url_for("consejeria.ver"))
+    if citacion is not None and citacion.estado not in (None, citacion.CANCELADA):
+        flash("Esa consejería ya tiene una cita." if citacion.estado in citacion.ABIERTAS
+              else "Esa consejería ya fue cerrada.", "error")
+        return redirect(url_for("consejeria.ver"))
+    return _pantalla(usuario, id_resultado=id_resultado, muestra=True)
+
+
+@consejeria_bp.post("/agendar/muestra/<int:id_resultado>")
+@requiere_login
+def agendar_muestra_confirmar(id_resultado):
+    usuario = usuario_actual()
+    fecha = consejeria.parsear_fecha(request.form.get("fecha"))
+    id_horario = request.form.get("horario", type=int)
+    if not fecha or not id_horario:
+        flash("Elegí una fecha y un horario.", "error")
+        return redirect(url_for("consejeria.agendar_muestra", id_resultado=id_resultado))
+    try:
+        consejeria.agendar(usuario, id_resultado, fecha, id_horario, muestra=True)
+    except (consejeria.ErrorConsejeria, consejeria.ErrorAgenda, SQLAlchemyError) as exc:
+        db.session.rollback()
+        flash(consejeria.mensaje_de_error(exc), "error")
+        return redirect(url_for("consejeria.agendar_muestra", id_resultado=id_resultado,
                                 fecha=fecha.isoformat()))
     flash("Tu consejería quedó agendada.", "ok")
     return redirect(url_for("consejeria.ver"))

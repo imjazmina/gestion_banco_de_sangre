@@ -8,9 +8,9 @@ solicitudes es el personal, desde el panel de administración. Acá el donante
 Nunca se muestra el documento del solicitante: la solicitud se difunde para
 conseguir donantes, no para exponer sus datos personales.
 """
-from datetime import date
+from datetime import date, datetime
 
-from app.models import Solicitud
+from app.models import Notificacion, Solicitud, Usuario, db
 
 
 def activas():
@@ -33,5 +33,65 @@ def activas():
 
 
 def por_id(id_solicitud):
-    """Una solicitud vigente concreta, o None. La usa el agendamiento."""
+    """Una solicitud publicada concreta, o None. La usa el agendamiento."""
     return next((s for s in activas() if s.id_solicitud == id_solicitud), None)
+
+
+def por_cedula(documento, id_usuario):
+    """Solicitud privada del paciente, para vincular una donación."""
+    documento = (documento or "").strip()
+    if not documento:
+        return None
+    return (Solicitud.query
+            .join(Usuario, Usuario.id_usuario == Solicitud.id_solicitante)
+            .filter(Usuario.documento == documento,
+                    Solicitud.estado == Solicitud.CREADA,
+                    Solicitud.consentimiento_publicacion.is_(False),
+                    Solicitud.id_solicitante != id_usuario,
+                    Solicitud.unidades_asignadas < Solicitud.unidades_requeridas)
+            .order_by(Solicitud.fecha_creacion.desc())
+            .first())
+
+
+def vinculable(id_solicitud, usuario):
+    """Pública por id, o privada si el id es de una solicitud Creada."""
+    if not id_solicitud:
+        return None
+    publica = por_id(id_solicitud)
+    if publica is not None and publica.id_solicitante != usuario.id_usuario:
+        return publica
+    privada = db.session.get(Solicitud, id_solicitud)
+    if (privada is not None
+            and privada.estado == Solicitud.CREADA
+            and not privada.consentimiento_publicacion
+            and privada.id_solicitante != usuario.id_usuario
+            and privada.unidades_asignadas < privada.unidades_requeridas):
+        return privada
+    return None
+
+
+def avisar_abierta(usuario):
+    """Una notificación por solicitud abierta. No se repite en cada ingreso."""
+    abiertas = (Solicitud.query
+                .filter(Solicitud.id_solicitante == usuario.id_usuario,
+                        Solicitud.estado.in_(Solicitud.ABIERTAS))
+                .all())
+    nuevas = False
+    for solicitud in abiertas:
+        ya = (Notificacion.query
+              .filter_by(id_usuario=usuario.id_usuario,
+                         id_solicitud=solicitud.id_solicitud,
+                         tipo=Notificacion.SOLICITUD_ABIERTA)
+              .first())
+        if ya is not None:
+            continue
+        db.session.add(Notificacion(
+            id_usuario=usuario.id_usuario,
+            id_solicitud=solicitud.id_solicitud,
+            tipo=Notificacion.SOLICITUD_ABIERTA,
+            mensaje="Solicitud abierta",
+            fecha_envio=datetime.now(),
+        ))
+        nuevas = True
+    if nuevas:
+        db.session.commit()

@@ -62,6 +62,8 @@ def ingresar():
         correo = request.form.get("correo", "").strip()
         usuario = autenticacion.autenticar(correo, request.form.get("contrasena", ""))
         if usuario:
+            from app.controllers.portal import solicitudes as ctrl_solicitudes
+            ctrl_solicitudes.avisar_abierta(usuario)
             iniciar_sesion(usuario)
             return redirect(url_for("main.index"))
 

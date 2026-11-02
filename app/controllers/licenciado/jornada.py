@@ -15,8 +15,8 @@ from app import calendario
 from app.controllers.portal.agenda import diferimiento_vigente
 from app.models import (
     Auditoria, Cita, Cuestionario, Diferimiento, Extraccion, HorarioDisponible,
-    Medicion, Notificacion, Pregunta, RegistroDiferimiento, TipoMedicion,
-    TransicionEstado, Unidad, Usuario, db,
+    Medicion, MuestraCompatibilidad, Notificacion, Pregunta, RegistroDiferimiento,
+    TipoMedicion, TransicionEstado, Unidad, Usuario, db,
 )
 
 INSTITUCION_LOCAL = "Hospital Regional de Luque"
@@ -26,6 +26,7 @@ ETIQUETA_TIPO = {
     Cita.REPOSICION: "Reposición",
     Cita.SOLIDARIA: "Solidaria",
     Cita.COMPATIBILIDAD: "Compatibilidad",
+    Cita.MUESTRA: "Muestra",
 }
 
 CAUSA_POR_MEDICION = {
@@ -91,8 +92,9 @@ def fila(cita):
         "estado": cita.estado,
         "donorId": cita.id_usuario,
         "tipoAgendamiento": (
-            "Extracción de compatibilidad"
-            if cita.tipo_cita == Cita.COMPATIBILIDAD else "Donación"),
+            "Extracción de muestra" if cita.tipo_cita == Cita.MUESTRA
+            else "Extracción de compatibilidad" if cita.tipo_cita == Cita.COMPATIBILIDAD
+            else "Donación"),
         "origen": "Espontáneo" if es_espontanea(cita) else "Agendada",
         "solicitudId": cita.id_solicitud or "",
         "grupo": grupo,
@@ -334,6 +336,8 @@ def registrar_extraccion(cita, personal, observacion, n_unidades=0):
     Si no se completó ninguna, no hay fila en unidad ni código de unidad.
     """
     _exigir_ajeno(cita, personal)
+    if cita.tipo_cita == Cita.MUESTRA:
+        raise ErrorJornada("Esta cita registra una muestra, no unidades.")
     if extraccion_de(cita) is not None:
         raise ErrorJornada("Esta cita ya tiene una extracción.")
     if not mediciones_aptas(cita):
@@ -368,7 +372,6 @@ def registrar_extraccion(cita, personal, observacion, n_unidades=0):
             id_extraccion=extraccion.id_extraccion,
             id_donante=cita.id_usuario,
             codigo=_codigo("UN"),
-            componente="sangre_total",
             estado=Unidad.REGISTRADA,
             fecha_vencimiento=vencimiento,
         )
@@ -400,6 +403,66 @@ def registrar_extraccion(cita, personal, observacion, n_unidades=0):
                         Auditoria.CAMBIO_ESTADO)
     _commit()
     return unidades
+
+
+def muestra_de(cita):
+    extraccion = extraccion_de(cita)
+    if extraccion is None:
+        return None
+    return (MuestraCompatibilidad.query
+            .filter_by(id_extraccion=extraccion.id_extraccion)
+            .first())
+
+
+def registrar_muestra(cita, personal, observacion):
+    """Cierra la cita con una muestra. No crea unidades ni vencimiento."""
+    _exigir_ajeno(cita, personal)
+    if cita.tipo_cita != Cita.MUESTRA:
+        raise ErrorJornada("Esta cita no es una extracción de muestra.")
+    from app.models import Solicitud
+    solicitud = (Solicitud.query
+                 .filter_by(id_solicitante=cita.id_usuario, estado=Solicitud.CREADA)
+                 .order_by(Solicitud.fecha_creacion.desc())
+                 .first())
+    if solicitud is None:
+        raise ErrorJornada("La muestra no está asociada a una solicitud creada.")
+    if extraccion_de(cita) is not None:
+        raise ErrorJornada("Esta cita ya tiene una extracción.")
+    if not mediciones_aptas(cita):
+        raise ErrorJornada(
+            "No se extrae si falta una medición o alguna no es apta.")
+    if cita.estado not in (Cita.PENDIENTE, Cita.CONFIRMADA):
+        raise ErrorJornada("Esta cita ya está cerrada.")
+
+    observacion = (observacion or "").strip() or "Muestra venosa sin incidentes."
+    fecha = datetime.now()
+    extraccion = Extraccion(
+        id_cita=cita.id_cita,
+        id_personal=personal.id_usuario,
+        codigo_unico=_codigo("EX"),
+        fecha=fecha,
+        observacion=observacion,
+    )
+    db.session.add(extraccion)
+    db.session.flush()
+    Auditoria.registrar(personal.id_usuario, "EXTRACCION",
+                        extraccion.id_extraccion, Auditoria.ALTA)
+    muestra = MuestraCompatibilidad(
+        id_extraccion=extraccion.id_extraccion,
+        id_solicitud=solicitud.id_solicitud,
+        codigo=_codigo("MC"),
+        fecha=fecha,
+    )
+    db.session.add(muestra)
+    db.session.flush()
+    Auditoria.registrar(personal.id_usuario, "MUESTRA_COMPATIBILIDAD",
+                        muestra.id_muestra, Auditoria.ALTA)
+    cita.estado = Cita.COMPLETADA
+    cita.id_personal = personal.id_usuario
+    Auditoria.registrar(personal.id_usuario, "CITA", cita.id_cita,
+                        Auditoria.CAMBIO_ESTADO)
+    _commit()
+    return muestra
 
 
 def buscar_donante(documento):

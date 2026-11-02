@@ -85,7 +85,9 @@ INSERT INTO diferimiento (nombre, tipo, dias_rehabilitacion) VALUES
   ('Chagas (T. cruzi)',                  'Permanente',  NULL),
   ('HTLV I/II',                          'Permanente',  NULL),
   ('Anti-HBc (Hepatitis B)',            'Permanente',  NULL),
-  ('CMV',                                'Permanente',  NULL)
+  ('CMV',                                'Permanente',  NULL),
+  ('PAI positivo',                       'Permanente',  NULL),
+  ('PAI negativo',                       'Temporal',      0)
 ON CONFLICT (nombre) DO NOTHING;
 
 -- ---------- Cuestionario ----------
@@ -476,8 +478,8 @@ BEGIN
   VALUES (v_cita, v_pers, 'EX-' || p_codigo, v_momento, COALESCE(p_obs, 'Extracción sin incidentes.'))
   RETURNING id_extraccion INTO v_ext;
   INSERT INTO unidad (id_extraccion, id_donante, id_solicitud, codigo, id_tipo_sangre,
-                      componente, estado, fecha_vencimiento)
-  VALUES (v_ext, v_don, v_sol, p_codigo, v_tipo, 'sangre_total', 'Registrada', p_vto)
+                      estado, fecha_vencimiento)
+  VALUES (v_ext, v_don, v_sol, p_codigo, v_tipo, 'Registrada', p_vto)
   RETURNING id_unidad INTO v_uni;
   INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha_hora)
   VALUES (v_uni, v_pers, 'Registrada', 'En laboratorio', v_momento + interval '20 minutes');
@@ -704,36 +706,36 @@ SELECT maqueta_usuario('90000208', 'Diferido', 'Temporal 8', DATE '1994-06-20', 
 -- Solicitudes
 
 SELECT maqueta_solicitud('1234567', 'Dr. Ramón Espínola', 'O+', 2, 0, 'Publicada', TIMESTAMP '2026-09-09 10:00');
-SELECT maqueta_solicitud('80000001', 'Dra. Liz Montiel', 'A+', 1, 1, 'Completa', TIMESTAMP '2026-09-08 10:00');
+SELECT maqueta_solicitud('80000001', 'Dra. Liz Montiel', 'A+', 1, 1, 'Cerrada', TIMESTAMP '2026-09-08 10:00');
 SELECT maqueta_solicitud('80000002', 'Dr. Carlos Mendoza', 'O+', 3, 0, 'Publicada', TIMESTAMP '2026-09-07 10:00');
 SELECT maqueta_solicitud('80000003', 'Dra. Patricia Acuña', 'B+', 1, 0, 'Publicada', TIMESTAMP '2026-09-06 10:00');
-SELECT maqueta_solicitud('80000010', 'Dra. Liz Montiel', 'O+', 1, 1, 'Completa', TIMESTAMP '2026-08-01 09:00');
-SELECT maqueta_solicitud('80000011', 'Dra. Liz Montiel', 'A+', 1, 1, 'Completa', TIMESTAMP '2026-08-02 09:00');
-SELECT maqueta_solicitud('80000012', 'Dra. Liz Montiel', 'B+', 1, 1, 'Completa', TIMESTAMP '2026-08-03 09:00');
-SELECT maqueta_solicitud('80000013', 'Dra. Liz Montiel', 'O+', 1, 1, 'Completa', TIMESTAMP '2026-08-04 09:00');
-SELECT maqueta_solicitud('80000014', 'Dra. Liz Montiel', 'A+', 1, 1, 'Completa', TIMESTAMP '2026-08-05 09:00');
-SELECT maqueta_solicitud('80000015', 'Dra. Liz Montiel', 'B+', 1, 1, 'Completa', TIMESTAMP '2026-08-06 09:00');
-SELECT maqueta_solicitud('80000016', 'Dra. Liz Montiel', 'O+', 1, 1, 'Completa', TIMESTAMP '2026-08-07 09:00');
-SELECT maqueta_solicitud('80000017', 'Dra. Liz Montiel', 'A+', 1, 1, 'Completa', TIMESTAMP '2026-08-08 09:00');
-SELECT maqueta_solicitud('80000018', 'Dra. Liz Montiel', 'B+', 1, 1, 'Completa', TIMESTAMP '2026-08-09 09:00');
-SELECT maqueta_solicitud('80000019', 'Dra. Liz Montiel', 'O+', 1, 1, 'Completa', TIMESTAMP '2026-08-10 09:00');
-SELECT maqueta_solicitud('80000020', 'Dra. Liz Montiel', 'A+', 1, 1, 'Completa', TIMESTAMP '2026-08-11 09:00');
-SELECT maqueta_solicitud('80000021', 'Dra. Liz Montiel', 'B+', 1, 1, 'Completa', TIMESTAMP '2026-08-12 09:00');
-SELECT maqueta_solicitud('80000022', 'Dra. Liz Montiel', 'O+', 1, 1, 'Completa', TIMESTAMP '2026-08-13 09:00');
-SELECT maqueta_solicitud('80000023', 'Dra. Liz Montiel', 'A+', 1, 1, 'Completa', TIMESTAMP '2026-08-14 09:00');
-SELECT maqueta_solicitud('80000024', 'Dra. Liz Montiel', 'B+', 1, 1, 'Completa', TIMESTAMP '2026-08-15 09:00');
-SELECT maqueta_solicitud('80000025', 'Dra. Liz Montiel', 'O+', 1, 1, 'Completa', TIMESTAMP '2026-08-16 09:00');
-SELECT maqueta_solicitud('80000026', 'Dra. Liz Montiel', 'A+', 1, 1, 'Completa', TIMESTAMP '2026-08-17 09:00');
-SELECT maqueta_solicitud('80000027', 'Dra. Liz Montiel', 'B+', 1, 1, 'Completa', TIMESTAMP '2026-08-18 09:00');
-SELECT maqueta_solicitud('80000028', 'Dra. Liz Montiel', 'O+', 1, 1, 'Completa', TIMESTAMP '2026-08-19 09:00');
-SELECT maqueta_solicitud('80000029', 'Dra. Liz Montiel', 'A+', 1, 1, 'Completa', TIMESTAMP '2026-08-20 09:00');
-SELECT maqueta_solicitud('80000030', 'Dra. Liz Montiel', 'B+', 1, 1, 'Completa', TIMESTAMP '2026-08-21 09:00');
-SELECT maqueta_solicitud('80000031', 'Dra. Liz Montiel', 'O+', 1, 1, 'Completa', TIMESTAMP '2026-08-22 09:00');
-SELECT maqueta_solicitud('80000032', 'Dra. Liz Montiel', 'A+', 1, 1, 'Completa', TIMESTAMP '2026-08-23 09:00');
-SELECT maqueta_solicitud('80000033', 'Dra. Liz Montiel', 'B+', 1, 1, 'Completa', TIMESTAMP '2026-08-24 09:00');
-SELECT maqueta_solicitud('80000034', 'Dra. Liz Montiel', 'O+', 1, 1, 'Completa', TIMESTAMP '2026-08-25 09:00');
-SELECT maqueta_solicitud('80000035', 'Dra. Liz Montiel', 'A+', 1, 1, 'Completa', TIMESTAMP '2026-08-26 09:00');
-SELECT maqueta_solicitud('80000036', 'Dra. Liz Montiel', 'B+', 1, 1, 'Completa', TIMESTAMP '2026-08-27 09:00');
+SELECT maqueta_solicitud('80000010', 'Dra. Liz Montiel', 'O+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-01 09:00');
+SELECT maqueta_solicitud('80000011', 'Dra. Liz Montiel', 'A+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-02 09:00');
+SELECT maqueta_solicitud('80000012', 'Dra. Liz Montiel', 'B+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-03 09:00');
+SELECT maqueta_solicitud('80000013', 'Dra. Liz Montiel', 'O+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-04 09:00');
+SELECT maqueta_solicitud('80000014', 'Dra. Liz Montiel', 'A+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-05 09:00');
+SELECT maqueta_solicitud('80000015', 'Dra. Liz Montiel', 'B+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-06 09:00');
+SELECT maqueta_solicitud('80000016', 'Dra. Liz Montiel', 'O+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-07 09:00');
+SELECT maqueta_solicitud('80000017', 'Dra. Liz Montiel', 'A+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-08 09:00');
+SELECT maqueta_solicitud('80000018', 'Dra. Liz Montiel', 'B+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-09 09:00');
+SELECT maqueta_solicitud('80000019', 'Dra. Liz Montiel', 'O+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-10 09:00');
+SELECT maqueta_solicitud('80000020', 'Dra. Liz Montiel', 'A+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-11 09:00');
+SELECT maqueta_solicitud('80000021', 'Dra. Liz Montiel', 'B+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-12 09:00');
+SELECT maqueta_solicitud('80000022', 'Dra. Liz Montiel', 'O+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-13 09:00');
+SELECT maqueta_solicitud('80000023', 'Dra. Liz Montiel', 'A+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-14 09:00');
+SELECT maqueta_solicitud('80000024', 'Dra. Liz Montiel', 'B+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-15 09:00');
+SELECT maqueta_solicitud('80000025', 'Dra. Liz Montiel', 'O+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-16 09:00');
+SELECT maqueta_solicitud('80000026', 'Dra. Liz Montiel', 'A+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-17 09:00');
+SELECT maqueta_solicitud('80000027', 'Dra. Liz Montiel', 'B+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-18 09:00');
+SELECT maqueta_solicitud('80000028', 'Dra. Liz Montiel', 'O+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-19 09:00');
+SELECT maqueta_solicitud('80000029', 'Dra. Liz Montiel', 'A+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-20 09:00');
+SELECT maqueta_solicitud('80000030', 'Dra. Liz Montiel', 'B+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-21 09:00');
+SELECT maqueta_solicitud('80000031', 'Dra. Liz Montiel', 'O+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-22 09:00');
+SELECT maqueta_solicitud('80000032', 'Dra. Liz Montiel', 'A+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-23 09:00');
+SELECT maqueta_solicitud('80000033', 'Dra. Liz Montiel', 'B+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-24 09:00');
+SELECT maqueta_solicitud('80000034', 'Dra. Liz Montiel', 'O+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-25 09:00');
+SELECT maqueta_solicitud('80000035', 'Dra. Liz Montiel', 'A+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-26 09:00');
+SELECT maqueta_solicitud('80000036', 'Dra. Liz Montiel', 'B+', 1, 1, 'Cerrada', TIMESTAMP '2026-08-27 09:00');
 SELECT maqueta_solicitud('80000037', 'Dr. Carlos Mendoza', 'O+', 2, 0, 'Publicada', TIMESTAMP '2026-09-03 11:00');
 SELECT maqueta_solicitud('80000038', 'Dr. Carlos Mendoza', 'O+', 2, 0, 'Publicada', TIMESTAMP '2026-09-04 11:00');
 
@@ -1006,6 +1008,50 @@ SELECT don.id_usuario,
 
 
 
+-- ---------- Solicitud de prueba (una cuenta, una solicitud Creada) ----------
+INSERT INTO usuario (documento, nombre, apellido, fecha_nacimiento, genero,
+                     contrasena, consentimiento_privacidad, estado,
+                     cuenta_suprimida, fecha_alta)
+SELECT '81000001', 'Carmen', 'Ferreira', DATE '1987-06-14', 'Femenino',
+       '$2b$12$7Uiuz.EAbyZtiwAqGKssqOrUDX2ZDAzE2gZGv9HcmB2r0AepQ3f/m',
+       true, true, false, timestamp '2026-11-01 09:00'
+WHERE NOT EXISTS (SELECT 1 FROM usuario WHERE documento = '81000001');
+
+INSERT INTO correo (id_usuario, direccion, es_principal)
+SELECT u.id_usuario, 'solicitud.abierta@gmail.com', true
+  FROM usuario u
+ WHERE u.documento = '81000001'
+   AND NOT EXISTS (SELECT 1 FROM correo c WHERE c.direccion = 'solicitud.abierta@gmail.com');
+
+INSERT INTO usuario_rol (id_usuario, id_rol)
+SELECT u.id_usuario, r.id_rol
+  FROM usuario u, rol r
+ WHERE u.documento = '81000001' AND r.codigo = 'DONANTE'
+   AND NOT EXISTS (
+       SELECT 1 FROM usuario_rol ur
+        WHERE ur.id_usuario = u.id_usuario AND ur.id_rol = r.id_rol);
+
+INSERT INTO solicitud (id_solicitante, medico_tratante, id_tipo_sangre,
+                       unidades_requeridas, unidades_asignadas,
+                       consentimiento_publicacion, fecha_limite, estado, fecha_creacion)
+SELECT u.id_usuario, 'Dra. Liz Montiel', NULL, 2, 0, false,
+       DATE '2026-12-31', 'Creada', timestamp '2026-11-01 09:00'
+  FROM usuario u
+ WHERE u.documento = '81000001'
+   AND NOT EXISTS (
+       SELECT 1 FROM solicitud s
+        WHERE s.id_solicitante = u.id_usuario
+          AND s.fecha_creacion = timestamp '2026-11-01 09:00');
+
+INSERT INTO historial_solicitud (id_solicitud, estado_anterior, estado_nuevo, fecha_hora)
+SELECT s.id_solicitud, NULL, 'Creada', timestamp '2026-11-01 09:00'
+  FROM solicitud s
+  JOIN usuario u ON u.id_usuario = s.id_solicitante
+ WHERE u.documento = '81000001'
+   AND s.estado = 'Creada'
+   AND NOT EXISTS (
+       SELECT 1 FROM historial_solicitud h WHERE h.id_solicitud = s.id_solicitud);
+
 COMMIT;
 
 -- Controles (período 2026-09-01 a 2026-09-10)
@@ -1065,12 +1111,12 @@ SELECT
     WHERE e.fecha::date BETWEEN DATE '2026-09-01' AND DATE '2026-09-10'
       AND c.tipo_cita <> 'Extraccion de compatibilidad'
       AND r.resultado = 'No reactivo') AS no_reactivos_periodo,
-  (SELECT count(*) FROM unidad WHERE estado = 'En stock' AND componente = 'sangre_total') AS stock_total,
+  (SELECT count(*) FROM unidad WHERE estado = 'En stock') AS stock_total,
   (SELECT count(*) FROM unidad
     WHERE estado = 'En stock'
       AND fecha_vencimiento > DATE '2026-09-10'
       AND fecha_vencimiento <= DATE '2026-10-10') AS proximas_a_vencer,
-  (SELECT count(*) FROM solicitud WHERE estado = 'Completa') AS solicitudes_completas,
+  (SELECT count(*) FROM solicitud WHERE estado = 'Cerrada') AS solicitudes_cerradas,
   (SELECT count(*) FROM solicitud WHERE estado = 'Publicada') AS solicitudes_publicadas,
   (SELECT count(*) FROM cita WHERE estado = 'No apto') AS citas_no_apto,
   (SELECT count(*) FROM registro_diferimiento rd JOIN diferimiento d ON d.id_diferimiento = rd.id_diferimiento

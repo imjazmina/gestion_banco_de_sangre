@@ -120,7 +120,7 @@ def _motivos(filas=None):
 
 
 def _stock_por_grupo():
-    unidades = Unidad.query.filter_by(estado=Unidad.EN_STOCK, componente="sangre_total").all()
+    unidades = Unidad.query.filter_by(estado=Unidad.EN_STOCK).all()
     conteo = {}
     for unidad in unidades:
         etiqueta = unidad.id_tipo_sangre and _etiqueta(unidad) or "Sin tipificar"
@@ -370,7 +370,7 @@ def _solicitudes():
     """Solicitudes por estado. Es una foto del momento, no del período."""
     filas = dict(db.session.query(Solicitud.estado, func.count())
                  .group_by(Solicitud.estado).all())
-    return [{"label": "Atendidas", "n": filas.get(Solicitud.COMPLETA, 0), "color": "#120C61"},
+    return [{"label": "Atendidas", "n": filas.get(Solicitud.CERRADA, 0), "color": "#120C61"},
             {"label": "Pendientes", "n": filas.get(Solicitud.PUBLICADA, 0), "color": "#2563EB"}]
 
 
@@ -395,7 +395,6 @@ def _por_vencer_tablero(hasta):
     limite = hasta + timedelta(days=_SIM["stock"]["umbral_dias"])
     return (Unidad.query
             .filter(Unidad.estado == Unidad.EN_STOCK,
-                    Unidad.componente == "sangre_total",
                     Unidad.fecha_vencimiento > hasta,
                     Unidad.fecha_vencimiento <= limite)
             .count())

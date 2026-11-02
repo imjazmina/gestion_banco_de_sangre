@@ -81,8 +81,13 @@ class Usuario(db.Model):
         from app.models.catalogos import TipoSangre
         from app.models.donacion import ResultadoLaboratorio, Unidad
 
-        return (
-            TipoSangre.query
+        from app.models.donacion import (
+            Cita, Extraccion, MuestraCompatibilidad, ResultadoCompatibilidad,
+        )
+
+        de_unidad = (
+            db.session.query(TipoSangre, ResultadoLaboratorio.fecha,
+                             ResultadoLaboratorio.id_resultado)
             .join(ResultadoLaboratorio,
                   ResultadoLaboratorio.id_tipo_sangre == TipoSangre.id_tipo_sangre)
             .join(Unidad, Unidad.id_unidad == ResultadoLaboratorio.id_unidad)
@@ -91,6 +96,26 @@ class Usuario(db.Model):
                       ResultadoLaboratorio.id_resultado.asc())
             .first()
         )
+        de_muestra = (
+            db.session.query(TipoSangre, ResultadoCompatibilidad.fecha,
+                             ResultadoCompatibilidad.id_resultado_compatibilidad)
+            .join(ResultadoCompatibilidad,
+                  ResultadoCompatibilidad.id_tipo_sangre == TipoSangre.id_tipo_sangre)
+            .join(MuestraCompatibilidad,
+                  MuestraCompatibilidad.id_muestra == ResultadoCompatibilidad.id_muestra)
+            .join(Extraccion,
+                  Extraccion.id_extraccion == MuestraCompatibilidad.id_extraccion)
+            .join(Cita, Cita.id_cita == Extraccion.id_cita)
+            .filter(Cita.id_usuario == id_usuario)
+            .order_by(ResultadoCompatibilidad.fecha.asc(),
+                      ResultadoCompatibilidad.id_resultado_compatibilidad.asc())
+            .first()
+        )
+        candidatos = [fila for fila in (de_unidad, de_muestra) if fila is not None]
+        if not candidatos:
+            return None
+        candidatos.sort(key=lambda fila: (fila[1], fila[2]))
+        return candidatos[0][0]
 
     @property
     def tipo_sangre(self):

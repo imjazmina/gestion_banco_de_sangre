@@ -17,22 +17,24 @@ class Solicitud(db.Model):
         db.Integer, db.ForeignKey("usuario.id_usuario"), nullable=False)
     medico_tratante = db.Column(db.String(120))
     id_tipo_sangre = db.Column(
-        db.Integer, db.ForeignKey("tipo_sangre.id_tipo_sangre"), nullable=False)
+        db.Integer, db.ForeignKey("tipo_sangre.id_tipo_sangre"))
     unidades_requeridas = db.Column(db.Integer, nullable=False)
     unidades_asignadas = db.Column(db.Integer, nullable=False, default=0)
     # Sin consentimiento no se publica: lo exige ck_solicitud_publicacion.
     consentimiento_publicacion = db.Column(db.Boolean, nullable=False, default=False)
     fecha_limite = db.Column(db.Date)
-    estado = db.Column(db.String(20), nullable=False, default="Publicada")
+    estado = db.Column(db.String(20), nullable=False, default="Creada")
     fecha_creacion = db.Column(db.DateTime, nullable=False, default=datetime.now)
 
     solicitante = db.relationship("Usuario", lazy="joined")
     tipo_sangre = db.relationship("TipoSangre", lazy="joined")
 
+    CREADA = "Creada"
     PUBLICADA = "Publicada"
-    COMPLETA = "Completa"
+    CERRADA = "Cerrada"
     VENCIDA = "Vencida"
     REVOCADA = "Revocada"
+    ABIERTAS = (CREADA, PUBLICADA)
 
 
 class HistorialSolicitud(db.Model):
@@ -59,7 +61,7 @@ class Cita(db.Model):
     __tablename__ = "cita"
 
     id_cita = db.Column(db.Integer, primary_key=True)
-    tipo_cita = db.Column(db.String(30), nullable=False)
+    tipo_cita = db.Column(db.String(50), nullable=False)
     id_usuario = db.Column(
         db.Integer, db.ForeignKey("usuario.id_usuario"), nullable=False)
     id_solicitud = db.Column(
@@ -116,6 +118,7 @@ class Cita(db.Model):
     REPOSICION = "Reposicion"
     SOLIDARIA = "Donacion solidaria"
     COMPATIBILIDAD = "Extraccion de compatibilidad"
+    MUESTRA = "Extraccion de muestra para compatibilidad"
 
     PENDIENTE = "Pendiente"
     CONFIRMADA = "Confirmada"
@@ -219,6 +222,9 @@ class RegistroDiferimiento(db.Model):
     fecha_fin = db.Column(db.Date)
     id_resultado = db.Column(
         db.Integer, db.ForeignKey("resultado_laboratorio.id_resultado"))
+    id_resultado_compatibilidad = db.Column(
+        db.Integer,
+        db.ForeignKey("resultado_compatibilidad.id_resultado_compatibilidad"))
 
     causa = db.relationship("Diferimiento", lazy="joined")
 
@@ -241,6 +247,45 @@ class Extraccion(db.Model):
     observacion = db.Column(db.Text, nullable=False)
 
 
+class MuestraCompatibilidad(db.Model):
+    """Muestra venosa para compatibilidad. No entra al inventario."""
+    __tablename__ = "muestra_compatibilidad"
+
+    id_muestra = db.Column(db.Integer, primary_key=True)
+    id_extraccion = db.Column(
+        db.Integer, db.ForeignKey("extraccion.id_extraccion"),
+        nullable=False, unique=True)
+    id_solicitud = db.Column(
+        db.Integer, db.ForeignKey("solicitud.id_solicitud"), nullable=False)
+    codigo = db.Column(db.String(40), nullable=False, unique=True)
+    fecha = db.Column(db.DateTime, nullable=False, default=datetime.now)
+
+    solicitud = db.relationship("Solicitud")
+    extraccion = db.relationship("Extraccion")
+
+
+class ResultadoCompatibilidad(db.Model):
+    """Tipificación y PAI de una muestra. No descarta unidades."""
+    __tablename__ = "resultado_compatibilidad"
+
+    id_resultado_compatibilidad = db.Column(db.Integer, primary_key=True)
+    id_muestra = db.Column(
+        db.Integer, db.ForeignKey("muestra_compatibilidad.id_muestra"),
+        nullable=False, unique=True)
+    id_tipo_sangre = db.Column(
+        db.Integer, db.ForeignKey("tipo_sangre.id_tipo_sangre"), nullable=False)
+    id_diferimiento = db.Column(
+        db.Integer, db.ForeignKey("diferimiento.id_diferimiento"), nullable=False)
+    fecha = db.Column(db.DateTime, nullable=False, default=datetime.now)
+
+    tipo_sangre = db.relationship("TipoSangre", lazy="joined")
+    pai = db.relationship("Diferimiento", lazy="joined")
+    muestra = db.relationship("MuestraCompatibilidad")
+
+    PAI_POSITIVO = "PAI positivo"
+    PAI_NEGATIVO = "PAI negativo"
+
+
 class Unidad(db.Model):
     """Bolsa de sangre obtenida de una extracción."""
     __tablename__ = "unidad"
@@ -255,7 +300,6 @@ class Unidad(db.Model):
     codigo = db.Column(db.String(40), nullable=False, unique=True)
     id_tipo_sangre = db.Column(
         db.Integer, db.ForeignKey("tipo_sangre.id_tipo_sangre"))
-    componente = db.Column(db.String(20), nullable=False, default="sangre_total")
     estado = db.Column(db.String(20), nullable=False, default="Registrada")
     fecha_vencimiento = db.Column(db.Date)
 
@@ -328,7 +372,11 @@ class CitacionConsejeria(db.Model):
         db.Integer, db.ForeignKey("horario_disponible.id_horario"), nullable=False)
     id_resultado = db.Column(
         db.Integer, db.ForeignKey("resultado_laboratorio.id_resultado"),
-        nullable=False, unique=True)
+        unique=True)
+    id_resultado_compatibilidad = db.Column(
+        db.Integer,
+        db.ForeignKey("resultado_compatibilidad.id_resultado_compatibilidad"),
+        unique=True)
     horario = db.relationship("HorarioDisponible", lazy="joined")
     fecha_hora = db.Column(db.DateTime)
     estado = db.Column(db.String(20), nullable=False, default="Pendiente")
