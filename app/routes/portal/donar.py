@@ -11,6 +11,7 @@ from flask import (Blueprint, render_template, request, redirect,
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.controllers.portal import agenda, solicitudes as ctrl_solicitudes
+from app.controllers.portal.programacion import programador
 from app.controllers.sesion import requiere_login, usuario_actual
 from app.models import db
 
@@ -126,6 +127,11 @@ def confirmar():
         flash(agenda.mensaje_de_error(e), "error")
         return redirect(url_for("donar.agendar", fecha=fecha.isoformat(),
                                 horario=id_horario, tipo=tipo))
+
+    resultado = programador.agendar(cita, request.url_root.rstrip("/"))
+    if resultado == "fallo":
+        flash("La cita quedó registrada, pero no pudimos enviar el correo "
+              "del cuestionario. Podés responderlo desde Mi cita.", "info")
 
     return redirect(url_for("donar.confirmada", id_cita=cita.id_cita))
 

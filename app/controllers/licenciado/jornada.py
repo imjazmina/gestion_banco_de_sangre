@@ -166,7 +166,6 @@ def guardar_parte_b(cita, personal, formulario):
     from app.controllers.portal.cuestionario import _valor
 
     ahora = datetime.now()
-    estado_anterior = cita.estado
     existentes = respuestas_de(cita)
     nuevas = []
     modificadas = []
@@ -199,7 +198,6 @@ def guardar_parte_b(cita, personal, formulario):
             fila_resp.id_personal = personal.id_usuario
             fila_resp.fecha = ahora
             modificadas.append(fila_resp)
-    cita.estado = Cita.CONFIRMADA
     cita.id_personal = personal.id_usuario
     db.session.flush()
     for fila in nuevas:
@@ -208,9 +206,6 @@ def guardar_parte_b(cita, personal, formulario):
     for fila in modificadas:
         Auditoria.registrar(personal.id_usuario, "CUESTIONARIO",
                             fila.id_cuestionario, Auditoria.MODIFICACION)
-    if estado_anterior != Cita.CONFIRMADA:
-        Auditoria.registrar(personal.id_usuario, "CITA", cita.id_cita,
-                            Auditoria.CAMBIO_ESTADO)
     _commit()
 
 

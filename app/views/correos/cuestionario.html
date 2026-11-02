@@ -1,12 +1,12 @@
 {% import "correos/_base.html" as correo %}
-{% call correo.marco(titulo='Tu donación es hoy a las ' ~ hora) %}
+{% call correo.marco(titulo='Completá el cuestionario de tu cita') %}
   <p style="margin:0 0 14px; font-size:15px; line-height:1.55;">
-    Hola {{ nombre }}. Te esperamos hoy a las <b>{{ hora }}</b> en el Banco de
-    sangre del Hospital Regional de Luque.
+    Hola {{ nombre }}. Agendaste una donación para el <b>{{ fecha }}</b> a las
+    <b>{{ hora }}</b> en el Banco de sangre del Hospital Regional de Luque.
   </p>
 
   <p style="margin:0 0 6px; font-size:15px; line-height:1.55;">
-    Antes de venir, respondé el cuestionario de salud. Son 36 preguntas
+    Respondé el cuestionario de salud para confirmar la cita. Son 36 preguntas
     cortas y te lleva unos minutos desde el celular.
   </p>
 

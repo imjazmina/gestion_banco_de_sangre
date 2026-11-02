@@ -306,7 +306,12 @@ def reprogramar(cita, fecha, id_horario):
 
     `fecha_hora_creacion` se actualiza porque es lo que ancla el cálculo del
     día: es la fecha de alta de esta reserva, no de la primera que hubo.
+    Con el cuestionario ya enviado la cita quedó confirmada y no se mueve.
     """
+    from app.controllers.portal.cuestionario import completo
+    if completo(cita):
+        raise ErrorAgenda(
+            "No podés reprogramar porque el cuestionario ya fue enviado.")
     try:
         franja = _bloquear_franja(id_horario, fecha)
         cita.id_horario = id_horario

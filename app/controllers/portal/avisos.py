@@ -41,24 +41,15 @@ def pendientes_de_cuestionario(ahora=None):
     ahora = ahora or datetime.now()
     limite = ahora + timedelta(hours=HORAS_ANTES)
 
-    # RECORDATORIO_CITA es el tipo que el esquema ya tiene para esto. Se usa
-    # solo para este aviso, así que su presencia sobre una cita significa
-    # "ya se le mandó el cuestionario" y evita mandarlo dos veces.
-    ya_avisadas = {
-        n.id_cita for n in Notificacion.query
-        .filter(Notificacion.tipo == Notificacion.RECORDATORIO_CITA,
-                Notificacion.id_cita.isnot(None),
-                Notificacion.mensaje.ilike("%cuestionario%")).all()
-    }
-
     # La consulta filtra solo por estado: el día de la cita se calcula a
     # partir de la franja, así que no se puede acotar por fecha en SQL. Las
     # citas activas son pocas —como mucho una por donante— así que se
-    # traen y se filtran acá.
+    # traen y se filtran acá. ya_enviado mira el turno concreto, así una
+    # reprogramación puede volver a avisar y un reintento del mismo turno no.
     candidatas = Cita.query.filter(Cita.estado.in_(Cita.ACTIVAS)).all()
 
     pendientes = [c for c in candidatas
-                  if c.id_cita not in ya_avisadas
+                  if not ya_enviado(c)
                   and c.momento is not None
                   and ahora <= c.momento <= limite]
     return sorted(pendientes, key=lambda c: c.momento)
@@ -72,29 +63,56 @@ def proximas_citas(limite=10, ahora=None):
     return sorted(proximas, key=lambda c: c.momento)[:limite]
 
 
+def marca_turno(cita):
+    """Fecha y hora que identifican el turno avisado, dentro del mensaje."""
+    return (f"del {cita.fecha_cita.strftime('%d/%m/%Y')} a las "
+            f"{cita.horario.hora_inicio.strftime('%H:%M')}")
+
+
+def ya_enviado(cita):
+    """True si este turno ya tiene el correo del cuestionario registrado."""
+    if cita is None or cita.fecha_cita is None or cita.horario is None:
+        return False
+    marca = marca_turno(cita)
+    return (Notificacion.query
+            .filter(Notificacion.id_cita == cita.id_cita,
+                    Notificacion.tipo == Notificacion.RECORDATORIO_CITA,
+                    Notificacion.mensaje.ilike(f"%cuestionario%{marca}%"))
+            .first() is not None)
+
+
 def enviar_cuestionario(cita, url_base):
     """
     Manda el correo del cuestionario de una cita y deja el registro.
 
     Devuelve (enviado, detalle). La notificación se guarda aunque el correo
     haya ido a la consola: lo que registra es que el aviso ya se generó para
-    esa cita, y así no se repite en la próxima corrida.
+    ese turno, y así no se repite. Una cita cancelada no genera registro.
     """
+    if cita.estado not in Cita.ACTIVAS:
+        return False, "la cita está cancelada"
+    if ctrl_cuestionario.completo(cita):
+        return False, "el cuestionario ya está completo"
+    if ya_enviado(cita):
+        return True, "ya enviado"
+
     destino = cita.donante.correo_principal
     if destino is None:
         return False, "el donante no tiene correo principal cargado"
 
     enlace = f"{url_base}/cuestionario/{cita.id_cita}"
     hora = cita.horario.hora_inicio.strftime("%H:%M")
+    fecha = cita.fecha_cita.strftime("%d/%m/%Y")
     cuerpo = render_template(
         "correos/cuestionario.html",
-        nombre=cita.donante.nombre, hora=hora, enlace=enlace,
+        nombre=cita.donante.nombre, hora=hora, fecha=fecha, enlace=enlace,
         enlace_cita=f"{url_base}/mi-cita/")
 
     try:
-        salio = correo.enviar(destino.direccion,
-                              f"Tu donación es hoy a las {hora}: completá el cuestionario",
-                              cuerpo)
+        salio = correo.enviar(
+            destino.direccion,
+            f"Completá el cuestionario para tu cita del {fecha} a las {hora}",
+            cuerpo)
     except correo.ErrorCorreo as e:
         return False, str(e)
 
@@ -103,7 +121,7 @@ def enviar_cuestionario(cita, url_base):
         id_cita=cita.id_cita,
         tipo=Notificacion.RECORDATORIO_CITA,
         mensaje=(f"Te enviamos a tu correo el cuestionario previo para tu cita "
-                 f"de hoy a las {hora}. Respondelo antes de venir."),
+                 f"{marca_turno(cita)}. Respondelo antes de venir."),
         fecha_envio=datetime.now()))
     db.session.commit()
 

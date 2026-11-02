@@ -46,8 +46,25 @@ def create_app(config_class=Config, inicializar=True):
             if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
                 from app.controllers.comun.simulacion import reponer_laboratorio
                 reponer_laboratorio()
+                _arrancar_programador(app)
 
     return app
+
+
+def _arrancar_programador(app):
+    """Arma los envíos del cuestionario solo en el proceso que atiende.
+
+    El recargador de depuración arranca dos procesos. El padre no atiende
+    pedidos: si el temporizador quedara ahí, desaparece al recargar.
+    """
+    if os.environ.get("FLASK_RUN_FROM_CLI") != "true":
+        return
+    if app.debug and os.environ.get("WERKZEUG_RUN_MAIN") != "true":
+        return
+    from app.controllers.portal.programacion import programador
+    programador.enganchar(app)
+    with app.app_context():
+        programador.rearmar()
 
 
 def _validar_configuracion(app):

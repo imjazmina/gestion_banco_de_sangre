@@ -318,25 +318,20 @@ def habilitado(cita):
     """
     ¿Se puede responder el cuestionario de esta cita ahora?
 
-    Solo el mismo día. El cuestionario pregunta por el estado de salud de
-    hoy —si durmió bien, si tomó alcohol, si está con fiebre—, así que una
-    respuesta de hace tres días no dice nada sobre el donante que se
-    presenta. Por eso se habilita recién el día de la cita, que es cuando el
-    correo con el enlace también llega.
+    Desde que se agenda hasta el día de la cita, inclusive. El correo con
+    el enlace sale al reservar, y la cita pasa a Confirmada al enviarlo.
     """
     if cita is None or cita.estado not in Cita.ACTIVAS:
         return False
-    return cita.fecha_cita == date.today()
+    if cita.fecha_cita is None:
+        return False
+    return cita.fecha_cita >= date.today()
 
 
 def motivo_no_habilitado(cita):
     """Qué decirle a la persona cuando todavía no puede responderlo."""
     if cita is None or cita.estado not in Cita.ACTIVAS:
         return "No encontramos esa cita entre las tuyas."
-    if cita.fecha_cita > date.today():
-        return (f"El cuestionario se habilita el día de tu cita, el "
-                f"{cita.fecha_cita.strftime('%d/%m/%Y')}. Te va a llegar el "
-                f"enlace por correo unas horas antes.")
     return ("El día de esa cita ya pasó y el cuestionario quedó cerrado. "
             "Si necesitás ayuda, comunicate con el banco de sangre.")
 
