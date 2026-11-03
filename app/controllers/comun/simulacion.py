@@ -398,7 +398,7 @@ def solicitudes_publicadas():
 
 
 def candidatos_de(solicitud):
-    """Donantes cuyo grupo puede notificar a ese receptor. Sin aviso nuevo."""
+    """Donantes cuyo grupo ABO/Rh puede servir a ese receptor. Es preselección."""
     ids = [fila.id_tipo_donante for fila in CompatibilidadAboRh.query.filter_by(
         id_tipo_receptor=solicitud.id_tipo_sangre).all()]
     if not ids:
@@ -421,6 +421,26 @@ def candidatos_de(solicitud):
                     Usuario.id_usuario != solicitud.id_solicitante)
             .order_by(Usuario.apellido)
             .all())
+
+
+def _avisar_compatibles(solicitud):
+    """Aviso de preselección. No afirma compatibilidad definitiva ni nombra al paciente."""
+    if solicitud.id_tipo_sangre is None:
+        return
+    texto = (
+        "Hay una solicitud de donación que podría coincidir con tu grupo. "
+        "Es una preselección por ABO y Rh: la compatibilidad definitiva "
+        "la confirma el personal de salud."
+    )
+    ahora = datetime.now()
+    for donante in candidatos_de(solicitud):
+        db.session.add(Notificacion(
+            id_usuario=donante.id_usuario,
+            id_solicitud=solicitud.id_solicitud,
+            tipo=Notificacion.PRESELECCION_COMPATIBLE,
+            mensaje=texto,
+            fecha_envio=ahora,
+        ))
 
 
 def _solicitante_de_servicio():
@@ -571,6 +591,8 @@ def simular_compatibilidad(id_muestra):
     if (solicitud.consentimiento_publicacion
             and solicitud.estado == Solicitud.CREADA):
         _cambiar_estado(solicitud, Solicitud.PUBLICADA, personal)
+    if solicitud.estado == Solicitud.PUBLICADA:
+        _avisar_compatibles(solicitud)
 
     if positivo:
         registro = RegistroDiferimiento(

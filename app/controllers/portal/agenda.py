@@ -45,7 +45,7 @@ TIPOS_VALIDOS = {clave for clave, _, _, _ in TIPOS}
 NECESITA_SOLICITUD = {clave for clave, _, _, necesita in TIPOS if necesita}
 ETIQUETA = {clave: etiqueta for clave, etiqueta, _, _ in TIPOS}
 TIPO_MUESTRA = Cita.MUESTRA
-ETIQUETA[TIPO_MUESTRA] = "Extracción de muestra"
+ETIQUETA[TIPO_MUESTRA] = "Extracción de muestra para compatibilidad"
 
 DOW_CORTO = ["lun", "mar", "mié", "jue", "vie", "sáb", "dom"]
 

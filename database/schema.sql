@@ -148,7 +148,6 @@ CREATE TABLE cita (
         'Donacion altruista',
         'Reposicion',
         'Donacion solidaria',
-        'Extraccion de compatibilidad',
         'Extraccion de muestra para compatibilidad'
     )),
     CONSTRAINT ck_cita_estado CHECK (estado IN (
@@ -480,7 +479,8 @@ CREATE TABLE notificacion (
         'ASIGNACION_SOLICITANTE',
         'META_COMPLETA',
         'CITACION_GENERICA',
-        'SOLICITUD_ABIERTA'
+        'SOLICITUD_ABIERTA',
+        'PRESELECCION_COMPATIBLE'
     ))
 );
 

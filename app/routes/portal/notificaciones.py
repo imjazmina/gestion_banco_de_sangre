@@ -24,6 +24,7 @@ ESTILOS = {
     "META_COMPLETA":          ("activity",  "#E6F4F3", "#0F766E"),
     "CITACION_GENERICA":      ("megaphone", "#F3F4F6", "#6B7280"),
     "SOLICITUD_ABIERTA":      ("info",      "#FEF3E2", "#D97706"),
+    "PRESELECCION_COMPATIBLE": ("users",   "#EAF1FE", "#2563EB"),
 }
 
 TITULOS = {
@@ -36,6 +37,7 @@ TITULOS = {
     "META_COMPLETA":          "Solicitud completa",
     "CITACION_GENERICA":      "Mensaje del banco de sangre",
     "SOLICITUD_ABIERTA":      "Solicitud abierta",
+    "PRESELECCION_COMPATIBLE": "Podrías ser compatible",
 }
 
 

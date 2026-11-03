@@ -1,4 +1,4 @@
-"""Preselección ABO/Rh. Lista candidatos. No envía un aviso nuevo."""
+"""Preselección ABO/Rh. Lista candidatos. El aviso sale con el resultado de laboratorio."""
 from flask import Blueprint
 
 from app.controllers.comun.acceso import pintar, requiere

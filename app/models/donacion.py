@@ -117,7 +117,7 @@ class Cita(db.Model):
     ALTRUISTA = "Donacion altruista"
     REPOSICION = "Reposicion"
     SOLIDARIA = "Donacion solidaria"
-    COMPATIBILIDAD = "Extraccion de compatibilidad"
+    COMPATIBILIDAD = "Extraccion de muestra para compatibilidad"
     MUESTRA = "Extraccion de muestra para compatibilidad"
 
     PENDIENTE = "Pendiente"
