@@ -144,17 +144,21 @@
         {% if tab == 'donaciones' %}
         <div class="inf-grid donaciones">
           <div class="card kpi span-2">
+            <b style="color:#120C61">{{ datos.registrados_n }}</b>
+            <span>Donantes registrados</span>
+          </div>
+          <div class="card kpi span-2">
             <b style="color:#0F766E">{{ datos.donaciones_n }}</b>
             <span>Donaciones</span>
           </div>
           {% call caja('Colectas por tipo de donación', 'span-4') %}
             {{ dona(datos.colectas_grad, datos.colectas) }}
           {% endcall %}
-          {% call caja('Donantes por género', 'span-6') %}
+          {% call caja('Donantes por género', 'span-4') %}
             {{ reparto(datos.generos) }}
           {% endcall %}
-          {% call caja('Evolución de colectas por período', 'span-7') %}
-            {{ linea(datos.linea) }}
+          {% call caja('Donaciones por grupo sanguíneo', 'span-7') %}
+            {{ barras(datos.grupos_donacion, '#120C61') }}
           {% endcall %}
           {% call caja('Donantes por rango de edad', 'span-5') %}
             {{ columnas(datos.edades) }}
@@ -179,7 +183,7 @@
           <div class="card kpi span-3"><b style="color:#120C61">{{ datos.procesados }}</b><span>Volúmenes procesados</span></div>
           <div class="card kpi span-3"><b style="color:#B91C1C">{{ datos.reactivos }}</b><span>Reactivos</span></div>
           <div class="card kpi span-3"><b style="color:#059669">{{ datos.no_reactivos }}</b><span>No reactivos</span></div>
-          <div class="card kpi span-3"><b style="color:#D97706">{{ datos.en_laboratorio }}</b><span>En laboratorio</span></div>
+          <div class="card kpi span-3"><b style="color:#D97706">{{ datos.pai }}</b><span>PAI positivo</span></div>
           {% call caja('Detalle de resultados serológicos', 'span-12') %}
             {{ barras(datos.serologia, '#D97706', true) }}
           {% endcall %}
@@ -216,6 +220,24 @@
           {% endcall %}
           {% call caja('Evolución del volumen', 'stock-evo') %}
             {{ columnas(datos.volumen_mes) }}
+          {% endcall %}
+          {% call caja('Unidades próximas a vencer', 'span-12') %}
+            {% if datos.proximas %}
+            <table class="inf-tabla">
+              <thead><tr><th>Unidad</th><th>Grupo</th><th>Vencimiento</th></tr></thead>
+              <tbody>
+                {% for u in datos.proximas %}
+                <tr>
+                  <td>{{ u.codigo }}</td>
+                  <td>{{ u.grupo }}</td>
+                  <td>{{ u.vence.strftime('%d/%m/%Y') }}</td>
+                </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+            {% else %}
+            <p class="muted">No hay unidades próximas a vencer en este período.</p>
+            {% endif %}
           {% endcall %}
         </div>
         {% endif %}

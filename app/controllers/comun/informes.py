@@ -1,41 +1,33 @@
 """
 Informes de donaciones, diferimientos, serología y stock (RF20, RF21).
 
-Casi todas las cifras salen de consultas a la base y responden al período
-que se elija en pantalla. Lo que no se puede derivar sigue viniendo de
-database/informes_simulados.json, porque el esquema no lo modela:
+Todas las cifras salen de la base y responden al período elegido.
+Una extracción de compatibilidad o de muestra no es una donación:
+no produce una unidad para el banco y queda fuera de esos conteos.
 
-  - el detalle de marcadores serológicos: no hay columna de marcador, y
-    resultado_laboratorio solo guarda Reactivo / No reactivo;
-  - el estado «En laboratorio», por el mismo CHECK;
-  - la hemovigilancia completa: no existe una tabla de eventos adversos
-    con momento y severidad;
-  - los hemocomponentes separados: unidad tiene CHECK componente =
-    'sangre_total', así que solo hay bolsas enteras;
-  - la evolución mensual del volumen de stock: haría falta reconstruir el
-    saldo histórico con transicion_estado.
-
-Una convención que vale para todo el módulo: una extracción de
-compatibilidad NO es una donación. Se hace para pruebas cruzadas y no
-produce una unidad para el banco, así que queda fuera de los conteos.
+El stock disponible es el estado En stock de una unidad ya extraída.
+Reactiva, descartada, vencida o todavía sin extraer no entra.
+La vida útil que usa «próximos a vencer» es la misma de la extracción:
+30 días, cargados en unidad.fecha_vencimiento.
 """
 import csv as _csv
 import io
-import json
 from datetime import date, datetime, timedelta
-from pathlib import Path
 
 from sqlalchemy import func
 
 from app.models import (
-    Cita, Diferimiento, Extraccion, RegistroDiferimiento, ResultadoLaboratorio,
-    Solicitud, TipoSangre, Unidad, Usuario, db,
+    Cita, Diferimiento, Extraccion, RegistroDiferimiento, ResultadoCompatibilidad,
+    ResultadoLaboratorio,
+    Rol, Solicitud, TipoSangre, TransicionEstado, Unidad, Usuario, UsuarioRol, db,
 )
 
-_SIM_PATH = Path(__file__).resolve().parents[3] / "database" / "informes_simulados.json"
-_SIM = json.loads(_SIM_PATH.read_text(encoding="utf-8"))
-
-SERIE_PRUEBA = _SIM["donaciones"]["colectas_mensuales_2026"]
+# La extracción deja el vencimiento a 30 días. El listado usa el mismo plazo.
+UMBRAL_DIAS = 30
+_NO_DONACION = (Cita.COMPATIBILIDAD, Cita.MUESTRA)
+_CLAVES_OBS = ("Momento", "Tipo", "Reacción", "Severidad")
+_COLOR_MOMENTO = {"Durante": "#D97706", "Posterior": "#2563EB"}
+_COLOR_SEVERIDAD = {"Leve": "#059669", "Moderado": "#D97706", "Grave": "#B91C1C"}
 
 
 def _periodo(desde, hasta):
@@ -98,9 +90,9 @@ def armar(desde=None, hasta=None):
         "lipotimias": lipotimias,
         "motivos": _motivos(difs),
         "stock": _stock_por_grupo(),
-        "serie": SERIE_PRUEBA,
-        "nota_serie": ("La serie mensual es simulación con datos de prueba. "
-                       "No representa la producción del hospital."),
+        "serie": [{"mes": f["label"], "v": f["n"]}
+                  for f in _colectas_del_año(hasta.year)],
+        "nota_serie": "La serie mensual sale de las extracciones registradas.",
         "nota_stock": ("El stock por grupo cuenta unidades en estado En stock "
                        "de sangre total ya registradas en este prototipo. "
                        "No es el inventario operativo del hospital."),
@@ -120,7 +112,13 @@ def _motivos(filas=None):
 
 
 def _stock_por_grupo():
-    unidades = Unidad.query.filter_by(estado=Unidad.EN_STOCK).all()
+    """Unidades ya extraídas que siguen en stock. El resto no está disponible."""
+    hoy = date.today()
+    unidades = (Unidad.query
+                .join(Extraccion, Extraccion.id_extraccion == Unidad.id_extraccion)
+                .filter(Unidad.estado == Unidad.EN_STOCK,
+                        func.date(Extraccion.fecha) <= hoy)
+                .all())
     conteo = {}
     for unidad in unidades:
         etiqueta = unidad.id_tipo_sangre and _etiqueta(unidad) or "Sin tipificar"
@@ -134,21 +132,16 @@ def _etiqueta(unidad):
     return tipo.etiqueta if tipo else "Sin tipificar"
 
 
-PERIODO_MUESTRA = (
-    date.fromisoformat(_SIM["periodo"]["desde"]),
-    date.fromisoformat(_SIM["periodo"]["hasta"]),
-)
+def _periodo_default():
+    """El año en curso, hasta hoy: es el recorte con el que abre el informe."""
+    hoy = date.today()
+    return date(hoy.year, 1, 1), hoy
+
+
 _MESES = (
     "enero", "febrero", "marzo", "abril", "mayo", "junio",
     "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
 )
-
-# Series que el esquema no modela. Ver el encabezado del módulo.
-SEROLOGIA = _SIM["serologia"]["marcadores"]
-EVENTOS_TIPO = _SIM["hemovigilancia"]["por_tipo"]
-EVENTOS_MOMENTO = _SIM["hemovigilancia"]["por_momento"]
-EVENTOS_SEVERIDAD = _SIM["hemovigilancia"]["por_severidad"]
-VOLUMEN = _SIM["stock"]["evolucion_volumen"]
 
 # Colores y orden de presentación. No son datos: definen cómo se dibuja
 # cada serie, y por eso viven acá y no en la base.
@@ -186,7 +179,7 @@ def _donaciones(desde, hasta):
             .join(Usuario, Usuario.id_usuario == Cita.id_usuario)
             .filter(func.date(Extraccion.fecha) >= desde,
                     func.date(Extraccion.fecha) <= hasta,
-                    Cita.tipo_cita != Cita.COMPATIBILIDAD)
+                    ~Cita.tipo_cita.in_(_NO_DONACION))
             .all())
 
 
@@ -243,53 +236,47 @@ def _colectas_del_año(año):
                 func.count().label("n"))
              .join(Cita, Cita.id_cita == Extraccion.id_cita)
              .filter(func.extract("year", Extraccion.fecha) == año,
-                     Cita.tipo_cita != Cita.COMPATIBILIDAD)
+                     ~Cita.tipo_cita.in_(_NO_DONACION))
              .group_by("mes").all())
     conteo = {int(f.mes): f.n for f in filas}
     return [{"label": MESES_CORTOS[m - 1], "n": conteo.get(m, 0)}
             for m in range(1, 13)]
 
 
-# A partir de acá el gráfico pasa de días a meses. Con más de seis semanas
-# una barra por día deja etiquetas ilegibles.
-DIAS_PARA_AGRUPAR_POR_MES = 45
-
-
-def _serie_del_periodo(filas, desde, hasta):
+def _por_grupo_donacion(filas):
     """
-    La evolución de las colectas dentro del período elegido.
+    Donaciones del período por ABO/Rh.
 
-    Se arma sobre el período y no sobre el año entero: si no, al consultar
-    diez días el gráfico muestra doce meses donde once están vacíos, y
-    parece que la actividad se desplomó. Los días sin donaciones sí se
-    incluyen, porque un hueco en la serie es información.
+    Cuenta la extracción, no la bolsa. El estado actual de la unidad no
+    entra: descartada, asignada o vencida sigue siendo una donación de
+    ese grupo.
     """
-    dias = (hasta - desde).days + 1
-    if dias <= DIAS_PARA_AGRUPAR_POR_MES:
-        conteo = {}
-        for extraccion, _c, _u in filas:
-            conteo[extraccion.fecha.date()] = conteo.get(extraccion.fecha.date(), 0) + 1
-        serie = []
-        for i in range(dias):
-            dia = desde + timedelta(days=i)
-            serie.append({"label": f"{dia.day}/{dia.month}", "n": conteo.get(dia, 0)})
-        return serie, "Día"
-
-    conteo = {}
+    ids = [extraccion.id_extraccion for extraccion, _c, _u in filas]
+    grupo_de = {}
+    if ids:
+        unidades = (db.session.query(Unidad.id_extraccion, TipoSangre)
+                    .outerjoin(TipoSangre,
+                               TipoSangre.id_tipo_sangre == Unidad.id_tipo_sangre)
+                    .filter(Unidad.id_extraccion.in_(ids))
+                    .order_by(Unidad.id_unidad)
+                    .all())
+        for id_extraccion, tipo in unidades:
+            if id_extraccion in grupo_de or tipo is None:
+                continue
+            grupo_de[id_extraccion] = tipo.etiqueta.replace("−", "-")
+    conteo = {grupo: 0 for grupo in ORDEN_GRUPOS}
+    sin_tipificar = 0
     for extraccion, _c, _u in filas:
-        clave = (extraccion.fecha.year, extraccion.fecha.month)
-        conteo[clave] = conteo.get(clave, 0) + 1
-    serie = []
-    año, mes = desde.year, desde.month
-    while (año, mes) <= (hasta.year, hasta.month):
-        etiqueta = MESES_CORTOS[mes - 1]
-        if hasta.year != desde.year:
-            etiqueta = f"{etiqueta} {str(año)[2:]}"
-        serie.append({"label": etiqueta, "n": conteo.get((año, mes), 0)})
-        mes += 1
-        if mes == 13:
-            mes, año = 1, año + 1
-    return serie, "Mes"
+        grupo = grupo_de.get(extraccion.id_extraccion)
+        if grupo in conteo:
+            conteo[grupo] += 1
+        else:
+            sin_tipificar += 1
+    salida = [{"label": grupo, "n": conteo[grupo], "color": "#120C61"}
+              for grupo in ORDEN_GRUPOS]
+    if sin_tipificar:
+        salida.append({"label": "Sin tipificar", "n": sin_tipificar, "color": "#120C61"})
+    return salida
 
 
 def _registros_diferimiento(desde, hasta):
@@ -333,15 +320,14 @@ def _diferidas(registros):
     return len({r.id_donante for r, _c in registros})
 
 
-def _en_laboratorio(desde, hasta):
-    """Unidades extraídas en el período que siguen en el paso En laboratorio."""
-    return (db.session.query(func.count(Unidad.id_unidad))
-            .join(Extraccion, Extraccion.id_extraccion == Unidad.id_extraccion)
-            .join(Cita, Cita.id_cita == Extraccion.id_cita)
-            .filter(func.date(Extraccion.fecha) >= desde,
-                    func.date(Extraccion.fecha) <= hasta,
-                    Cita.tipo_cita != Cita.COMPATIBILIDAD,
-                    Unidad.estado == Unidad.EN_LABORATORIO)
+def _pai_positivos(desde, hasta):
+    """Muestras del período cuyo PAI quedó positivo."""
+    return (db.session.query(func.count(ResultadoCompatibilidad.id_resultado_compatibilidad))
+            .join(Diferimiento,
+                  Diferimiento.id_diferimiento == ResultadoCompatibilidad.id_diferimiento)
+            .filter(func.date(ResultadoCompatibilidad.fecha) >= desde,
+                    func.date(ResultadoCompatibilidad.fecha) <= hasta,
+                    Diferimiento.nombre == ResultadoCompatibilidad.PAI_POSITIVO)
             .scalar() or 0)
 
 
@@ -353,17 +339,14 @@ def _serologia(desde, hasta):
              .join(Cita, Cita.id_cita == Extraccion.id_cita)
              .filter(func.date(Extraccion.fecha) >= desde,
                      func.date(Extraccion.fecha) <= hasta,
-                     Cita.tipo_cita != Cita.COMPATIBILIDAD)
+                     ~Cita.tipo_cita.in_(_NO_DONACION))
              .group_by(ResultadoLaboratorio.resultado).all())
     conteo = dict(filas)
     reactivos = conteo.get("Reactivo", 0)
     no_reactivos = conteo.get("No reactivo", 0)
     return {"procesados": reactivos + no_reactivos,
             "reactivos": reactivos,
-            "no_reactivos": no_reactivos,
-            # «En investigación» de la maqueta es el paso En laboratorio
-            # (UNIDAD.estado), no un tercer valor de resultado.
-            "en_laboratorio": _en_laboratorio(desde, hasta)}
+            "no_reactivos": no_reactivos}
 
 
 def _solicitudes():
@@ -387,30 +370,39 @@ def _stock_tablero():
             for g in ORDEN_GRUPOS]
 
 
-def _por_vencer_tablero(hasta):
+def _proximas(hasta):
     """
-    Unidades en stock que vencen dentro del umbral, contadas desde el
-    cierre del período que se está mirando.
+    Unidades en stock que vencen dentro de los 30 días posteriores al
+    cierre del período. La fecha ya viene calculada en la unidad.
     """
-    limite = hasta + timedelta(days=_SIM["stock"]["umbral_dias"])
-    return (Unidad.query
-            .filter(Unidad.estado == Unidad.EN_STOCK,
-                    Unidad.fecha_vencimiento > hasta,
-                    Unidad.fecha_vencimiento <= limite)
-            .count())
+    limite = hasta + timedelta(days=UMBRAL_DIAS)
+    filas = (db.session.query(Unidad, TipoSangre)
+             .outerjoin(TipoSangre, TipoSangre.id_tipo_sangre == Unidad.id_tipo_sangre)
+             .join(Extraccion, Extraccion.id_extraccion == Unidad.id_extraccion)
+             .filter(Unidad.estado == Unidad.EN_STOCK,
+                     Unidad.fecha_vencimiento > hasta,
+                     Unidad.fecha_vencimiento <= limite,
+                     func.date(Extraccion.fecha) <= hasta)
+             .order_by(Unidad.fecha_vencimiento, Unidad.codigo)
+             .all())
+    return [{"codigo": unidad.codigo,
+             "grupo": tipo.etiqueta if tipo else "Sin tipificar",
+             "vence": unidad.fecha_vencimiento}
+            for unidad, tipo in filas]
 
 
 def leer_periodo(desde_txt, hasta_txt):
-    """Devuelve (desde, hasta, error). Sin fechas, usa el período de la maqueta."""
+    """Devuelve (desde, hasta, error). Sin fechas, usa el año en curso."""
+    defecto = _periodo_default()
     if not desde_txt and not hasta_txt:
-        return PERIODO_MUESTRA[0], PERIODO_MUESTRA[1], ""
+        return defecto[0], defecto[1], ""
     try:
         desde = date.fromisoformat(desde_txt) if desde_txt else None
         hasta = date.fromisoformat(hasta_txt) if hasta_txt else None
     except ValueError:
-        return PERIODO_MUESTRA[0], PERIODO_MUESTRA[1], "Indique fecha de inicio y de fin."
+        return defecto[0], defecto[1], "Indique fecha de inicio y de fin."
     if desde is None or hasta is None:
-        return PERIODO_MUESTRA[0], PERIODO_MUESTRA[1], "Indique fecha de inicio y de fin."
+        return defecto[0], defecto[1], "Indique fecha de inicio y de fin."
     if hasta < desde:
         return desde, hasta, "La fecha de fin no puede ser anterior a la de inicio."
     return desde, hasta, ""
@@ -456,31 +448,141 @@ def _barras(filas):
     return salida
 
 
-def _linea(filas):
-    maximo = max((f["n"] for f in filas), default=1) or 1
-
-    def y(valor):
-        return round(8 + (1 - valor / maximo) * 84, 2)
-
-    puntos = []
-    cantidad = len(filas)
-    for i, fila in enumerate(filas):
-        x = 50 if cantidad == 1 else round(2 + (i / (cantidad - 1)) * 96, 2)
-        puntos.append({**fila, "x": x, "y": y(fila["n"])})
-    marcas = [maximo, round(maximo / 2), 0]
-    return {
-        "puntos": puntos,
-        "trazo": " ".join(f"{p['x']},{p['y']}" for p in puntos),
-        "marcas": [{"n": m, "y": y(m)} for m in marcas],
-    }
-
-
 def _filas(*bloques):
     salida = []
     for i, bloque in enumerate(bloques):
         if i:
             salida.append([])
         salida.extend(bloque)
+    return salida
+
+
+def _vacio(filas):
+    return filas or [{"label": "Sin registros", "n": 0, "color": "#120C61"}]
+
+
+def _campos_obs(texto):
+    """Lee Momento, Tipo, Reacción y Severidad tal como los guarda la extracción."""
+    campos = {}
+    for parte in (texto or "").split(" · "):
+        if ": " not in parte:
+            continue
+        clave, valor = parte.split(": ", 1)
+        if clave in _CLAVES_OBS:
+            campos[clave] = valor.strip()
+    return campos
+
+
+def _registrados(desde, hasta):
+    """Donantes cuya cuenta se dio de alta en el período. Es el corte de RF20."""
+    return (db.session.query(func.count(func.distinct(Usuario.id_usuario)))
+            .join(UsuarioRol, UsuarioRol.id_usuario == Usuario.id_usuario)
+            .join(Rol, Rol.id_rol == UsuarioRol.id_rol)
+            .filter(Rol.codigo == Rol.DONANTE,
+                    Usuario.cuenta_suprimida.is_(False),
+                    func.date(Usuario.fecha_alta) >= desde,
+                    func.date(Usuario.fecha_alta) <= hasta)
+            .scalar() or 0)
+
+
+def _marcadores(desde, hasta):
+    """Cada reactivo cuenta por la causa permanente que lo confirmó."""
+    filas = (db.session.query(Diferimiento.nombre, func.count())
+             .join(RegistroDiferimiento,
+                   RegistroDiferimiento.id_diferimiento == Diferimiento.id_diferimiento)
+             .join(ResultadoLaboratorio,
+                   ResultadoLaboratorio.id_resultado == RegistroDiferimiento.id_resultado)
+             .join(Unidad, Unidad.id_unidad == ResultadoLaboratorio.id_unidad)
+             .join(Extraccion, Extraccion.id_extraccion == Unidad.id_extraccion)
+             .join(Cita, Cita.id_cita == Extraccion.id_cita)
+             .filter(func.date(Extraccion.fecha) >= desde,
+                     func.date(Extraccion.fecha) <= hasta,
+                     ~Cita.tipo_cita.in_(_NO_DONACION),
+                     ResultadoLaboratorio.resultado == ResultadoLaboratorio.REACTIVO)
+             .group_by(Diferimiento.nombre)
+             .all())
+    return [{"label": nombre, "n": n, "color": "#D97706"} for nombre, n in filas]
+
+
+def _hemovigilancia(desde, hasta):
+    """
+    Eventos leídos de extraccion.observacion.
+
+    El formulario ya guarda momento y tipo. La severidad solo aparece si
+    esa clave está en el texto: el formulario no la pide.
+    """
+    filas = (Extraccion.query
+             .join(Cita, Cita.id_cita == Extraccion.id_cita)
+             .filter(func.date(Extraccion.fecha) >= desde,
+                     func.date(Extraccion.fecha) <= hasta,
+                     ~Cita.tipo_cita.in_(_NO_DONACION))
+             .all())
+    momentos, tipos, severidad = {}, {}, {}
+    eventos = 0
+    for extraccion in filas:
+        campos = _campos_obs(extraccion.observacion)
+        momento = campos.get("Momento")
+        tipo = campos.get("Tipo")
+        reaccion = campos.get("Reacción")
+        grado = campos.get("Severidad")
+        if not (momento or tipo or grado or reaccion == "Lipotimia"):
+            continue
+        eventos += 1
+        if momento:
+            momentos[momento] = momentos.get(momento, 0) + 1
+        if grado:
+            severidad[grado] = severidad.get(grado, 0) + 1
+        if tipo:
+            tipos[tipo] = tipos.get(tipo, 0) + 1
+        elif reaccion == "Lipotimia":
+            tipos["Lipotimia"] = tipos.get("Lipotimia", 0) + 1
+
+    def series(conteo, colores):
+        return [{"label": k, "n": v, "color": colores.get(k, "#120C61")}
+                for k, v in sorted(conteo.items(), key=lambda p: -p[1])]
+
+    return {
+        "extracciones": len(filas),
+        "eventos": eventos,
+        "momentos": _vacio(series(momentos, _COLOR_MOMENTO)),
+        "severidad": _vacio(series(severidad, _COLOR_SEVERIDAD)),
+        "tipos": _vacio(series(tipos, {})),
+    }
+
+
+def _stock_al(corte):
+    """Cuántas unidades estaban en stock al cierre de esa fecha."""
+    ultimas = (db.session.query(
+                TransicionEstado.id_unidad,
+                TransicionEstado.estado_destino,
+                func.row_number().over(
+                    partition_by=TransicionEstado.id_unidad,
+                    order_by=(TransicionEstado.fecha.desc(),
+                              TransicionEstado.id_transicion.desc()),
+                ).label("rn"))
+               .filter(func.date(TransicionEstado.fecha) <= corte)
+               .subquery())
+    return (db.session.query(func.count())
+            .select_from(ultimas)
+            .filter(ultimas.c.rn == 1,
+                    ultimas.c.estado_destino == Unidad.EN_STOCK)
+            .scalar() or 0)
+
+
+def _volumen_mensual(desde, hasta):
+    salida = []
+    año, mes = desde.year, desde.month
+    while (año, mes) <= (hasta.year, hasta.month):
+        fin = date(año + (mes == 12), 1 if mes == 12 else mes + 1, 1) - timedelta(days=1)
+        if fin > hasta:
+            fin = hasta
+        etiqueta = MESES_CORTOS[mes - 1]
+        if hasta.year != desde.year:
+            etiqueta = f"{etiqueta} {str(año)[2:]}"
+        salida.append({"label": etiqueta, "n": _stock_al(fin), "color": "#0F766E"})
+        mes += 1
+        if mes == 13:
+            mes, año = 1, año + 1
     return salida
 
 
@@ -494,7 +596,7 @@ def presentacion(desde, hasta, error="", con_hemovigilancia=True):
     COLECTAS_TIPO = _por_tipo(filas)
     GENEROS = _por_genero(filas)
     RANGOS_EDAD = _por_edad(filas, hasta)
-    COLECTAS_LINEA, eje_serie = _serie_del_periodo(filas, desde, hasta)
+    GRUPOS_DONACION = _por_grupo_donacion(filas)
     MOTIVOS_MUESTRA = _por_motivo(registros) or [{"label": "Sin registros", "n": 0, "color": "#120C61"}]
     CLASIFICACION = _clasificacion(registros)
     # Aptas y diferidas reparten el total de personas evaluadas: las que
@@ -507,13 +609,18 @@ def presentacion(desde, hasta, error="", con_hemovigilancia=True):
 
     stock_filas = _stock_tablero()
     volumen = sum(f["n"] for f in stock_filas)
-    eventos = _SIM["hemovigilancia"]["eventos"]
     solicitudes_total = sum(f["n"] for f in SOLICITUDES)
     atendidas = next(f["n"] for f in SOLICITUDES if f["label"] == "Atendidas")
     pendientes = next(f["n"] for f in SOLICITUDES if f["label"] == "Pendientes")
-    por_vencer = _por_vencer_tablero(hasta)
+    proximas = _proximas(hasta)
+    por_vencer = len(proximas)
     sero = _serologia(desde, hasta)
-    hemo = _SIM["hemovigilancia"]
+    pai = _pai_positivos(desde, hasta)
+    marcadores = _marcadores(desde, hasta)
+    hemo = _hemovigilancia(desde, hasta)
+    eventos = hemo["eventos"]
+    registrados_n = _registrados(desde, hasta)
+    volumen_serie = _volumen_mensual(desde, hasta)
     evaluadas = donaciones_n + diferidas
     pestanas = [
         ("donaciones", "Donaciones"),
@@ -530,22 +637,24 @@ def presentacion(desde, hasta, error="", con_hemovigilancia=True):
     motivos = _barras(MOTIVOS_MUESTRA)
     proporcion = _barras(PROPORCION)
     clasificacion = _barras(CLASIFICACION)
-    serologia = _barras(sorted(SEROLOGIA, key=lambda f: -f["n"]))
-    momentos = _barras(EVENTOS_MOMENTO)
-    severidad = _barras(EVENTOS_SEVERIDAD)
-    tipos = _barras(sorted(EVENTOS_TIPO, key=lambda f: -f["n"]))
+    serologia = _barras(_vacio(sorted(marcadores, key=lambda f: -f["n"])))
+    momentos = _barras(hemo["momentos"])
+    severidad = _barras(hemo["severidad"])
+    tipos = _barras(sorted(hemo["tipos"], key=lambda f: -f["n"]))
     stock = _barras(stock_filas)
-    volumen_mes = _barras(VOLUMEN)
+    volumen_mes = _barras(volumen_serie)
     solicitudes = _barras(SOLICITUDES)
-    linea = _linea(COLECTAS_LINEA)
+    grupos_donacion = _barras(GRUPOS_DONACION)
 
     paneles = {
         "donaciones": {
             "nombre": "Donaciones",
             "filas": _filas(
-                [["Indicador", "Valor"], ["Donaciones", str(donaciones_n)]],
+                [["Indicador", "Valor"],
+                 ["Donantes registrados", str(registrados_n)],
+                 ["Donaciones", str(donaciones_n)]],
                 [["Tipo de donación", "Cantidad"], *([f["label"], str(f["n"])] for f in colectas)],
-                [[eje_serie, "Colectas"], *([f["label"], str(f["n"])] for f in COLECTAS_LINEA)],
+                [["Grupo sanguíneo", "Donaciones"], *([f["label"], str(f["n"])] for f in grupos_donacion)],
                 [["Género", "Cantidad"], *([f["label"], str(f["n"])] for f in generos)],
                 [["Rango de edad", "Cantidad"], *([f["label"], str(f["n"])] for f in edades)],
             ),
@@ -564,7 +673,7 @@ def presentacion(desde, hasta, error="", con_hemovigilancia=True):
             "filas": _filas(
                 [["Indicador", "Valor"], ["Volúmenes procesados", str(sero["procesados"])],
                  ["Reactivos", str(sero["reactivos"])], ["No reactivos", str(sero["no_reactivos"])],
-                 ["En laboratorio", str(sero["en_laboratorio"])]],
+                 ["PAI positivo", str(pai)]],
                 [["Marcador", "Reactivos"], *([f["label"], str(f["n"])] for f in serologia)],
             ),
         },
@@ -588,12 +697,18 @@ def presentacion(desde, hasta, error="", con_hemovigilancia=True):
                 [["Grupo sanguíneo", "Volumen"], *([f["label"], str(f["n"])] for f in stock)],
                 [["Mes", "Volumen disponible"], *([f["label"], str(f["n"])] for f in volumen_mes)],
                 [["Estado de solicitud", "Cantidad"], *([f["label"], str(f["n"])] for f in solicitudes)],
+                [["Unidad", "Grupo", "Vencimiento"],
+                 *([f["codigo"], f["grupo"], f["vence"].isoformat()] for f in proximas)],
             ),
         },
     }
     return {
         "desde": desde,
         "hasta": hasta,
+        "hoy": date.today(),
+        "sin_datos": donaciones_n == 0 and diferidas == 0,
+        "registrados_n": registrados_n,
+        "proximas": proximas,
         "periodo": _periodo_largo(desde, hasta),
         "error": error,
         "pestanas": [{"id": i, "nombre": n} for i, n in pestanas],
@@ -603,7 +718,7 @@ def presentacion(desde, hasta, error="", con_hemovigilancia=True):
         "colectas_grad": _conico(colectas),
         "generos": generos,
         "edades": edades,
-        "linea": linea,
+        "grupos_donacion": grupos_donacion,
         "proporcion": proporcion,
         "proporcion_grad": _conico(proporcion),
         "proporcion_centro": f"{_porcentaje(diferidas, evaluadas)}%",
@@ -612,7 +727,7 @@ def presentacion(desde, hasta, error="", con_hemovigilancia=True):
         "procesados": sero["procesados"],
         "reactivos": sero["reactivos"],
         "no_reactivos": sero["no_reactivos"],
-        "en_laboratorio": sero["en_laboratorio"],
+        "pai": pai,
         "serologia": serologia,
         "extracciones": hemo["extracciones"],
         "eventos": eventos,

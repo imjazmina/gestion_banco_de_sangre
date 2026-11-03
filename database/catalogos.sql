@@ -6,7 +6,7 @@
 --
 --  Cómo correrlo (pgAdmin): Query Tool sobre gestion_donantes → pegar → Ejecutar.
 --
---  Decisiones de la maqueta (2026-09-10):
+--  Decisiones de la maqueta:
 --  * Diagnóstico se guarda como Reposicion.
 --  * Totales históricos de donantes se completan con citas sintéticas.
 --  * Causa «Otro» de diferimientos no se carga.
@@ -16,7 +16,8 @@
 --  * Temporal: fecha_fin la calcula el trigger (fecha_inicio + días del catálogo).
 --  * Diferimiento externo: solo institución, sin cita (no se puede continuar).
 --  * Extracción de compatibilidad: donante del padrón, no el paciente.
---  * Próximo a vencer: fecha_vencimiento entre 2026-09-11 y 2026-10-10.
+--  * Cada unidad nace con fecha_vencimiento = día de la extracción + 30.
+--  * El año 2026 carga entre 50 y 200 casos por mes (documentos 91MMNNN).
 -- ============================================================================
 
 BEGIN;
@@ -294,9 +295,12 @@ AS $$
   SELECT (p_fecha - 1)::timestamp + time '08:00';
 $$;
 
+DROP FUNCTION IF EXISTS maqueta_usuario(varchar, varchar, varchar, date, varchar, varchar, varchar, varchar);
+
 CREATE OR REPLACE FUNCTION maqueta_usuario(
   p_doc varchar, p_nom varchar, p_ape varchar, p_nac date, p_gen varchar,
-  p_tel varchar, p_mail varchar, p_grupo varchar
+  p_tel varchar, p_mail varchar, p_grupo varchar,
+  p_alta timestamp DEFAULT timestamp '2023-01-01 08:00'
 ) RETURNS integer
 LANGUAGE plpgsql
 AS $$
@@ -309,7 +313,7 @@ BEGIN
                          contrasena, consentimiento_privacidad, estado,
                          cuenta_suprimida, fecha_alta)
     VALUES (p_doc, p_nom, p_ape, p_nac, p_gen, NULL, true, true, false,
-            timestamp '2023-01-01 08:00')
+            p_alta)
     RETURNING id_usuario INTO v_id;
   END IF;
   IF p_mail IS NOT NULL AND NOT EXISTS (SELECT 1 FROM correo c WHERE c.direccion = p_mail) THEN
@@ -326,9 +330,11 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS maqueta_cita(varchar, varchar, date, time, varchar, varchar, varchar);
+
 CREATE OR REPLACE FUNCTION maqueta_cita(
   p_doc varchar, p_tipo varchar, p_fecha date, p_hora time, p_estado varchar,
-  p_sol_doc varchar, p_personal varchar
+  p_sol_doc varchar, p_personal varchar, p_espontanea boolean DEFAULT false
 ) RETURNS integer
 LANGUAGE plpgsql
 AS $$
@@ -343,7 +349,12 @@ BEGIN
   SELECT id_usuario INTO v_user FROM usuario WHERE documento = p_doc;
   SELECT id_usuario INTO v_pers FROM usuario WHERE documento = COALESCE(p_personal, '00000000');
   v_hor := maqueta_id_horario(p_fecha, p_hora);
-  v_res := maqueta_reserva(p_fecha);
+  -- 00:01 del mismo día es la marca de quien llega sin reserva.
+  IF p_espontanea THEN
+    v_res := p_fecha::timestamp + time '00:01';
+  ELSE
+    v_res := maqueta_reserva(p_fecha);
+  END IF;
   IF v_user IS NULL OR v_pers IS NULL OR v_hor IS NULL THEN
     RAISE EXCEPTION 'cita: faltan usuario/personal/horario % % %', p_doc, p_fecha, p_hora;
   END IF;
@@ -392,9 +403,12 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS maqueta_diferimiento(varchar, varchar, integer, varchar, varchar, date, date);
+
 CREATE OR REPLACE FUNCTION maqueta_diferimiento(
   p_doc varchar, p_causa varchar, p_cita integer, p_origen varchar,
-  p_institucion varchar, p_inicio date, p_fin date
+  p_institucion varchar, p_inicio date, p_fin date,
+  p_personal varchar DEFAULT '10000001'
 ) RETURNS integer
 LANGUAGE plpgsql
 AS $$
@@ -407,7 +421,11 @@ DECLARE
 BEGIN
   SELECT id_usuario INTO v_don FROM usuario WHERE documento = p_doc;
   SELECT id_diferimiento INTO v_dif FROM diferimiento WHERE nombre = p_causa;
-  SELECT id_usuario INTO v_pers FROM usuario WHERE documento = '10000001';
+  IF p_personal IS NULL THEN
+    v_pers := NULL;
+  ELSE
+    SELECT id_usuario INTO v_pers FROM usuario WHERE documento = p_personal;
+  END IF;
   v_resultado := NULL;
   IF p_origen = 'LABORATORIO' THEN
     SELECT r.id_resultado INTO v_resultado
@@ -442,10 +460,14 @@ BEGIN
 END;
 $$;
 
+DROP FUNCTION IF EXISTS maqueta_donacion(varchar, varchar, date, time, varchar, varchar, varchar, varchar, date, text, varchar);
+
 CREATE OR REPLACE FUNCTION maqueta_donacion(
   p_doc varchar, p_tipo varchar, p_fecha date, p_hora time,
   p_codigo varchar, p_grupo varchar, p_resultado varchar,
-  p_estado varchar, p_vto date, p_obs text, p_sol_doc varchar
+  p_estado varchar, p_vto date, p_obs text, p_sol_doc varchar,
+  p_espontanea boolean DEFAULT false,
+  p_con_resultado boolean DEFAULT true
 ) RETURNS integer
 LANGUAGE plpgsql
 AS $$
@@ -458,16 +480,18 @@ DECLARE
   v_tipo integer;
   v_sol integer;
   v_momento timestamp;
+  v_vto date;
 BEGIN
   IF EXISTS (SELECT 1 FROM unidad WHERE codigo = p_codigo) THEN
     SELECT id_unidad INTO v_uni FROM unidad WHERE codigo = p_codigo;
     RETURN v_uni;
   END IF;
-  v_cita := maqueta_cita(p_doc, p_tipo, p_fecha, p_hora, 'Completada', p_sol_doc, '10000001');
+  v_cita := maqueta_cita(p_doc, p_tipo, p_fecha, p_hora, 'Completada', p_sol_doc, '10000001', p_espontanea);
   SELECT id_usuario INTO v_pers FROM usuario WHERE documento = '10000001';
   SELECT id_usuario INTO v_don FROM usuario WHERE documento = p_doc;
   v_tipo := maqueta_id_tipo(p_grupo);
   v_momento := p_fecha::timestamp + p_hora;
+  v_vto := p_fecha + 30;
   IF p_sol_doc IS NOT NULL THEN
     SELECT s.id_solicitud INTO v_sol
       FROM solicitud s JOIN usuario u ON u.id_usuario = s.id_solicitante
@@ -479,11 +503,14 @@ BEGIN
   RETURNING id_extraccion INTO v_ext;
   INSERT INTO unidad (id_extraccion, id_donante, id_solicitud, codigo, id_tipo_sangre,
                       estado, fecha_vencimiento)
-  VALUES (v_ext, v_don, v_sol, p_codigo, v_tipo, 'Registrada', p_vto)
+  VALUES (v_ext, v_don, v_sol, p_codigo, v_tipo, 'Registrada', v_vto)
   RETURNING id_unidad INTO v_uni;
   INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha_hora)
   VALUES (v_uni, v_pers, 'Registrada', 'En laboratorio', v_momento + interval '20 minutes');
   UPDATE unidad SET estado = 'En laboratorio' WHERE id_unidad = v_uni;
+  IF NOT p_con_resultado THEN
+    RETURN v_uni;
+  END IF;
   INSERT INTO resultado_laboratorio (id_unidad, id_tipo_sangre, resultado, fecha)
   VALUES (v_uni, v_tipo, p_resultado, v_momento + interval '1 day');
   IF p_resultado = 'Reactivo' THEN
@@ -517,6 +544,11 @@ BEGIN
     INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha_hora)
     VALUES (v_uni, v_pers, 'En laboratorio', 'En stock', v_momento + interval '1 day');
     UPDATE unidad SET estado = 'En stock' WHERE id_unidad = v_uni;
+    IF v_vto < CURRENT_DATE THEN
+      INSERT INTO transicion_estado (id_unidad, id_personal, estado_origen, estado_destino, fecha_hora)
+      VALUES (v_uni, v_pers, 'En stock', 'Vencida', v_vto::timestamp);
+      UPDATE unidad SET estado = 'Vencida' WHERE id_unidad = v_uni;
+    END IF;
   END IF;
   RETURN v_uni;
 END;
@@ -820,95 +852,6 @@ SELECT maqueta_donacion('7444444', 'Donacion altruista', DATE '2023-06-28', TIME
 SELECT maqueta_donacion('7444444', 'Donacion altruista', DATE '2023-06-27', TIME '07:00', 'UN-H-7444444-04', 'A+', 'No reactivo', 'Utilizada', NULL, NULL, NULL);
 SELECT maqueta_donacion('7444444', 'Donacion altruista', DATE '2023-06-26', TIME '07:00', 'UN-H-7444444-05', 'A+', 'No reactivo', 'Utilizada', NULL, NULL, NULL);
 
--- 86 donaciones del período (más Jorge UN-2026-0912 = 87)
-
-SELECT maqueta_donacion('90000001', 'Donacion altruista', DATE '2026-09-01', TIME '07:00', 'UN-P-0001', 'O+', 'Reactivo', 'Descartada', NULL, 'Hematoma en el sitio de punción.', NULL);
-SELECT maqueta_donacion('90000002', 'Donacion altruista', DATE '2026-09-02', TIME '07:00', 'UN-P-0002', 'O+', 'Reactivo', 'Descartada', NULL, 'Hematoma en el sitio de punción.', NULL);
-SELECT maqueta_donacion('90000003', 'Donacion altruista', DATE '2026-09-03', TIME '07:00', 'UN-P-0003', 'O+', 'Reactivo', 'Descartada', NULL, 'Hematoma en el sitio de punción.', NULL);
-SELECT maqueta_donacion('90000004', 'Donacion altruista', DATE '2026-09-04', TIME '07:00', 'UN-P-0004', 'O+', 'Reactivo', 'Descartada', NULL, 'Hematoma en el sitio de punción.', NULL);
-SELECT maqueta_donacion('90000005', 'Donacion altruista', DATE '2026-09-07', TIME '07:00', 'UN-P-0005', 'O+', 'No reactivo', 'En stock', DATE '2026-09-18', 'Cuadro febril durante la extracción.', NULL);
-SELECT maqueta_donacion('90000006', 'Donacion altruista', DATE '2026-09-08', TIME '07:00', 'UN-P-0006', 'O+', 'No reactivo', 'En stock', DATE '2026-09-22', 'Cuadro febril durante la extracción.', NULL);
-SELECT maqueta_donacion('90000007', 'Donacion altruista', DATE '2026-09-09', TIME '07:00', 'UN-P-0007', 'O+', 'No reactivo', 'En stock', DATE '2026-09-27', 'Cuadro febril durante la extracción.', NULL);
-SELECT maqueta_donacion('90000008', 'Donacion altruista', DATE '2026-09-10', TIME '07:00', 'UN-P-0008', 'O+', 'No reactivo', 'En stock', DATE '2026-10-01', 'Lipotimia en sala de extracción.', NULL);
-SELECT maqueta_donacion('90000009', 'Donacion altruista', DATE '2026-09-01', TIME '07:30', 'UN-P-0009', 'O+', 'No reactivo', 'En stock', DATE '2026-10-05', 'Lipotimia en sala de extracción.', NULL);
-SELECT maqueta_donacion('90000010', 'Donacion altruista', DATE '2026-09-02', TIME '07:30', 'UN-P-0010', 'O+', 'No reactivo', 'En stock', DATE '2026-10-09', 'Lipotimia en sala de extracción.', NULL);
-SELECT maqueta_donacion('90000011', 'Donacion altruista', DATE '2026-09-03', TIME '07:30', 'UN-P-0011', 'O+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Reacción alérgica leve.', NULL);
-SELECT maqueta_donacion('90000012', 'Donacion altruista', DATE '2026-09-04', TIME '07:30', 'UN-P-0012', 'O+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Reacción alérgica leve.', NULL);
-SELECT maqueta_donacion('90000013', 'Donacion altruista', DATE '2026-09-07', TIME '07:30', 'UN-P-0013', 'O+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Náuseas durante la donación.', NULL);
-SELECT maqueta_donacion('90000014', 'Donacion altruista', DATE '2026-09-08', TIME '07:30', 'UN-P-0014', 'O+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Náuseas durante la donación.', NULL);
-SELECT maqueta_donacion('90000015', 'Donacion altruista', DATE '2026-09-09', TIME '07:30', 'UN-P-0015', 'O+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Dolor local en el brazo.', NULL);
-SELECT maqueta_donacion('90000016', 'Donacion altruista', DATE '2026-09-10', TIME '07:30', 'UN-P-0016', 'O+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Dolor local en el brazo.', NULL);
-SELECT maqueta_donacion('90000017', 'Donacion altruista', DATE '2026-09-01', TIME '08:00', 'UN-P-0017', 'O+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Hipotensión transitoria.', NULL);
-SELECT maqueta_donacion('90000018', 'Donacion altruista', DATE '2026-09-02', TIME '08:00', 'UN-P-0018', 'O+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Hormigueo en la mano.', NULL);
-SELECT maqueta_donacion('90000019', 'Donacion altruista', DATE '2026-09-03', TIME '08:00', 'UN-P-0019', 'O+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Reacción vasovagal.', NULL);
-SELECT maqueta_donacion('90000020', 'Donacion altruista', DATE '2026-09-04', TIME '08:00', 'UN-P-0020', 'O+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Otro evento adverso no clasificado.', NULL);
-SELECT maqueta_donacion('90000021', 'Donacion altruista', DATE '2026-09-07', TIME '08:00', 'UN-P-0021', 'O+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000022', 'Donacion altruista', DATE '2026-09-08', TIME '08:00', 'UN-P-0022', 'O+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000023', 'Donacion altruista', DATE '2026-09-09', TIME '08:00', 'UN-P-0023', 'O+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000024', 'Donacion altruista', DATE '2026-09-10', TIME '08:00', 'UN-P-0024', 'O+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000025', 'Donacion altruista', DATE '2026-09-01', TIME '08:30', 'UN-P-0025', 'O+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000026', 'Donacion altruista', DATE '2026-09-02', TIME '08:30', 'UN-P-0026', 'A+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000027', 'Donacion altruista', DATE '2026-09-03', TIME '08:30', 'UN-P-0027', 'A+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000028', 'Donacion altruista', DATE '2026-09-04', TIME '08:30', 'UN-P-0028', 'A+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000029', 'Donacion altruista', DATE '2026-09-07', TIME '08:30', 'UN-P-0029', 'A+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000030', 'Donacion altruista', DATE '2026-09-08', TIME '08:30', 'UN-P-0030', 'A+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000031', 'Donacion altruista', DATE '2026-09-09', TIME '08:30', 'UN-P-0031', 'A+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000032', 'Donacion altruista', DATE '2026-09-10', TIME '08:30', 'UN-P-0032', 'A+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000033', 'Donacion altruista', DATE '2026-09-01', TIME '09:00', 'UN-P-0033', 'A+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000034', 'Donacion altruista', DATE '2026-09-02', TIME '09:00', 'UN-P-0034', 'A+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000035', 'Donacion altruista', DATE '2026-09-03', TIME '09:00', 'UN-P-0035', 'A+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000036', 'Donacion altruista', DATE '2026-09-04', TIME '09:00', 'UN-P-0036', 'B+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000037', 'Donacion altruista', DATE '2026-09-07', TIME '09:00', 'UN-P-0037', 'B+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000038', 'Donacion altruista', DATE '2026-09-08', TIME '09:00', 'UN-P-0038', 'B+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000039', 'Donacion altruista', DATE '2026-09-09', TIME '09:00', 'UN-P-0039', 'B+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000040', 'Donacion altruista', DATE '2026-09-10', TIME '09:00', 'UN-P-0040', 'AB+', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000041', 'Donacion altruista', DATE '2026-09-01', TIME '09:30', 'UN-P-0041', 'O-', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000042', 'Donacion altruista', DATE '2026-09-02', TIME '09:30', 'UN-P-0042', 'O-', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000043', 'Donacion altruista', DATE '2026-09-03', TIME '09:30', 'UN-P-0043', 'O-', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000044', 'Donacion altruista', DATE '2026-09-04', TIME '09:30', 'UN-P-0044', 'A-', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000045', 'Donacion altruista', DATE '2026-09-07', TIME '09:30', 'UN-P-0045', 'A-', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000046', 'Donacion altruista', DATE '2026-09-08', TIME '09:30', 'UN-P-0046', 'B-', 'No reactivo', 'En stock', DATE '2026-11-15', 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000047', 'Donacion solidaria', DATE '2026-09-09', TIME '09:30', 'UN-P-0047', 'A+', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000010');
-SELECT maqueta_donacion('90000048', 'Donacion solidaria', DATE '2026-09-10', TIME '09:30', 'UN-P-0048', 'A+', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000011');
-SELECT maqueta_donacion('90000049', 'Donacion solidaria', DATE '2026-09-01', TIME '10:00', 'UN-P-0049', 'A+', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000012');
-SELECT maqueta_donacion('90000050', 'Donacion solidaria', DATE '2026-09-02', TIME '10:00', 'UN-P-0050', 'A+', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000013');
-SELECT maqueta_donacion('90000051', 'Donacion solidaria', DATE '2026-09-03', TIME '10:00', 'UN-P-0051', 'B+', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000014');
-SELECT maqueta_donacion('90000052', 'Donacion solidaria', DATE '2026-09-04', TIME '10:00', 'UN-P-0052', 'B+', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000015');
-SELECT maqueta_donacion('90000053', 'Donacion solidaria', DATE '2026-09-07', TIME '10:00', 'UN-P-0053', 'B+', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000016');
-SELECT maqueta_donacion('90000054', 'Donacion solidaria', DATE '2026-09-08', TIME '10:00', 'UN-P-0054', 'B+', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000017');
-SELECT maqueta_donacion('90000055', 'Donacion altruista', DATE '2026-09-09', TIME '10:00', 'UN-P-0055', 'B+', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000018');
-SELECT maqueta_donacion('90000056', 'Donacion altruista', DATE '2026-09-10', TIME '10:00', 'UN-P-0056', 'B+', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000019');
-SELECT maqueta_donacion('90000057', 'Donacion altruista', DATE '2026-09-01', TIME '10:30', 'UN-P-0057', 'B+', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000020');
-SELECT maqueta_donacion('90000058', 'Donacion altruista', DATE '2026-09-02', TIME '10:30', 'UN-P-0058', 'B+', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000021');
-SELECT maqueta_donacion('90000059', 'Donacion altruista', DATE '2026-09-03', TIME '10:30', 'UN-P-0059', 'B+', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000022');
-SELECT maqueta_donacion('90000060', 'Donacion altruista', DATE '2026-09-04', TIME '10:30', 'UN-P-0060', 'B+', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000023');
-SELECT maqueta_donacion('90000061', 'Donacion altruista', DATE '2026-09-07', TIME '10:30', 'UN-P-0061', 'B+', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000024');
-SELECT maqueta_donacion('90000062', 'Reposicion', DATE '2026-09-08', TIME '10:30', 'UN-P-0062', 'B+', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000025');
-SELECT maqueta_donacion('90000063', 'Reposicion', DATE '2026-09-09', TIME '10:30', 'UN-P-0063', 'AB+', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000026');
-SELECT maqueta_donacion('90000064', 'Reposicion', DATE '2026-09-10', TIME '10:30', 'UN-P-0064', 'AB+', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000027');
-SELECT maqueta_donacion('90000065', 'Reposicion', DATE '2026-09-01', TIME '11:00', 'UN-P-0065', 'AB+', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000028');
-SELECT maqueta_donacion('90000066', 'Reposicion', DATE '2026-09-02', TIME '11:00', 'UN-P-0066', 'AB+', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000029');
-SELECT maqueta_donacion('90000067', 'Reposicion', DATE '2026-09-03', TIME '11:00', 'UN-P-0067', 'AB+', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000030');
-SELECT maqueta_donacion('90000068', 'Reposicion', DATE '2026-09-04', TIME '11:00', 'UN-P-0068', 'AB+', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000031');
-SELECT maqueta_donacion('90000069', 'Reposicion', DATE '2026-09-07', TIME '11:00', 'UN-P-0069', 'O-', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000032');
-SELECT maqueta_donacion('90000070', 'Reposicion', DATE '2026-09-08', TIME '11:00', 'UN-P-0070', 'O-', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000033');
-SELECT maqueta_donacion('90000071', 'Reposicion', DATE '2026-09-09', TIME '11:00', 'UN-P-0071', 'O-', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000034');
-SELECT maqueta_donacion('90000072', 'Reposicion', DATE '2026-09-10', TIME '11:00', 'UN-P-0072', 'O-', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000035');
-SELECT maqueta_donacion('90000073', 'Reposicion', DATE '2026-09-01', TIME '11:30', 'UN-P-0073', 'O-', 'No reactivo', 'Asignada', NULL, 'Extracción sin incidentes.', '80000036');
-SELECT maqueta_donacion('90000074', 'Reposicion', DATE '2026-09-02', TIME '11:30', 'UN-P-0074', 'O-', 'No reactivo', 'Utilizada', NULL, 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000075', 'Reposicion', DATE '2026-09-03', TIME '11:30', 'UN-P-0075', 'O-', 'No reactivo', 'Utilizada', NULL, 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000076', 'Reposicion', DATE '2026-09-04', TIME '11:30', 'UN-P-0076', 'O-', 'No reactivo', 'Utilizada', NULL, 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000077', 'Reposicion', DATE '2026-09-07', TIME '11:30', 'UN-P-0077', 'A-', 'No reactivo', 'Utilizada', NULL, 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000078', 'Reposicion', DATE '2026-09-08', TIME '11:30', 'UN-P-0078', 'A-', 'No reactivo', 'Utilizada', NULL, 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000079', 'Reposicion', DATE '2026-09-09', TIME '11:30', 'UN-P-0079', 'A-', 'No reactivo', 'Utilizada', NULL, 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000080', 'Reposicion', DATE '2026-09-10', TIME '11:30', 'UN-P-0080', 'A-', 'No reactivo', 'Utilizada', NULL, 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000081', 'Reposicion', DATE '2026-09-01', TIME '12:00', 'UN-P-0081', 'A-', 'No reactivo', 'Utilizada', NULL, 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000082', 'Reposicion', DATE '2026-09-02', TIME '12:00', 'UN-P-0082', 'B-', 'No reactivo', 'Utilizada', NULL, 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000083', 'Reposicion', DATE '2026-09-03', TIME '12:00', 'UN-P-0083', 'B-', 'No reactivo', 'Utilizada', NULL, 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000084', 'Reposicion', DATE '2026-09-04', TIME '12:00', 'UN-P-0084', 'B-', 'No reactivo', 'Utilizada', NULL, 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000085', 'Reposicion', DATE '2026-09-07', TIME '12:00', 'UN-P-0085', 'B-', 'No reactivo', 'Utilizada', NULL, 'Extracción sin incidentes.', NULL);
-SELECT maqueta_donacion('90000086', 'Reposicion', DATE '2026-09-08', TIME '12:00', 'UN-P-0086', 'AB-', 'No reactivo', 'Utilizada', NULL, 'Extracción sin incidentes.', NULL);
-
 -- Citas del 2026-09-10 (donación y compatibilidad)
 
 SELECT maqueta_cita('3456789', 'Donacion altruista', DATE '2026-09-10', TIME '07:30', 'Pendiente', NULL, '00000000');
@@ -919,11 +862,11 @@ SELECT maqueta_cita('6123456', 'Reposicion', DATE '2026-09-10', TIME '11:00', 'P
 SELECT maqueta_cita('1876543', 'Donacion altruista', DATE '2026-09-10', TIME '11:30', 'Pendiente', NULL, '00000000');
 SELECT maqueta_cita('5678901', 'Donacion solidaria', DATE '2026-09-10', TIME '12:00', 'Ausente', '1234567', '10000001');
 -- Compatibilidad: donantes del padrón (no el paciente). RN03 impide citarse por solicitud propia.
-SELECT maqueta_cita('90000009', 'Extraccion de compatibilidad', DATE '2026-09-10', TIME '07:30', 'Pendiente', '1234567', '00000000');
-SELECT maqueta_cita('90000010', 'Extraccion de compatibilidad', DATE '2026-09-10', TIME '08:00', 'Completada', '80000001', '10000001');
-SELECT maqueta_cita('90000011', 'Extraccion de compatibilidad', DATE '2026-09-10', TIME '08:30', 'Pendiente', '80000002', '00000000');
-SELECT maqueta_cita('90000012', 'Extraccion de compatibilidad', DATE '2026-09-10', TIME '09:00', 'Pendiente', '80000003', '00000000');
-SELECT maqueta_donacion('90000010', 'Extraccion de compatibilidad', DATE '2026-09-10', TIME '08:00', 'UN-2026-EC02', 'A+', 'No reactivo', 'Asignada', NULL, NULL, '80000001');
+SELECT maqueta_cita('90000009', 'Extraccion de muestra para compatibilidad', DATE '2026-09-10', TIME '07:30', 'Pendiente', '1234567', '00000000');
+SELECT maqueta_cita('90000010', 'Extraccion de muestra para compatibilidad', DATE '2026-09-10', TIME '08:00', 'Completada', '80000001', '10000001');
+SELECT maqueta_cita('90000011', 'Extraccion de muestra para compatibilidad', DATE '2026-09-10', TIME '08:30', 'Pendiente', '80000002', '00000000');
+SELECT maqueta_cita('90000012', 'Extraccion de muestra para compatibilidad', DATE '2026-09-10', TIME '09:00', 'Pendiente', '80000003', '00000000');
+SELECT maqueta_donacion('90000010', 'Extraccion de muestra para compatibilidad', DATE '2026-09-10', TIME '08:00', 'UN-2026-EC02', 'A+', 'No reactivo', 'Asignada', NULL, NULL, '80000001');
 
 -- Citas no aptas y diferimientos
 
@@ -943,41 +886,6 @@ SELECT maqueta_medicion((SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usu
 SELECT maqueta_diferimiento('7444444', 'Anti-HCV (Hepatitis C)', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '7444444' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2025-04-14') AND h.hora_inicio = TIME '09:00' LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2025-04-14', NULL);
 SELECT maqueta_diferimiento('7555555', 'Enfermedad infecciosa reciente', NULL, 'CUESTIONARIO_PERSONAL', 'Hospital Nacional de Itauguá', DATE '2026-07-01', NULL);
 SELECT maqueta_diferimiento('5485567', 'VIH 1/2', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '5485567' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-08-20') AND h.hora_inicio = TIME '11:00' LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2026-08-20', NULL);
-SELECT maqueta_cita('90000201', 'Donacion altruista', DATE '2026-09-01', TIME '07:00', 'No apto', NULL, '10000001');
-SELECT maqueta_diferimiento('90000201', 'Hemoglobina baja', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '90000201' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-09-01') AND h.hora_inicio = TIME '07:00' LIMIT 1), 'MEDICION', 'Hospital Regional de Luque', DATE '2026-09-01', NULL);
-SELECT maqueta_medicion((SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000201' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-01') LIMIT 1), 'HB', 11.1, TIMESTAMP '2026-09-01 07:15');
-SELECT maqueta_cita('90000202', 'Donacion altruista', DATE '2026-09-02', TIME '07:00', 'No apto', NULL, '10000001');
-SELECT maqueta_diferimiento('90000202', 'Hemoglobina baja', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '90000202' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-09-02') AND h.hora_inicio = TIME '07:00' LIMIT 1), 'MEDICION', 'Hospital Regional de Luque', DATE '2026-09-02', NULL);
-SELECT maqueta_medicion((SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000202' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-02') LIMIT 1), 'HB', 11.1, TIMESTAMP '2026-09-02 07:15');
-SELECT maqueta_diferimiento('90000202', 'Cuadro febril o gripal', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000202' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-02') LIMIT 1), 'CUESTIONARIO_PERSONAL', 'Hospital Regional de Luque', DATE '2026-09-02', NULL);
-SELECT maqueta_cita('90000203', 'Donacion altruista', DATE '2026-09-03', TIME '07:00', 'No apto', NULL, '10000001');
-SELECT maqueta_diferimiento('90000203', 'Hemoglobina baja', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '90000203' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-09-03') AND h.hora_inicio = TIME '07:00' LIMIT 1), 'MEDICION', 'Hospital Regional de Luque', DATE '2026-09-03', NULL);
-SELECT maqueta_medicion((SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000203' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-03') LIMIT 1), 'HB', 11.1, TIMESTAMP '2026-09-03 07:15');
-SELECT maqueta_diferimiento('90000203', 'Cuadro febril o gripal', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000203' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-03') LIMIT 1), 'CUESTIONARIO_PERSONAL', 'Hospital Regional de Luque', DATE '2026-09-03', NULL);
-SELECT maqueta_cita('90000204', 'Donacion altruista', DATE '2026-09-04', TIME '07:00', 'No apto', NULL, '10000001');
-SELECT maqueta_diferimiento('90000204', 'Hemoglobina baja', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '90000204' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-09-04') AND h.hora_inicio = TIME '07:00' LIMIT 1), 'MEDICION', 'Hospital Regional de Luque', DATE '2026-09-04', NULL);
-SELECT maqueta_medicion((SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000204' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-04') LIMIT 1), 'HB', 11.1, TIMESTAMP '2026-09-04 07:15');
-SELECT maqueta_diferimiento('90000204', 'Enfermedad infecciosa reciente', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000204' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-04') LIMIT 1), 'CUESTIONARIO_PERSONAL', 'Hospital Regional de Luque', DATE '2026-09-04', NULL);
-SELECT maqueta_cita('90000205', 'Donacion altruista', DATE '2026-09-07', TIME '07:00', 'No apto', NULL, '10000001');
-SELECT maqueta_diferimiento('90000205', 'Presión arterial fuera de rango', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '90000205' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-09-07') AND h.hora_inicio = TIME '07:00' LIMIT 1), 'MEDICION', 'Hospital Regional de Luque', DATE '2026-09-07', NULL);
-SELECT maqueta_medicion((SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000205' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-07') LIMIT 1), 'PAS', 170, TIMESTAMP '2026-09-07 07:15');
-SELECT maqueta_diferimiento('90000205', 'Enfermedad infecciosa reciente', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000205' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-07') LIMIT 1), 'CUESTIONARIO_PERSONAL', 'Hospital Regional de Luque', DATE '2026-09-07', NULL);
-SELECT maqueta_cita('90000206', 'Donacion altruista', DATE '2026-09-08', TIME '07:00', 'No apto', NULL, '10000001');
-SELECT maqueta_diferimiento('90000206', 'Presión arterial fuera de rango', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '90000206' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-09-08') AND h.hora_inicio = TIME '07:00' LIMIT 1), 'MEDICION', 'Hospital Regional de Luque', DATE '2026-09-08', NULL);
-SELECT maqueta_medicion((SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000206' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-08') LIMIT 1), 'PAS', 170, TIMESTAMP '2026-09-08 07:15');
-SELECT maqueta_diferimiento('90000206', 'Tratamiento con antibióticos', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000206' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-08') LIMIT 1), 'CUESTIONARIO_PERSONAL', 'Hospital Regional de Luque', DATE '2026-09-08', NULL);
-SELECT maqueta_cita('90000207', 'Donacion altruista', DATE '2026-09-09', TIME '07:00', 'No apto', NULL, '10000001');
-SELECT maqueta_diferimiento('90000207', 'Presión arterial fuera de rango', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '90000207' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-09-09') AND h.hora_inicio = TIME '07:00' LIMIT 1), 'MEDICION', 'Hospital Regional de Luque', DATE '2026-09-09', NULL);
-SELECT maqueta_medicion((SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000207' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-09') LIMIT 1), 'PAS', 170, TIMESTAMP '2026-09-09 07:15');
-SELECT maqueta_diferimiento('90000207', 'Tratamiento con antibióticos', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000207' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-09') LIMIT 1), 'CUESTIONARIO_PERSONAL', 'Hospital Regional de Luque', DATE '2026-09-09', NULL);
-SELECT maqueta_cita('90000208', 'Donacion altruista', DATE '2026-09-10', TIME '07:00', 'No apto', NULL, '10000001');
-SELECT maqueta_diferimiento('90000208', 'Presión arterial fuera de rango', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '90000208' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-09-10') AND h.hora_inicio = TIME '07:00' LIMIT 1), 'MEDICION', 'Hospital Regional de Luque', DATE '2026-09-10', NULL);
-SELECT maqueta_medicion((SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000208' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-10') LIMIT 1), 'PAS', 170, TIMESTAMP '2026-09-10 07:15');
-SELECT maqueta_diferimiento('90000208', 'Peso inferior al mínimo', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000208' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-10') LIMIT 1), 'CUESTIONARIO_PERSONAL', 'Hospital Regional de Luque', DATE '2026-09-10', NULL);
-SELECT maqueta_diferimiento('90000001', 'VDRL (Sífilis)', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000001' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-01') LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2026-09-01', NULL);
-SELECT maqueta_diferimiento('90000002', 'Chagas (T. cruzi)', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000002' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-02') LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2026-09-02', NULL);
-SELECT maqueta_diferimiento('90000003', 'HTLV I/II', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000003' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-03') LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2026-09-03', NULL);
-SELECT maqueta_diferimiento('90000004', 'CMV', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='90000004' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2026-09-04') LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2026-09-04', NULL);
 
 -- Citaciones de consejería (solo permanentes con resultado)
 
@@ -1052,9 +960,543 @@ SELECT s.id_solicitud, NULL, 'Creada', timestamp '2026-11-01 09:00'
    AND NOT EXISTS (
        SELECT 1 FROM historial_solicitud h WHERE h.id_solicitud = s.id_solicitud);
 
+-- Año 2026: entre 50 y 200 casos por mes, con los escenarios de los informes.
+-- El documento 91MMNNN es el caso. 92MMNNN es el paciente de una donación solidaria.
+-- La vida útil de cada unidad es la fecha de extracción más 30 días.
+
+DROP FUNCTION IF EXISTS maqueta_anio();
+
+CREATE OR REPLACE FUNCTION maqueta_anio()
+RETURNS void
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  v_mes integer;
+  v_n integer;
+  v_i integer;
+  v_esc integer;
+  v_dia integer;
+  v_ultimo integer;
+  v_edad integer;
+  v_idx integer;
+  v_idx2 integer;
+  v_doc varchar;
+  v_pac varchar;
+  v_gen varchar;
+  v_grupo varchar;
+  v_fecha date;
+  v_nac date;
+  v_hora time;
+  v_obs text;
+  v_reaccion varchar;
+  v_causa varchar;
+  v_causa2 varchar;
+  v_origen varchar;
+  v_origen2 varchar;
+  v_pers varchar;
+  v_pers2 varchar;
+  v_tipo_cita varchar;
+  v_tipo_inc varchar;
+  v_momento varchar;
+  v_marcador varchar;
+  v_pai varchar;
+  v_med_codigo varchar;
+  v_med_valor numeric;
+  v_cita integer;
+  v_sol integer;
+  v_ext integer;
+  v_serol integer := 0;
+  v_con_res boolean;
+  v_causas text[] := ARRAY[
+    'Cuadro febril o gripal',
+    'Tratamiento con antibióticos',
+    'Enfermedad infecciosa reciente',
+    'Viaje a zona endémica',
+    'Tatuaje, piercing o acupuntura',
+    'Cirugía o procedimiento invasivo',
+    'Transfusión recibida',
+    'Embarazo o lactancia'
+  ];
+  v_marcas text[] := ARRAY[
+    'VIH 1/2',
+    'HBsAg (Hepatitis B)',
+    'Anti-HCV (Hepatitis C)',
+    'VDRL (Sífilis)',
+    'Chagas (T. cruzi)',
+    'HTLV I/II',
+    'Anti-HBc (Hepatitis B)',
+    'CMV'
+  ];
+  v_tipos text[] := ARRAY[
+    'Hematoma', 'Febril', 'Lipotimia', 'Alérgica', 'Náuseas',
+    'Dolor local', 'Hipotensión', 'Hormigueo', 'Vasovagal', 'Otro'
+  ];
+  v_grupos text[] := ARRAY[
+    'O+','O+','O+','A+','A+','B+','AB+','O-','A-','B-','AB-'
+  ];
+  v_cupos integer[] := ARRAY[93,106,119,132,145,87,100,113,126,139,81,94];
+BEGIN
+  FOR v_mes IN 1..12 LOOP
+    v_n := v_cupos[v_mes];
+    v_ultimo := extract(day FROM (make_date(2026, v_mes, 1) + interval '1 month - 1 day'))::int;
+    FOR v_i IN 1..v_n LOOP
+      v_doc := '91' || lpad(v_mes::text, 2, '0') || lpad(v_i::text, 3, '0');
+      IF EXISTS (SELECT 1 FROM usuario WHERE documento = v_doc) THEN
+        CONTINUE;
+      END IF;
+
+      v_dia := 1 + ((v_i * 7 + v_mes) % v_ultimo);
+      v_fecha := make_date(2026, v_mes, v_dia);
+      v_hora := (time '07:00' + ((v_i % 16) * interval '30 minutes'))::time;
+      v_edad := 18 + ((v_i * 11 + v_mes) % 48);
+      v_nac := (v_fecha - make_interval(years => v_edad))::date;
+      v_gen := CASE WHEN v_i % 2 = 0 THEN 'Femenino' ELSE 'Masculino' END;
+      v_grupo := v_grupos[1 + ((v_i + v_mes) % array_length(v_grupos, 1))];
+      v_esc := 1 + ((v_i + v_mes * 3) % 10);
+      v_reaccion := CASE WHEN (v_i + v_mes) % 7 = 0 THEN 'Lipotimia' ELSE 'Normal' END;
+      v_obs := format(
+        'Brazo: Derecho · Punción: Punción única · Reacción: %s · Anticoagulante: CPD-A · Bolsa: Simple · Marca: HRL · Inicio: %s · Fin: %s · Cantidad: 450 ml · Unidades: 1 · Tabuladora: T1 · Lote: L2026 · Resultado: Completa',
+        v_reaccion,
+        to_char(v_hora, 'HH24:MI'),
+        to_char((v_hora + interval '15 minutes')::time, 'HH24:MI'));
+
+      PERFORM maqueta_usuario(
+        v_doc, 'Donante', 'Año ' || v_doc, v_nac, v_gen,
+        NULL, v_doc || '@maqueta.local', v_grupo, v_fecha::timestamp + v_hora);
+
+      IF v_esc IN (1, 7, 10) THEN
+        v_tipo_cita := CASE WHEN v_esc = 10 THEN 'Reposicion' ELSE 'Donacion altruista' END;
+        v_con_res := NOT (v_esc = 1 AND v_fecha >= CURRENT_DATE - 10 AND v_i % 4 = 0);
+        PERFORM maqueta_donacion(
+          v_doc, v_tipo_cita, v_fecha, v_hora, 'UN-A-' || v_doc, v_grupo,
+          'No reactivo', 'En stock', NULL, v_obs, NULL, v_esc = 7, v_con_res);
+
+      ELSIF v_esc = 2 THEN
+        v_pac := '92' || substring(v_doc FROM 3);
+        PERFORM maqueta_usuario(
+          v_pac, 'Paciente', 'Solicitud ' || v_pac, v_nac, v_gen,
+          NULL, v_pac || '@maqueta.local', v_grupo, v_fecha::timestamp);
+        PERFORM maqueta_solicitud(
+          v_pac, 'Dra. Liz Montiel', v_grupo, 1, 1, 'Cerrada',
+          (v_fecha - 1)::timestamp + time '09:00');
+        PERFORM maqueta_donacion(
+          v_doc, 'Donacion solidaria', v_fecha, v_hora, 'UN-A-' || v_doc, v_grupo,
+          'No reactivo', 'Asignada', NULL, v_obs, v_pac, false, true);
+
+      ELSIF v_esc = 3 THEN
+        v_serol := v_serol + 1;
+        v_marcador := v_marcas[1 + ((v_serol - 1) % array_length(v_marcas, 1))];
+        PERFORM maqueta_donacion(
+          v_doc, 'Donacion altruista', v_fecha, v_hora, 'UN-A-' || v_doc, v_grupo,
+          'Reactivo', 'Descartada', NULL, v_obs, NULL, false, true);
+        SELECT e.id_cita INTO v_cita
+          FROM unidad un
+          JOIN extraccion e ON e.id_extraccion = un.id_extraccion
+         WHERE un.codigo = 'UN-A-' || v_doc;
+        PERFORM maqueta_diferimiento(
+          v_doc, v_marcador, v_cita, 'LABORATORIO',
+          'Hospital Regional de Luque', v_fecha, NULL, NULL);
+        INSERT INTO citacion_consejeria (
+            id_donante, id_personal, id_horario, id_resultado, estado)
+        SELECT don.id_usuario, jef.id_usuario,
+               maqueta_id_horario(v_fecha, v_hora), r.id_resultado, 'Pendiente'
+          FROM usuario don
+          JOIN usuario jef ON jef.documento = '10000002'
+          JOIN unidad un ON un.codigo = 'UN-A-' || v_doc
+          JOIN resultado_laboratorio r ON r.id_unidad = un.id_unidad
+         WHERE don.documento = v_doc
+           AND NOT EXISTS (
+               SELECT 1 FROM citacion_consejeria c
+                WHERE c.id_resultado = r.id_resultado);
+
+      ELSIF v_esc IN (4, 5, 8) THEN
+        v_idx := 1 + ((v_i + v_mes) % array_length(v_causas, 1));
+        IF v_causas[v_idx] = 'Embarazo o lactancia' AND v_gen <> 'Femenino' THEN
+          v_idx := 1;
+        END IF;
+        v_causa := v_causas[v_idx];
+        IF v_esc = 5 OR (v_esc = 8 AND v_i % 2 = 0) THEN
+          v_cita := maqueta_cita(
+            v_doc, 'Donacion altruista', v_fecha, v_hora, 'No apto',
+            NULL, '10000001', v_esc = 8);
+          IF v_i % 3 = 0 THEN
+            v_med_codigo := 'HB';
+            v_med_valor := 11.0;
+            v_causa := 'Hemoglobina baja';
+          ELSIF v_i % 3 = 1 THEN
+            v_med_codigo := 'PAS';
+            v_med_valor := 170;
+            v_causa := 'Presión arterial fuera de rango';
+          ELSE
+            v_med_codigo := 'PESO';
+            v_med_valor := 45;
+            v_causa := 'Peso inferior al mínimo';
+          END IF;
+          PERFORM maqueta_medicion(v_cita, v_med_codigo, v_med_valor, v_fecha::timestamp + v_hora);
+          PERFORM maqueta_diferimiento(
+            v_doc, v_causa, v_cita, 'MEDICION',
+            'Hospital Regional de Luque', v_fecha, NULL, '10000001');
+        ELSE
+          v_cita := maqueta_cita(
+            v_doc, 'Donacion altruista', v_fecha, v_hora, 'No apto',
+            NULL, '10000001', v_esc = 8);
+          v_origen := CASE WHEN v_i % 2 = 0 THEN 'CUESTIONARIO_SISTEMA' ELSE 'CUESTIONARIO_PERSONAL' END;
+          v_pers := CASE WHEN v_origen = 'CUESTIONARIO_SISTEMA' THEN NULL ELSE '10000001' END;
+          PERFORM maqueta_diferimiento(
+            v_doc, v_causa, v_cita, v_origen,
+            'Hospital Regional de Luque', v_fecha, NULL, v_pers);
+          IF v_i % 3 = 0 THEN
+            v_idx2 := 1 + (v_idx % array_length(v_causas, 1));
+            IF v_causas[v_idx2] = 'Embarazo o lactancia' AND v_gen <> 'Femenino' THEN
+              v_idx2 := 1;
+            END IF;
+            IF v_idx2 = v_idx THEN
+              v_idx2 := CASE WHEN v_idx = 1 THEN 2 ELSE 1 END;
+            END IF;
+            v_causa2 := v_causas[v_idx2];
+            v_origen2 := CASE
+              WHEN v_origen = 'CUESTIONARIO_SISTEMA' THEN 'CUESTIONARIO_PERSONAL'
+              ELSE 'CUESTIONARIO_SISTEMA' END;
+            v_pers2 := CASE WHEN v_origen2 = 'CUESTIONARIO_SISTEMA' THEN NULL ELSE '10000001' END;
+            PERFORM maqueta_diferimiento(
+              v_doc, v_causa2, v_cita, v_origen2,
+              'Hospital Regional de Luque', v_fecha, NULL, v_pers2);
+          END IF;
+        END IF;
+
+      ELSIF v_esc = 6 THEN
+        v_tipo_inc := v_tipos[1 + (v_i % array_length(v_tipos, 1))];
+        v_momento := CASE WHEN v_i % 2 = 0 THEN 'Durante' ELSE 'Posterior' END;
+        v_obs := format(
+          'Momento: %s · Tipo: %s · Resultado: Sin sangre · Incidencia: Extracción interrumpida.',
+          v_momento, v_tipo_inc);
+        v_cita := maqueta_cita(
+          v_doc, 'Donacion altruista', v_fecha, v_hora, 'Completada',
+          NULL, '10000001', false);
+        IF NOT EXISTS (SELECT 1 FROM extraccion WHERE id_cita = v_cita) THEN
+          INSERT INTO extraccion (id_cita, id_personal, codigo_unico, fecha, observacion)
+          SELECT v_cita, p.id_usuario, 'EX-A-' || v_doc,
+                 v_fecha::timestamp + v_hora, v_obs
+            FROM usuario p
+           WHERE p.documento = '10000001';
+        END IF;
+
+      ELSE
+        -- Escenario 9: solicitud de volúmenes, cita agendada y muestra.
+        v_sol := maqueta_solicitud(
+          v_doc, 'Dra. Liz Montiel', v_grupo, 2, 0, 'Creada',
+          (v_fecha - 1)::timestamp + time '09:00');
+        v_cita := maqueta_cita(
+          v_doc, 'Extraccion de muestra para compatibilidad', v_fecha, v_hora,
+          'Completada', NULL, '10000001', false);
+        IF NOT EXISTS (SELECT 1 FROM extraccion WHERE id_cita = v_cita) THEN
+          INSERT INTO extraccion (id_cita, id_personal, codigo_unico, fecha, observacion)
+          SELECT v_cita, p.id_usuario, 'EX-A-' || v_doc,
+                 v_fecha::timestamp + v_hora,
+                 'Brazo: Derecho · Punción: Punción única · Reacción: Normal · Resultado: Completa · Incidencia: Muestra para compatibilidad.'
+            FROM usuario p
+           WHERE p.documento = '10000001'
+          RETURNING id_extraccion INTO v_ext;
+        ELSE
+          SELECT id_extraccion INTO v_ext FROM extraccion WHERE id_cita = v_cita;
+        END IF;
+        INSERT INTO muestra_compatibilidad (id_extraccion, id_solicitud, codigo, fecha)
+        SELECT v_ext, v_sol, 'MC-A-' || v_doc, v_fecha::timestamp + v_hora
+         WHERE NOT EXISTS (
+             SELECT 1 FROM muestra_compatibilidad m WHERE m.id_extraccion = v_ext);
+        v_pai := CASE WHEN v_i % 4 = 0 THEN 'PAI positivo' ELSE 'PAI negativo' END;
+        INSERT INTO resultado_compatibilidad (
+            id_muestra, id_tipo_sangre, id_diferimiento, fecha)
+        SELECT m.id_muestra, maqueta_id_tipo(v_grupo), d.id_diferimiento, m.fecha
+          FROM muestra_compatibilidad m
+          JOIN diferimiento d ON d.nombre = v_pai
+         WHERE m.codigo = 'MC-A-' || v_doc
+           AND NOT EXISTS (
+               SELECT 1 FROM resultado_compatibilidad r
+                WHERE r.id_muestra = m.id_muestra);
+        IF v_pai = 'PAI positivo' THEN
+          INSERT INTO registro_diferimiento (
+              id_donante, id_diferimiento, id_cita, id_personal, origen,
+              institucion_diagnostico, fecha_inicio, id_resultado_compatibilidad)
+          SELECT don.id_usuario, d.id_diferimiento, v_cita, NULL, 'LABORATORIO',
+                 'Hospital Regional de Luque', v_fecha, rc.id_resultado_compatibilidad
+            FROM usuario don
+            JOIN diferimiento d ON d.nombre = 'PAI positivo'
+            JOIN muestra_compatibilidad m ON m.codigo = 'MC-A-' || v_doc
+            JOIN resultado_compatibilidad rc ON rc.id_muestra = m.id_muestra
+           WHERE don.documento = v_doc
+             AND NOT EXISTS (
+                 SELECT 1 FROM registro_diferimiento r
+                  WHERE r.id_resultado_compatibilidad = rc.id_resultado_compatibilidad);
+          INSERT INTO citacion_consejeria (
+              id_donante, id_personal, id_horario, id_resultado_compatibilidad, estado)
+          SELECT don.id_usuario, jef.id_usuario,
+                 maqueta_id_horario(v_fecha, v_hora),
+                 rc.id_resultado_compatibilidad, 'Pendiente'
+            FROM usuario don
+            JOIN usuario jef ON jef.documento = '10000002'
+            JOIN muestra_compatibilidad m ON m.codigo = 'MC-A-' || v_doc
+            JOIN resultado_compatibilidad rc ON rc.id_muestra = m.id_muestra
+           WHERE don.documento = v_doc
+             AND NOT EXISTS (
+                 SELECT 1 FROM citacion_consejeria c
+                  WHERE c.id_resultado_compatibilidad = rc.id_resultado_compatibilidad);
+        END IF;
+      END IF;
+    END LOOP;
+  END LOOP;
+END;
+$$;
+
+SELECT maqueta_anio();
+
+DO $$
+DECLARE
+  v_mes integer;
+  v_n integer;
+  v_marca text;
+  v_rango text;
+  v_marcas text[] := ARRAY[
+    'VIH 1/2', 'HBsAg (Hepatitis B)', 'Anti-HCV (Hepatitis C)', 'VDRL (Sífilis)',
+    'Chagas (T. cruzi)', 'HTLV I/II', 'Anti-HBc (Hepatitis B)', 'CMV'
+  ];
+BEGIN
+  FOR v_mes IN 1..12 LOOP
+    SELECT count(*) INTO v_n
+      FROM usuario
+     WHERE documento LIKE '91' || lpad(v_mes::text, 2, '0') || '%';
+    IF v_n < 50 OR v_n > 200 THEN
+      RAISE EXCEPTION 'El mes % tiene % casos (corresponde entre 50 y 200)', v_mes, v_n;
+    END IF;
+  END LOOP;
+
+  IF (SELECT count(DISTINCT genero) FROM usuario WHERE documento LIKE '91%') < 2 THEN
+    RAISE EXCEPTION 'Faltan géneros en los casos del año';
+  END IF;
+
+  FOREACH v_rango IN ARRAY ARRAY['18-25','26-35','36-45','46-55','56-65'] LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM usuario u
+       WHERE u.documento LIKE '91%'
+         AND extract(year FROM age(DATE '2026-06-15', u.fecha_nacimiento))::int
+             BETWEEN split_part(v_rango, '-', 1)::int AND split_part(v_rango, '-', 2)::int
+    ) THEN
+      RAISE EXCEPTION 'Falta el rango de edad %', v_rango;
+    END IF;
+  END LOOP;
+
+  IF (SELECT count(DISTINCT rtrim(t.grupo) || t.factor)
+        FROM unidad un
+        JOIN usuario u ON u.id_usuario = un.id_donante
+        JOIN tipo_sangre t ON t.id_tipo_sangre = un.id_tipo_sangre
+       WHERE u.documento LIKE '91%') < 8 THEN
+    RAISE EXCEPTION 'Faltan grupos sanguíneos en las unidades del año';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM cita c
+    JOIN usuario u ON u.id_usuario = c.id_usuario
+    JOIN extraccion e ON e.id_cita = c.id_cita
+    JOIN unidad un ON un.id_extraccion = e.id_extraccion
+    JOIN resultado_laboratorio r ON r.id_unidad = un.id_unidad
+    WHERE u.documento LIKE '91%'
+      AND c.tipo_cita = 'Donacion altruista'
+      AND c.fecha_hora_creacion::time <> time '00:01'
+      AND r.resultado = 'No reactivo'
+  ) THEN
+    RAISE EXCEPTION 'Falta donación altruista exitosa con agendamiento';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM cita c
+    JOIN usuario u ON u.id_usuario = c.id_usuario
+    JOIN extraccion e ON e.id_cita = c.id_cita
+    JOIN unidad un ON un.id_extraccion = e.id_extraccion
+    JOIN resultado_laboratorio r ON r.id_unidad = un.id_unidad
+    WHERE u.documento LIKE '91%'
+      AND c.tipo_cita = 'Donacion solidaria'
+      AND r.resultado = 'No reactivo'
+      AND un.estado = 'Asignada'
+  ) THEN
+    RAISE EXCEPTION 'Falta donación solidaria exitosa';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM unidad un
+    JOIN usuario u ON u.id_usuario = un.id_donante
+    JOIN resultado_laboratorio r ON r.id_unidad = un.id_unidad
+    JOIN registro_diferimiento rd ON rd.id_resultado = r.id_resultado
+    JOIN diferimiento d ON d.id_diferimiento = rd.id_diferimiento
+    WHERE u.documento LIKE '91%'
+      AND r.resultado = 'Reactivo'
+      AND un.estado = 'Descartada'
+      AND d.tipo = 'Permanente'
+  ) THEN
+    RAISE EXCEPTION 'Falta extracción con serología reactiva';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM registro_diferimiento rd
+    JOIN usuario u ON u.id_usuario = rd.id_donante
+    JOIN cita c ON c.id_cita = rd.id_cita
+    WHERE u.documento LIKE '91%'
+      AND rd.origen = 'CUESTIONARIO_SISTEMA'
+      AND c.fecha_hora_creacion::time <> time '00:01'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM registro_diferimiento rd
+    JOIN usuario u ON u.id_usuario = rd.id_donante
+    JOIN cita c ON c.id_cita = rd.id_cita
+    WHERE u.documento LIKE '91%'
+      AND rd.origen = 'CUESTIONARIO_PERSONAL'
+      AND c.fecha_hora_creacion::time <> time '00:01'
+  ) THEN
+    RAISE EXCEPTION 'Falta diferimiento de cuestionario A o B';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM registro_diferimiento rd
+    JOIN usuario u ON u.id_usuario = rd.id_donante
+    JOIN cita c ON c.id_cita = rd.id_cita
+    JOIN medicion m ON m.id_cita = c.id_cita AND m.apto = false
+    WHERE u.documento LIKE '91%'
+      AND rd.origen = 'MEDICION'
+      AND c.fecha_hora_creacion::time <> time '00:01'
+  ) THEN
+    RAISE EXCEPTION 'Falta diferimiento en el examen físico';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM extraccion e
+    JOIN cita c ON c.id_cita = e.id_cita
+    JOIN usuario u ON u.id_usuario = c.id_usuario
+    WHERE u.documento LIKE '91%'
+      AND e.observacion LIKE '%Incidencia: Extracción interrumpida.%'
+      AND NOT EXISTS (SELECT 1 FROM unidad un WHERE un.id_extraccion = e.id_extraccion)
+  ) THEN
+    RAISE EXCEPTION 'Falta extracción interrumpida';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM cita c
+    JOIN usuario u ON u.id_usuario = c.id_usuario
+    JOIN extraccion e ON e.id_cita = c.id_cita
+    JOIN unidad un ON un.id_extraccion = e.id_extraccion
+    JOIN resultado_laboratorio r ON r.id_unidad = un.id_unidad
+    WHERE u.documento LIKE '91%'
+      AND c.tipo_cita = 'Donacion altruista'
+      AND c.fecha_hora_creacion::time = time '00:01'
+      AND r.resultado = 'No reactivo'
+  ) THEN
+    RAISE EXCEPTION 'Falta donación exitosa sin agendamiento';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM cita c
+    JOIN usuario u ON u.id_usuario = c.id_usuario
+    JOIN registro_diferimiento rd ON rd.id_cita = c.id_cita
+    WHERE u.documento LIKE '91%'
+      AND c.fecha_hora_creacion::time = time '00:01'
+      AND c.estado = 'No apto'
+      AND NOT EXISTS (SELECT 1 FROM extraccion e WHERE e.id_cita = c.id_cita)
+  ) THEN
+    RAISE EXCEPTION 'Falta diferimiento sin agendamiento';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM muestra_compatibilidad m
+    JOIN extraccion e ON e.id_extraccion = m.id_extraccion
+    JOIN cita c ON c.id_cita = e.id_cita
+    JOIN usuario u ON u.id_usuario = c.id_usuario
+    JOIN solicitud s ON s.id_solicitud = m.id_solicitud
+    WHERE u.documento LIKE '91%'
+      AND c.tipo_cita = 'Extraccion de muestra para compatibilidad'
+      AND c.fecha_hora_creacion::time <> time '00:01'
+  ) THEN
+    RAISE EXCEPTION 'Falta muestra de compatibilidad con solicitud';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM cita c
+    JOIN usuario u ON u.id_usuario = c.id_usuario
+    JOIN extraccion e ON e.id_cita = c.id_cita
+    JOIN unidad un ON un.id_extraccion = e.id_extraccion
+    JOIN resultado_laboratorio r ON r.id_unidad = un.id_unidad
+    WHERE u.documento LIKE '91%'
+      AND c.tipo_cita = 'Reposicion'
+      AND r.resultado = 'No reactivo'
+  ) THEN
+    RAISE EXCEPTION 'Falta donación de reposición exitosa';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM extraccion e
+    JOIN cita c ON c.id_cita = e.id_cita
+    JOIN usuario u ON u.id_usuario = c.id_usuario
+    WHERE u.documento LIKE '91%'
+      AND e.observacion LIKE '%Lipotimia%'
+  ) THEN
+    RAISE EXCEPTION 'Faltan lipotimias';
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM registro_diferimiento rd
+    JOIN diferimiento d ON d.id_diferimiento = rd.id_diferimiento
+    JOIN usuario u ON u.id_usuario = rd.id_donante
+    WHERE u.documento LIKE '91%' AND d.tipo = 'Temporal'
+  ) OR NOT EXISTS (
+    SELECT 1 FROM registro_diferimiento rd
+    JOIN diferimiento d ON d.id_diferimiento = rd.id_diferimiento
+    JOIN usuario u ON u.id_usuario = rd.id_donante
+    WHERE u.documento LIKE '91%' AND d.tipo = 'Permanente'
+  ) THEN
+    RAISE EXCEPTION 'Faltan diferimientos temporales o permanentes';
+  END IF;
+
+  FOREACH v_marca IN ARRAY v_marcas LOOP
+    IF NOT EXISTS (
+      SELECT 1 FROM registro_diferimiento rd
+      JOIN diferimiento d ON d.id_diferimiento = rd.id_diferimiento
+      JOIN usuario u ON u.id_usuario = rd.id_donante
+      JOIN resultado_laboratorio r ON r.id_resultado = rd.id_resultado
+      WHERE u.documento LIKE '91%'
+        AND d.nombre = v_marca
+        AND r.resultado = 'Reactivo'
+    ) THEN
+      RAISE EXCEPTION 'Falta el marcador %', v_marca;
+    END IF;
+  END LOOP;
+
+  IF EXISTS (
+    SELECT 1 FROM unidad un
+    JOIN resultado_laboratorio r ON r.id_unidad = un.id_unidad
+    WHERE un.estado = 'En stock' AND r.resultado = 'Reactivo'
+  ) THEN
+    RAISE EXCEPTION 'Una unidad reactiva quedó en stock';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM unidad
+    WHERE estado = 'En stock'
+      AND codigo LIKE 'UN-A-%'
+      AND fecha_vencimiento < CURRENT_DATE
+  ) THEN
+    RAISE EXCEPTION 'Hay unidades del año vencidas contadas en stock';
+  END IF;
+
+  IF EXISTS (
+    SELECT 1 FROM unidad un
+    JOIN extraccion e ON e.id_extraccion = un.id_extraccion
+    WHERE un.codigo LIKE 'UN-A-%'
+      AND un.fecha_vencimiento IS DISTINCT FROM (e.fecha::date + 30)
+  ) THEN
+    RAISE EXCEPTION 'El vencimiento no es la extracción más 30 días';
+  END IF;
+END;
+$$;
+
 COMMIT;
 
--- Controles (período 2026-09-01 a 2026-09-10)
+-- Controles. El bloque anterior aborta la carga si el año no cierra.
 SELECT
   (SELECT count(*) FROM rol) AS roles,
   (SELECT count(*) FROM tipo_sangre) AS tipos_sangre,
@@ -1079,7 +1521,7 @@ SELECT
     WHERE u.documento IN ('3456789','4123456','2987654','5234567','3789012',
                           '4567890','2345678','6123456','1876543','5678901')
       AND c.fecha_hora_creacion = timestamp '2026-09-09 08:00'
-      AND c.tipo_cita <> 'Extraccion de compatibilidad') AS citas_dia_nominales,
+      AND c.tipo_cita <> 'Extraccion de muestra para compatibilidad') AS citas_dia_nominales,
   (SELECT count(*) FROM usuario u
     WHERE u.documento IN ('7111111','7222222','7333333','7444444','7555555')
       AND NOT EXISTS (
@@ -1089,7 +1531,7 @@ SELECT
     WHERE u.documento IN ('1234567','80000001','80000002','80000003')) AS solicitudes_nominales,
   (SELECT count(*) FROM extraccion e JOIN cita c ON c.id_cita = e.id_cita
     WHERE e.fecha::date BETWEEN DATE '2026-09-01' AND DATE '2026-09-10'
-      AND c.tipo_cita <> 'Extraccion de compatibilidad') AS extracciones_periodo,
+      AND c.tipo_cita <> 'Extraccion de muestra para compatibilidad') AS extracciones_periodo,
   (SELECT count(*) FROM cita c JOIN extraccion e ON e.id_cita = c.id_cita
     WHERE e.fecha::date BETWEEN DATE '2026-09-01' AND DATE '2026-09-10'
       AND c.tipo_cita = 'Donacion altruista') AS altruistas_periodo,
@@ -1103,13 +1545,13 @@ SELECT
     JOIN extraccion e ON e.id_extraccion = u.id_extraccion
     JOIN cita c ON c.id_cita = e.id_cita
     WHERE e.fecha::date BETWEEN DATE '2026-09-01' AND DATE '2026-09-10'
-      AND c.tipo_cita <> 'Extraccion de compatibilidad'
+      AND c.tipo_cita <> 'Extraccion de muestra para compatibilidad'
       AND r.resultado = 'Reactivo') AS reactivos_periodo,
   (SELECT count(*) FROM resultado_laboratorio r JOIN unidad u ON u.id_unidad = r.id_unidad
     JOIN extraccion e ON e.id_extraccion = u.id_extraccion
     JOIN cita c ON c.id_cita = e.id_cita
     WHERE e.fecha::date BETWEEN DATE '2026-09-01' AND DATE '2026-09-10'
-      AND c.tipo_cita <> 'Extraccion de compatibilidad'
+      AND c.tipo_cita <> 'Extraccion de muestra para compatibilidad'
       AND r.resultado = 'No reactivo') AS no_reactivos_periodo,
   (SELECT count(*) FROM unidad WHERE estado = 'En stock') AS stock_total,
   (SELECT count(*) FROM unidad
