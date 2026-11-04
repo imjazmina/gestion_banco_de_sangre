@@ -126,8 +126,8 @@ def _exigir_ajeno(cita, personal):
 
 
 def marcar_ausente(cita, personal):
-    if cita.estado not in Cita.ACTIVAS:
-        raise ErrorJornada("Esa cita ya no está pendiente de atención.")
+    if cita.estado != Cita.CONFIRMADA:
+        raise ErrorJornada("Solo una cita confirmada puede quedar ausente.")
     _exigir_ajeno(cita, personal)
     cita.estado = Cita.AUSENTE
     cita.id_personal = personal.id_usuario
@@ -287,8 +287,8 @@ def registrar_diferimiento(cita, personal, id_diferimiento, origen, institucion)
                       RegistroDiferimiento.MEDICION):
         raise ErrorJornada("Ese origen no corresponde a esta pantalla.")
     institucion = (institucion or "").strip() or INSTITUCION_LOCAL
-    if cita.estado not in (Cita.PENDIENTE, Cita.CONFIRMADA):
-        raise ErrorJornada("Esta cita ya está cerrada.")
+    if cita.estado != Cita.CONFIRMADA:
+        raise ErrorJornada("Solo una cita confirmada puede quedar no apta.")
 
     registro = RegistroDiferimiento(
         id_donante=cita.id_usuario,
@@ -343,8 +343,8 @@ def registrar_extraccion(cita, personal, observacion, n_unidades=0):
     if not mediciones_aptas(cita):
         raise ErrorJornada(
             "No se extrae si falta una medición o alguna no es apta.")
-    if cita.estado not in (Cita.PENDIENTE, Cita.CONFIRMADA):
-        raise ErrorJornada("Esta cita ya está cerrada.")
+    if cita.estado != Cita.CONFIRMADA:
+        raise ErrorJornada("Solo una cita confirmada puede completarse.")
     if n_unidades < 0:
         raise ErrorJornada("La cantidad de unidades no es válida.")
 
@@ -431,8 +431,8 @@ def registrar_muestra(cita, personal, observacion):
     if not mediciones_aptas(cita):
         raise ErrorJornada(
             "No se extrae si falta una medición o alguna no es apta.")
-    if cita.estado not in (Cita.PENDIENTE, Cita.CONFIRMADA):
-        raise ErrorJornada("Esta cita ya está cerrada.")
+    if cita.estado != Cita.CONFIRMADA:
+        raise ErrorJornada("Solo una cita confirmada puede completarse.")
 
     observacion = (observacion or "").strip() or "Muestra venosa sin incidentes."
     fecha = datetime.now()

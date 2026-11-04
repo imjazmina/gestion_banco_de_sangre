@@ -22,11 +22,10 @@
 
   <p class="muted mt-4">
     {% if citacion.fecha_hora %}Atención {{ citacion.fecha_hora.strftime('%d/%m/%Y %H:%M') }}.{% endif %}
-    Jefatura no agenda, no reprograma, no cancela y no confirma. Desde el día de atención marca ausente o completada. La confirmación la hace el donante ese día.
   </p>
   {% if puede_cerrar %}
   <form method="post" class="row mt-4">
-    <button class="btn btn-primary" name="estado" value="Completada" type="submit">Marcar completada</button>
+    <button class="btn btn-primary" name="estado" value="Realizada" type="submit">Marcar realizada</button>
     <button class="btn btn-ghost" name="estado" value="Ausente" type="submit">Marcar ausente</button>
   </form>
   {% endif %}

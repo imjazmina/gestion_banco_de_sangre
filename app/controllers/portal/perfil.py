@@ -17,6 +17,8 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
 from app.controllers.portal.agenda import diferimiento_vigente
+from app.controllers.portal.autenticacion import hashear, verificar
+from app.controllers.portal.recuperacion import validar_contrasena
 from app.models import (
     db, Usuario, Correo, Auditoria, Cita, Solicitud, HistorialSolicitud,
     Notificacion, Extraccion, Unidad, Asignacion,
@@ -179,6 +181,25 @@ def hacer_principal(usuario, id_correo):
     except IntegrityError:
         db.session.rollback()
         raise ErrorPerfil(["No se pudo cambiar el correo principal. Intentá de nuevo."])
+    except Exception:
+        db.session.rollback()
+        raise
+
+
+def cambiar_contrasena(usuario, actual, nueva, repetida):
+    """Reemplaza el hash. La actual se verifica; la nueva usa las mismas reglas que el alta."""
+    if not verificar(actual or "", usuario.contrasena):
+        raise ErrorPerfil(["La contraseña actual no es correcta."])
+
+    errores = validar_contrasena(nueva, repetida)
+    if errores:
+        raise ErrorPerfil(errores)
+
+    try:
+        usuario.contrasena = hashear(nueva)
+        Auditoria.registrar(usuario.id_usuario, "USUARIO",
+                            usuario.id_usuario, Auditoria.MODIFICACION)
+        db.session.commit()
     except Exception:
         db.session.rollback()
         raise

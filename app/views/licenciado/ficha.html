@@ -160,7 +160,7 @@
         <div class="summary">
           <div class="split">
             <strong class="mono">{{ u.codigo }}</strong>
-            {{ badge(u.estado, {'Registrada':'gray','En laboratorio':'info','En stock':'ok','Asignada':'navy','Utilizada':'gray','Descartada':'danger','Vencida':'danger'}.get(u.estado, 'gray')) }}
+            {{ badge(u.estado, {'Registrada':'gray','En laboratorio':'info','En stock':'ok','Asignada':'navy''Descartada':'danger','Vencida':'danger'}.get(u.estado, 'gray')) }}
           </div>
           {% set trans = transiciones|selectattr('id_unidad', 'equalto', u.id_unidad)|list %}
           {% if trans %}

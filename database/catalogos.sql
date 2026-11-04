@@ -1474,6 +1474,24 @@ BEGIN
     RAISE EXCEPTION 'Una unidad reactiva quedó en stock';
   END IF;
 
+  -- Una unidad con la fecha superada deja el stock: En stock o Asignada → Vencida.
+  INSERT INTO transicion_estado (
+      id_unidad, id_personal, estado_origen, estado_destino, motivo, fecha_hora)
+  SELECT un.id_unidad,
+         (SELECT id_usuario FROM usuario WHERE documento = '10000001'),
+         un.estado,
+         'Vencida',
+         'Fecha de vencimiento ya cargada, superada.',
+         CURRENT_TIMESTAMP
+    FROM unidad un
+   WHERE un.estado IN ('En stock', 'Asignada')
+     AND un.fecha_vencimiento < CURRENT_DATE;
+
+  UPDATE unidad
+     SET estado = 'Vencida'
+   WHERE estado IN ('En stock', 'Asignada')
+     AND fecha_vencimiento < CURRENT_DATE;
+
   IF EXISTS (
     SELECT 1 FROM unidad
     WHERE estado = 'En stock'

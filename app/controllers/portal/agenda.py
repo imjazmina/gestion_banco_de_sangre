@@ -376,6 +376,8 @@ def reprogramar(cita, fecha, id_horario):
 
 
 def cancelar(cita):
+    if cita.estado != Cita.PENDIENTE:
+        raise ErrorAgenda("Solo podés cancelar una cita pendiente.")
     cita.estado = Cita.CANCELADA
     Auditoria.registrar(cita.id_usuario, "CITA", cita.id_cita,
                         Auditoria.CAMBIO_ESTADO)

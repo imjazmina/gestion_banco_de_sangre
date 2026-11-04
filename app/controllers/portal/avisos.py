@@ -219,4 +219,20 @@ def correr(url_base, ahora=None):
     for usuario in pendientes_de_habilitacion(ahora):
         enviar_habilitacion(usuario)
         lineas.append(f"  habilitación usuario {usuario.id_usuario}")
+
+    from app.controllers.comun.simulacion import marcar_vencidas, vencer_publicadas
+    from app.controllers.portal.agenda import DOCUMENTO_PERSONAL_DE_TURNO
+    from app.models import Usuario
+
+    personal = Usuario.query.filter_by(documento=DOCUMENTO_PERSONAL_DE_TURNO).first()
+    if personal is None:
+        lineas.append("  solicitudes: falta el usuario Personal de turno.")
+    else:
+        try:
+            n = vencer_publicadas(personal, (ahora or datetime.now()).date())
+            lineas.append(f"  solicitudes vencidas: {n}")
+            lineas.append(f"  unidades vencidas: {marcar_vencidas(personal)}")
+        except Exception as exc:
+            db.session.rollback()
+            lineas.append(f"  solicitudes: FALLÓ — {exc}")
     return lineas

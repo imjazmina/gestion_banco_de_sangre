@@ -69,6 +69,9 @@ _FLUJO = {
     (Unidad.EN_LABORATORIO, Unidad.DESCARTADA),
     (Unidad.EN_STOCK, Unidad.ASIGNADA),
     (Unidad.EN_STOCK, Unidad.VENCIDA),
+    (Unidad.ASIGNADA, Unidad.UTILIZADA),
+    (Unidad.ASIGNADA, Unidad.EN_STOCK),
+    (Unidad.ASIGNADA, Unidad.VENCIDA),
 }
 
 
@@ -333,6 +336,8 @@ def _asignar_solicitud_de_la_cita(unidad, personal, tipo):
     solicitud.unidades_asignadas = (Asignacion.query
                                     .filter_by(id_solicitud=solicitud.id_solicitud)
                                     .count())
+    if solicitud.unidades_asignadas >= solicitud.unidades_requeridas:
+        _consumir_asignadas(solicitud, personal)
     db.session.add(Notificacion(
         id_usuario=solicitud.id_solicitante,
         id_solicitud=solicitud.id_solicitud,
@@ -348,6 +353,73 @@ def _asignar_solicitud_de_la_cita(unidad, personal, tipo):
             tipo=Notificacion.META_COMPLETA,
             mensaje="La cantidad publicada de tu solicitud ya se completó.",
         ))
+
+
+def _consumir_asignadas(solicitud, personal):
+    """Al completarse la solicitud, cada unidad asignada pasa a Utilizada."""
+    unidades = (Unidad.query
+                .filter_by(id_solicitud=solicitud.id_solicitud,
+                           estado=Unidad.ASIGNADA)
+                .all())
+    for unidad in unidades:
+        _transicion(unidad, personal, Unidad.UTILIZADA)
+
+
+def _liberar_unidades(solicitud, personal):
+    """Asignada vuelve a En stock y deja de ocupar la solicitud vencida."""
+    unidades = (Unidad.query
+                .filter_by(id_solicitud=solicitud.id_solicitud,
+                           estado=Unidad.ASIGNADA)
+                .all())
+    for unidad in unidades:
+        _transicion(unidad, personal, Unidad.EN_STOCK,
+                    motivo="La solicitud venció y la unidad vuelve al stock.")
+        unidad.id_solicitud = None
+        asignacion = Asignacion.query.filter_by(id_unidad=unidad.id_unidad).first()
+        if asignacion is not None:
+            db.session.delete(asignacion)
+    db.session.flush()
+    solicitud.unidades_asignadas = (Asignacion.query
+                                    .filter_by(id_solicitud=solicitud.id_solicitud)
+                                    .count())
+
+
+def fecha_de_publicacion(solicitud):
+    """Día en que quedó Publicada. Si nació así, vale fecha_creacion."""
+    fila = (HistorialSolicitud.query
+            .filter_by(id_solicitud=solicitud.id_solicitud,
+                       estado_nuevo=Solicitud.PUBLICADA)
+            .order_by(HistorialSolicitud.fecha_hora)
+            .first())
+    if fila is not None:
+        return fila.fecha_hora.date()
+    return solicitud.fecha_creacion.date()
+
+
+def vencer_publicadas(personal, hoy=None):
+    """
+    A los 7 días de publicada, si sigue Publicada: pasa a Vencida,
+    libera sus unidades asignadas y avisa al solicitante. Una sola vez.
+    """
+    from app.controllers.comun.estados import solicitud_vencida
+
+    hoy = hoy or date.today()
+    vencidas = 0
+    for solicitud in Solicitud.query.filter_by(estado=Solicitud.PUBLICADA).all():
+        if not solicitud_vencida(fecha_de_publicacion(solicitud), hoy):
+            continue
+        _liberar_unidades(solicitud, personal)
+        _cambiar_estado(solicitud, Solicitud.VENCIDA, personal)
+        db.session.add(Notificacion(
+            id_usuario=solicitud.id_solicitante,
+            id_solicitud=solicitud.id_solicitud,
+            tipo=Notificacion.SOLICITUD_VENCIDA,
+            mensaje="Tu solicitud venció a los 7 días de publicada y no se completó.",
+        ))
+        vencidas += 1
+    if vencidas:
+        db.session.commit()
+    return vencidas
 
 
 def _soltar_vinculo(cita, personal):
@@ -624,12 +696,12 @@ def simular_compatibilidad(id_muestra):
 
 
 def marcar_vencidas(personal):
-    """Pasa a Vencida una unidad en stock cuya fecha cargada ya se superó."""
+    """Pasa a Vencida una unidad cuya fecha ya se superó. Sale del stock."""
     hoy = date.today()
     unidades = (Unidad.query
                 .filter(Unidad.fecha_vencimiento.isnot(None),
                         Unidad.fecha_vencimiento < hoy,
-                        Unidad.estado == Unidad.EN_STOCK)
+                        Unidad.estado.in_((Unidad.EN_STOCK, Unidad.ASIGNADA)))
                 .all())
     for unidad in unidades:
         _transicion(unidad, personal, Unidad.VENCIDA,

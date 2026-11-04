@@ -13,7 +13,8 @@ perfil_bp = Blueprint("perfil", __name__, url_prefix="/perfil")
 def ver():
     return render_template("portal/perfil/ver.html",
                            **ctrl.resumen(usuario_actual()),
-                           editando=request.args.get("editar") == "1")
+                           editando=request.args.get("editar") == "1",
+                           abrir_clave=request.args.get("clave") == "1")
 
 
 @perfil_bp.post("/")
@@ -31,10 +32,10 @@ def guardar():
     return redirect(url_for("perfil.ver"))
 
 
-def _volver_con_error(error):
+def _volver_con_error(error, **extra):
     for mensaje in error.args[0]:
         flash(mensaje, "error")
-    return redirect(url_for("perfil.ver"))
+    return redirect(url_for("perfil.ver", **extra))
 
 
 @perfil_bp.post("/correos")
@@ -78,6 +79,22 @@ def eliminar_correo(id_correo):
     except ctrl.ErrorPerfil as e:
         return _volver_con_error(e)
     flash("Correo eliminado.", "ok")
+    return redirect(url_for("perfil.ver"))
+
+
+@perfil_bp.post("/contrasena")
+@requiere_login
+def cambiar_contrasena():
+    try:
+        ctrl.cambiar_contrasena(
+            usuario_actual(),
+            request.form.get("actual"),
+            request.form.get("nueva"),
+            request.form.get("repetir"),
+        )
+    except ctrl.ErrorPerfil as e:
+        return _volver_con_error(e, clave=1)
+    flash("Tu contraseña fue actualizada.", "ok")
     return redirect(url_for("perfil.ver"))
 
 

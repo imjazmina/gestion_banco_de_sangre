@@ -33,7 +33,9 @@
         {% if not cuestionario.completo %}
         <a class="btn btn-secondary" href="{{ url_for('mi_cita.reprogramar') }}">{{ ico('calendar') }} Reprogramar</a>
         {% endif %}
+        {% if cita.estado == 'Pendiente' %}
         <a class="btn btn-danger" href="{{ url_for('mi_cita.ver', confirmar='cancelar') }}">{{ ico('x') }} Cancelar cita</a>
+        {% endif %}
       </div>
     </div>
 
@@ -107,7 +109,7 @@
 
 {# Confirmación de cancelación. Va con ?confirmar=cancelar para que funcione
    igual sin JavaScript. #}
-{% if cita and confirmar == 'cancelar' %}
+{% if cita and cita.estado == 'Pendiente' and confirmar == 'cancelar' %}
 <div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="t-cancelar">
   <div class="modal-box">
     <h3 id="t-cancelar">Cancelar cita</h3>

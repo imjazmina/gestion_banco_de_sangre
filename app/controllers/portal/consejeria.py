@@ -6,7 +6,7 @@ reserva. Si cancela, la misma fila vuelve a Pendiente al reservar de nuevo:
 hay una sola citación por resultado. No hay cuestionario.
 
 Jefatura no reserva, no reprograma y no cancela. El día de atención la
-confirma el donante. Desde ese día, jefatura marca ausente o completada.
+confirma el donante. Desde ese día, jefatura marca ausente o realizada.
 
 El historial solo guarda el cambio de estado. Una reprogramación no lo
 cambia: queda en auditoría como MODIFICACION. No hay columna de motivo.

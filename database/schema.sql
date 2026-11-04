@@ -410,7 +410,7 @@ CREATE TABLE citacion_consejeria (
         'Confirmada',
         'Cancelada',
         'Ausente',
-        'Completada'
+        'Realizada'
     ))
 );
 
@@ -430,7 +430,7 @@ CREATE TABLE historial_cita_consejeria (
             'Confirmada',
             'Cancelada',
             'Ausente',
-            'Completada'
+            'Realizada'
         )
     ),
     CONSTRAINT ck_historial_cita_consejeria_nuevo CHECK (
@@ -439,7 +439,7 @@ CREATE TABLE historial_cita_consejeria (
             'Confirmada',
             'Cancelada',
             'Ausente',
-            'Completada'
+            'Realizada'
         )
     )
 );
@@ -480,6 +480,7 @@ CREATE TABLE notificacion (
         'META_COMPLETA',
         'CITACION_GENERICA',
         'SOLICITUD_ABIERTA',
+        'SOLICITUD_VENCIDA',
         'PRESELECCION_COMPATIBLE'
     ))
 );
@@ -497,7 +498,6 @@ CREATE TABLE buzon (
     tipo varchar(40),
     mensaje text NOT NULL,
     fecha timestamp NOT NULL,
-    estado varchar(20),
     CONSTRAINT fk_buzon_usuario FOREIGN KEY (id_usuario) REFERENCES usuario (id_usuario)
 );
 
@@ -806,6 +806,7 @@ BEGIN
         OR (NEW.estado_origen = 'En stock' AND NEW.estado_destino = 'Asignada')
         OR (NEW.estado_origen = 'En stock' AND NEW.estado_destino = 'Vencida')
         OR (NEW.estado_origen = 'Asignada' AND NEW.estado_destino = 'Utilizada')
+        OR (NEW.estado_origen = 'Asignada' AND NEW.estado_destino = 'En stock')
         OR (NEW.estado_origen = 'Asignada' AND NEW.estado_destino = 'Vencida')
     ) THEN
         RAISE EXCEPTION 'Transicion no permitida: % a %', NEW.estado_origen, NEW.estado_destino;
@@ -823,6 +824,65 @@ CREATE TRIGGER trg_transicion_permitida
 BEFORE INSERT ON transicion_estado
 FOR EACH ROW
 EXECUTE FUNCTION fn_transicion_permitida();
+
+-- El alta puede nacer en Pendiente o Confirmada. Un cambio posterior solo
+-- recorre estos pares.
+CREATE FUNCTION fn_cita_transicion()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF NEW.estado IS NOT DISTINCT FROM OLD.estado THEN
+        RETURN NEW;
+    END IF;
+    IF NOT (
+        (OLD.estado = 'Pendiente' AND NEW.estado = 'Confirmada')
+        OR (OLD.estado = 'Pendiente' AND NEW.estado = 'Cancelada')
+        OR (OLD.estado = 'Confirmada' AND NEW.estado = 'Ausente')
+        OR (OLD.estado = 'Confirmada' AND NEW.estado = 'Completada')
+        OR (OLD.estado = 'Confirmada' AND NEW.estado = 'No apto')
+    ) THEN
+        RAISE EXCEPTION 'Transicion de cita no permitida: % a %', OLD.estado, NEW.estado;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_cita_transicion
+BEFORE UPDATE OF estado ON cita
+FOR EACH ROW
+EXECUTE FUNCTION fn_cita_transicion();
+
+-- Pendiente es el alta. Confirmada la pone el recordatorio del paciente.
+-- Cancelada puede volver a Pendiente: hay una sola citación por resultado.
+-- Realizada reemplaza a Completada.
+CREATE FUNCTION fn_citacion_transicion()
+RETURNS trigger
+LANGUAGE plpgsql
+AS $$
+BEGIN
+    IF NEW.estado IS NOT DISTINCT FROM OLD.estado THEN
+        RETURN NEW;
+    END IF;
+    IF NOT (
+        (OLD.estado = 'Pendiente' AND NEW.estado = 'Confirmada')
+        OR (OLD.estado = 'Pendiente' AND NEW.estado = 'Cancelada')
+        OR (OLD.estado = 'Pendiente' AND NEW.estado = 'Realizada')
+        OR (OLD.estado = 'Pendiente' AND NEW.estado = 'Ausente')
+        OR (OLD.estado = 'Confirmada' AND NEW.estado = 'Realizada')
+        OR (OLD.estado = 'Confirmada' AND NEW.estado = 'Ausente')
+        OR (OLD.estado = 'Cancelada' AND NEW.estado = 'Pendiente')
+    ) THEN
+        RAISE EXCEPTION 'Transicion de citacion no permitida: % a %', OLD.estado, NEW.estado;
+    END IF;
+    RETURN NEW;
+END;
+$$;
+
+CREATE TRIGGER trg_citacion_transicion
+BEFORE UPDATE OF estado ON citacion_consejeria
+FOR EACH ROW
+EXECUTE FUNCTION fn_citacion_transicion();
 
 -- origen LABORATORIO solo con una causa permanente del catálogo.
 CREATE FUNCTION fn_laboratorio_solo_serologia()

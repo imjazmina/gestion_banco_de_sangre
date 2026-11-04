@@ -179,6 +179,10 @@ def enviar(cita, usuario, formulario):
     Una sola transacción: o quedan las 36 filas, el consentimiento y la cita
     en Confirmada, o no queda nada. No actualiza respuestas que ya existían.
     """
+    if cita.estado != Cita.PENDIENTE:
+        raise ErrorCuestionario(
+            "Esta cita ya no se puede confirmar con el cuestionario.")
+
     items = preguntas()
     if not items:
         current_app.logger.error(

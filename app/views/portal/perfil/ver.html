@@ -89,6 +89,51 @@
     </div>
 
     <div class="card" style="margin-top:20px;">
+      <div style="display:flex; gap:14px; align-items:flex-start;">
+        <div class="notif-ico" style="background:#E6F4F3; color:var(--teal);">{{ ico('shield') }}</div>
+        <div style="flex:1; min-width:0;">
+          <h2>Contraseña</h2>
+          <p class="sub" style="margin:4px 0 14px;">Pedimos la actual para confirmar que sos vos.</p>
+          <button class="btn btn-primary btn-sm" type="button"
+                  onclick="document.getElementById('modal-clave').hidden=false">
+            Actualizar contraseña
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div id="modal-clave" class="modal-overlay" role="dialog" aria-modal="true"
+         aria-labelledby="t-clave" {% if not abrir_clave %}hidden{% endif %}>
+      <div class="modal-box">
+        <h3 id="t-clave">Actualizar contraseña</h3>
+        <p>Ingresá la contraseña actual y elegí una nueva. Tiene que tener al menos 8 caracteres.</p>
+        <form method="post" action="{{ url_for('perfil.cambiar_contrasena') }}">
+          <div class="field">
+            <label for="clave-actual">Contraseña actual</label>
+            <input type="password" id="clave-actual" name="actual"
+                   autocomplete="current-password" required {% if abrir_clave %}autofocus{% endif %}>
+          </div>
+          <div class="field">
+            <label for="clave-nueva">Nueva contraseña</label>
+            <input type="password" id="clave-nueva" name="nueva" minlength="8"
+                   autocomplete="new-password" required>
+            <div class="hint">Al menos 8 caracteres.</div>
+          </div>
+          <div class="field">
+            <label for="clave-repetir">Confirmá la nueva contraseña</label>
+            <input type="password" id="clave-repetir" name="repetir" minlength="8"
+                   autocomplete="new-password" required>
+          </div>
+          <div class="modal-actions" style="flex-wrap:wrap;">
+            <button class="btn btn-ghost" type="button"
+                    onclick="document.getElementById('modal-clave').hidden=true">Cancelar</button>
+            <button class="btn btn-primary" type="submit">Actualizar contraseña</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
       <h2 style="margin-bottom:14px;">Estado de donación</h2>
       <div class="stat-row">
         <div class="blood-tag" style="font-size:16px; min-width:44px; height:36px;">{{ grupo or '—' }}</div>

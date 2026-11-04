@@ -36,6 +36,7 @@ class Notificacion(db.Model):
     META_COMPLETA = "META_COMPLETA"
     CITACION_GENERICA = "CITACION_GENERICA"
     SOLICITUD_ABIERTA = "SOLICITUD_ABIERTA"
+    SOLICITUD_VENCIDA = "SOLICITUD_VENCIDA"
     PRESELECCION_COMPATIBLE = "PRESELECCION_COMPATIBLE"
 
 
@@ -54,9 +55,6 @@ class Buzon(db.Model):
     tipo = db.Column(db.String(40))
     mensaje = db.Column(db.Text, nullable=False)
     fecha = db.Column(db.DateTime, nullable=False, default=datetime.now)
-    estado = db.Column(db.String(20))
-
-    RECIBIDO = "Recibido"
 
 
 class Auditoria(db.Model):

@@ -307,6 +307,7 @@ class Unidad(db.Model):
     EN_LABORATORIO = "En laboratorio"
     EN_STOCK = "En stock"
     ASIGNADA = "Asignada"
+    UTILIZADA = "Utilizada"
     DESCARTADA = "Descartada"
     VENCIDA = "Vencida"
 
@@ -385,7 +386,7 @@ class CitacionConsejeria(db.Model):
     CONFIRMADA = "Confirmada"
     CANCELADA = "Cancelada"
     AUSENTE = "Ausente"
-    COMPLETADA = "Completada"
+    REALIZADA = "Realizada"
     ABIERTAS = (PENDIENTE, CONFIRMADA)
 
 
