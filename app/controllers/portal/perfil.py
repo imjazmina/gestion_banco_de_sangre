@@ -11,15 +11,16 @@ import calendar
 import hashlib
 import re
 import secrets
-from datetime import date
+from datetime import date, datetime
 
 from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
 from app.controllers.portal.agenda import diferimiento_vigente
 from app.models import (
-    db, Usuario, Correo, Auditoria, Cita, Solicitud,
-    Notificacion, Extraccion, Unidad,
+    db, Usuario, Correo, Auditoria, Cita, Solicitud, HistorialSolicitud,
+    Notificacion, Extraccion, Unidad, Asignacion,
+    MuestraCompatibilidad, ResultadoCompatibilidad,
 )
 
 _CORREO = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -411,9 +412,82 @@ def historial_citas(usuario, limite=10):
     return citas[:limite]
 
 
+def solicitud_con_resultado(usuario):
+    """
+    La solicitud propia del donante cuyo resultado de laboratorio de
+    compatibilidad ya se registró, o None.
+
+    El resultado cuelga de la muestra (muestra_compatibilidad → solicitud).
+    Sin ese resultado la tarjeta del perfil no se muestra. Si hubiera más de
+    una, se toma la más reciente.
+    """
+    return (Solicitud.query
+            .join(MuestraCompatibilidad,
+                  MuestraCompatibilidad.id_solicitud == Solicitud.id_solicitud)
+            .join(ResultadoCompatibilidad,
+                  ResultadoCompatibilidad.id_muestra
+                  == MuestraCompatibilidad.id_muestra)
+            .filter(Solicitud.id_solicitante == usuario.id_usuario)
+            .order_by(Solicitud.fecha_creacion.desc())
+            .first())
+
+
+def donaciones_recibidas(solicitud):
+    """Unidades efectivamente asignadas a la solicitud. Es el historial de
+    donaciones recibidas; la revocación no lo toca."""
+    if solicitud is None:
+        return 0
+    return (Asignacion.query
+            .filter_by(id_solicitud=solicitud.id_solicitud)
+            .count())
+
+
+def puede_revocar(solicitud):
+    """Hay consentimiento vigente que revocar: solo mientras sigue abierta."""
+    return (solicitud is not None
+            and solicitud.consentimiento_publicacion
+            and solicitud.estado in Solicitud.ABIERTAS)
+
+
+def revocar_consentimiento(usuario):
+    """
+    Revoca el consentimiento de publicación de la solicitud propia.
+
+    No borra la solicitud ni toca las donaciones ya recibidas: solo retira el
+    permiso de publicación. La solicitud pasa a «Revocada» —el estado que
+    exige ck_solicitud_publicacion al quedar sin consentimiento— y el cambio
+    queda en el historial inmutable. No se puede volver a publicar desde acá.
+    """
+    solicitud = solicitud_con_resultado(usuario)
+    if solicitud is None:
+        raise ErrorPerfil(["No encontramos una solicitud para revocar."])
+    if solicitud.estado == Solicitud.REVOCADA:
+        return
+    if not puede_revocar(solicitud):
+        raise ErrorPerfil(["Esta solicitud ya no admite revocación."])
+
+    try:
+        anterior = solicitud.estado
+        solicitud.consentimiento_publicacion = False
+        solicitud.estado = Solicitud.REVOCADA
+        db.session.add(HistorialSolicitud(
+            id_solicitud=solicitud.id_solicitud,
+            estado_anterior=anterior,
+            estado_nuevo=Solicitud.REVOCADA,
+            fecha_hora=datetime.now(),
+        ))
+        Auditoria.registrar(usuario.id_usuario, "SOLICITUD",
+                            solicitud.id_solicitud, Auditoria.CAMBIO_ESTADO)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+
+
 def resumen(usuario):
     """Datos que muestra la pantalla de perfil."""
     ultima = ultima_donacion(usuario)
+    solicitud = solicitud_con_resultado(usuario)
     return {
         "usuario": usuario,
         "correos": sorted(usuario.correos,
@@ -425,4 +499,9 @@ def resumen(usuario):
         "habilitacion": habilitacion(usuario),
         "historial": historial_citas(usuario),
         "intervalo": INTERVALO_MESES.get(usuario.genero, INTERVALO_POR_DEFECTO),
+        "solicitud": solicitud,
+        "donaciones_recibidas": donaciones_recibidas(solicitud),
+        "puede_revocar": puede_revocar(solicitud),
+        "solicitud_revocada": solicitud is not None
+                              and solicitud.estado == Solicitud.REVOCADA,
     }

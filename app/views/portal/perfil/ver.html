@@ -162,6 +162,78 @@
       {% endif %}
     </div>
 
+    {% if solicitud %}
+    <div class="card" style="margin-top:20px;">
+      <h2 style="margin-bottom:6px;">Mi solicitud de donación</h2>
+      <p class="sub" style="margin-bottom:18px;">El estado de tu pedido de unidades y las donaciones que recibió.</p>
+
+      {# Estado de solicitud: barra de estado visual. El recorrido normal es
+         Creada → Publicada → Cerrada; «Revocada» y «Vencida» son desvíos
+         terminales y se muestran con una insignia aparte. #}
+      {% set pasos = ['Creada', 'Publicada', 'Cerrada'] %}
+      {% set terminal = solicitud.estado in ['Revocada', 'Vencida'] %}
+      {% set actual_idx = pasos.index(solicitud.estado) if solicitud.estado in pasos else 0 %}
+      <div class="estado-bar" role="list">
+        {% for paso in pasos %}
+        <div class="paso {{ 'actual' if loop.index0 == actual_idx and not terminal else ('hecho' if loop.index0 < actual_idx else '') }}" role="listitem">
+          <span class="punto">{{ loop.index }}</span>
+          <span class="et">{{ paso }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% if terminal %}
+      <div style="margin-top:14px; text-align:center;">
+        <span class="badge badge-{{ solicitud.estado | lower }}">{{ solicitud.estado }}</span>
+      </div>
+      {% endif %}
+
+      <table class="data" style="width:100%; margin-top:18px;">
+        <tbody>
+          <tr>
+            <td style="color:var(--ink2);">Estado actual</td>
+            <td style="text-align:right; font-weight:600;">{{ solicitud.estado }}</td>
+          </tr>
+          <tr>
+            <td style="color:var(--ink2);">Donaciones recibidas</td>
+            <td style="text-align:right; font-weight:600;">{{ donaciones_recibidas }} de {{ solicitud.unidades_requeridas }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="divider" style="margin:18px 0 14px;"></div>
+      {% if solicitud_revocada %}
+      <div class="banner info">
+        {{ ico('info') }}
+        <p><b>Consentimiento revocado</b>La solicitud ya no está disponible para publicación porque revocaste el consentimiento.</p>
+      </div>
+      {% elif puede_revocar %}
+      <h3 style="font-size:14.5px; margin-bottom:8px;">Consentimiento de publicación</h3>
+      <p class="sub" style="margin-bottom:12px;">Podés retirar el permiso para publicar tu solicitud. No elimina la solicitud ni afecta las donaciones ya recibidas.</p>
+      <button class="btn btn-danger btn-sm" type="button"
+              onclick="document.getElementById('modal-revocar').hidden=false">
+        {{ ico('x') }} Revocar consentimiento
+      </button>
+      {% endif %}
+    </div>
+
+    {% if puede_revocar %}
+    <div id="modal-revocar" class="modal-overlay" role="dialog" aria-modal="true"
+         aria-labelledby="t-revocar" hidden>
+      <div class="modal-box">
+        <h3 id="t-revocar">Revocar consentimiento</h3>
+        <p>¿Estás seguro de que deseas revocar el consentimiento de publicación?</p>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" type="button"
+                  onclick="document.getElementById('modal-revocar').hidden=true">Cancelar</button>
+          <form method="post" action="{{ url_for('perfil.revocar_consentimiento') }}">
+            <button class="btn btn-danger" type="submit">Confirmar</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
     <div class="card" style="margin-top:20px;">
       <h2 style="margin-bottom:6px;">Historial de citas</h2>
       <p class="sub" style="margin-bottom:14px;">Tus últimas citas agendadas, con el estado en que quedó cada una.</p>

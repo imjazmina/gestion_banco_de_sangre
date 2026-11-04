@@ -81,6 +81,17 @@ def eliminar_correo(id_correo):
     return redirect(url_for("perfil.ver"))
 
 
+@perfil_bp.post("/solicitud/revocar")
+@requiere_login
+def revocar_consentimiento():
+    try:
+        ctrl.revocar_consentimiento(usuario_actual())
+    except ctrl.ErrorPerfil as e:
+        return _volver_con_error(e)
+    flash("Revocaste el consentimiento de publicación de tu solicitud.", "ok")
+    return redirect(url_for("perfil.ver"))
+
+
 @perfil_bp.get("/suprimir")
 @requiere_login
 def confirmar_supresion():

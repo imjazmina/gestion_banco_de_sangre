@@ -307,7 +307,6 @@ class Unidad(db.Model):
     EN_LABORATORIO = "En laboratorio"
     EN_STOCK = "En stock"
     ASIGNADA = "Asignada"
-    UTILIZADA = "Utilizada"
     DESCARTADA = "Descartada"
     VENCIDA = "Vencida"
 
