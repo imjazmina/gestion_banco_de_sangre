@@ -8,34 +8,10 @@
   <div class="wrap center-narrow">
     <div class="section-head"><h1>Mi perfil</h1></div>
 
-    {% if editando %}
-    <div class="card">
-      <h2 style="margin-bottom:16px;">Editar mis datos</h2>
-      <form method="post" action="{{ url_for('perfil.guardar') }}">
-        <div class="two-col">
-          <div class="field">
-            <label for="nombre">Nombre *</label>
-            <input type="text" id="nombre" name="nombre" value="{{ usuario.nombre }}"
-                   maxlength="80" required autofocus>
-          </div>
-          <div class="field">
-            <label for="apellido">Apellido *</label>
-            <input type="text" id="apellido" name="apellido" value="{{ usuario.apellido }}"
-                   maxlength="80" required>
-          </div>
-        </div>
-        <div style="display:flex; gap:12px; flex-wrap:wrap;">
-          <button class="btn btn-primary" type="submit">Guardar cambios</button>
-          <a class="btn btn-ghost" href="{{ url_for('perfil.ver') }}">Cancelar</a>
-        </div>
-      </form>
-    </div>
-
-    {% else %}
+   
     <div class="card">
       <div class="flex-between" style="margin-bottom:16px;">
         <h2>Datos personales</h2>
-        <a class="btn btn-ghost btn-sm" href="{{ url_for('perfil.ver', editar=1) }}">{{ ico('edit') }} Editar</a>
       </div>
       <table class="data" style="width:100%;">
         <tbody>
@@ -49,8 +25,9 @@
     </div>
 
     <div class="card" style="margin-top:20px;">
+      <span class="card-eyebrow">Acceso y seguridad</span>
       <h2 style="margin-bottom:6px;">Correos</h2>
-      <p class="sub" style="margin-bottom:14px;">Con el principal iniciás sesión y recuperás la contraseña.</p>
+      <p class="sub">Con el principal iniciás sesión y recuperás la contraseña.</p>
       {% for c in correos %}
       <div class="divider" style="margin:14px 0;"></div>
       <form method="post" action="{{ url_for('perfil.editar_correo', id_correo=c.id_correo) }}">
@@ -84,21 +61,19 @@
           <input type="email" id="nuevo-correo" name="direccion" maxlength="120" required>
           <div class="hint">No reemplaza al principal.</div>
         </div>
-        <button class="btn btn-primary btn-sm" type="submit">Agregar</button>
+        <button class="btn btn-ghost btn-sm" type="submit">Agregar</button>
       </form>
-    </div>
 
-    <div class="card" style="margin-top:20px;">
-      <div style="display:flex; gap:14px; align-items:flex-start;">
-        <div class="notif-ico" style="background:#E6F4F3; color:var(--teal);">{{ ico('shield') }}</div>
-        <div style="flex:1; min-width:0;">
-          <h2>Contraseña</h2>
-          <p class="sub" style="margin:4px 0 14px;">Pedimos la actual para confirmar que sos vos.</p>
-          <button class="btn btn-primary btn-sm" type="button"
-                  onclick="document.getElementById('modal-clave').hidden=false">
-            Actualizar contraseña
-          </button>
+      <div class="divider" style="margin:20px 0 16px;"></div>
+      <div class="setting-row">
+        <div>
+          <div class="ui-label">Contraseña</div>
+          <p class="hint" style="margin-top:3px;">Pedimos la actual para confirmar que sos vos.</p>
         </div>
+        <button class="btn btn-secondary btn-sm" type="button"
+                onclick="document.getElementById('modal-clave').hidden=false">
+          {{ ico('shield') }} Actualizar contraseña
+        </button>
       </div>
     </div>
 
@@ -134,6 +109,7 @@
     </div>
 
     <div class="card" style="margin-top:20px;">
+      <span class="card-eyebrow">Donación</span>
       <h2 style="margin-bottom:14px;">Estado de donación</h2>
       <div class="stat-row">
         <div class="blood-tag" style="font-size:16px; min-width:44px; height:36px;">{{ grupo or '—' }}</div>
@@ -209,6 +185,7 @@
 
     {% if solicitud %}
     <div class="card" style="margin-top:20px;">
+      <span class="card-eyebrow">Solicitud</span>
       <h2 style="margin-bottom:6px;">Mi solicitud de donación</h2>
       <p class="sub" style="margin-bottom:18px;">El estado de tu pedido de unidades y las donaciones que recibió.</p>
 
@@ -280,6 +257,7 @@
     {% endif %}
 
     <div class="card" style="margin-top:20px;">
+      <span class="card-eyebrow">Historial</span>
       <h2 style="margin-bottom:6px;">Historial de citas</h2>
       <p class="sub" style="margin-bottom:14px;">Tus últimas citas agendadas, con el estado en que quedó cada una.</p>
       {% if historial %}
@@ -317,11 +295,11 @@
     </div>
 
     <div class="card" style="margin-top:20px; border-top:3px solid var(--danger);">
+      <span class="card-eyebrow" style="color:var(--danger);">Zona de riesgo</span>
       <h2 style="margin-bottom:6px;">Eliminar cuenta</h2>
       <p class="sub" style="margin-bottom:16px;">Elimina tu acceso al portal y tus datos de contacto, conforme a la Ley N.º 1682/01. El historial de donaciones se conserva por obligación sanitaria, desvinculado de tus datos de contacto.</p>
       <a class="btn btn-danger btn-sm" href="{{ url_for('perfil.confirmar_supresion') }}">{{ ico('trash') }} Suprimir mi cuenta</a>
     </div>
-    {% endif %}
   </div>
 </section>
 {% endblock %}

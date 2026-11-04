@@ -45,19 +45,6 @@ class ErrorSupresion(Exception):
         self.operaciones = operaciones
 
 
-def validar(nombre, apellido):
-    errores = []
-    if not nombre:
-        errores.append("Ingresá tu nombre.")
-    elif len(nombre) > 80:
-        errores.append("El nombre es demasiado largo.")
-    if not apellido:
-        errores.append("Ingresá tu apellido.")
-    elif len(apellido) > 80:
-        errores.append("El apellido es demasiado largo.")
-    return errores
-
-
 def _direccion(texto):
     return (texto or "").strip().lower()
 
@@ -80,26 +67,6 @@ def _direccion_ocupada(direccion, id_correo=None):
     if id_correo is not None:
         consulta = consulta.filter(Correo.id_correo != id_correo)
     return consulta.first() is not None
-
-
-def actualizar(usuario, datos):
-    """Guarda nombre y apellido. Los correos se gestionan aparte."""
-    nombre = (datos.get("nombre") or "").strip()
-    apellido = (datos.get("apellido") or "").strip()
-
-    errores = validar(nombre, apellido)
-    if errores:
-        raise ErrorPerfil(errores)
-
-    try:
-        usuario.nombre = nombre
-        usuario.apellido = apellido
-        Auditoria.registrar(usuario.id_usuario, "USUARIO",
-                            usuario.id_usuario, Auditoria.MODIFICACION)
-        db.session.commit()
-    except Exception:
-        db.session.rollback()
-        raise
 
 
 def agregar_correo(usuario, direccion):

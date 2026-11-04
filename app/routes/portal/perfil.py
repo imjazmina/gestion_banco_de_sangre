@@ -13,23 +13,7 @@ perfil_bp = Blueprint("perfil", __name__, url_prefix="/perfil")
 def ver():
     return render_template("portal/perfil/ver.html",
                            **ctrl.resumen(usuario_actual()),
-                           editando=request.args.get("editar") == "1",
                            abrir_clave=request.args.get("clave") == "1")
-
-
-@perfil_bp.post("/")
-@requiere_login
-def guardar():
-    usuario = usuario_actual()
-    try:
-        ctrl.actualizar(usuario, request.form)
-    except ctrl.ErrorPerfil as e:
-        for mensaje in e.args[0]:
-            flash(mensaje, "error")
-        return redirect(url_for("perfil.ver", editar=1))
-
-    flash("Tus datos fueron actualizados.", "ok")
-    return redirect(url_for("perfil.ver"))
 
 
 def _volver_con_error(error, **extra):
