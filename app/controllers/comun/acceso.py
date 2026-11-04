@@ -1,8 +1,8 @@
 """Sesión del personal de salud.
 
-Usa la misma cookie que el portal (`id_usuario` en sesion.py). El correo
-de ingreso es `perfil_personal.correo_institucional` y la contraseña es el
-hash de `usuario`. No hay usuarios de demostración en este archivo.
+Comparte la cookie con el portal, con ámbito `personal`. El correo de
+ingreso es `perfil_personal.correo_institucional` y la contraseña es el
+hash de ese perfil. No hay usuarios de demostración en este archivo.
 """
 from functools import wraps
 
@@ -10,7 +10,9 @@ from flask import redirect, render_template, request, url_for
 from sqlalchemy import func
 
 from app.controllers.portal.autenticacion import verificar
-from app.controllers.sesion import cerrar_sesion, iniciar_sesion, usuario_actual
+from app.controllers.sesion import (
+    AMBITO_PERSONAL, cerrar_sesion, iniciar_sesion, usuario_en_ambito,
+)
 from app.models import Auditoria, PerfilPersonal, Rol, db
 
 
@@ -43,7 +45,7 @@ def _codigo_panel(usuario):
 
 def operador_actual():
     """Dict para la plantilla, o None si no hay personal con sesión válida."""
-    usuario = usuario_actual()
+    usuario = usuario_en_ambito(AMBITO_PERSONAL)
     if usuario is None:
         return None
     codigo = _codigo_panel(usuario)
@@ -77,7 +79,7 @@ def intentar_ingreso(email, contrasena):
 
     usuario = perfil.usuario
     if (usuario is None or not usuario.estado or usuario.cuenta_suprimida
-            or not verificar(contrasena, usuario.contrasena)):
+            or not verificar(contrasena, perfil.contrasena)):
         return None, "Correo o contraseña incorrectos."
     if _codigo_panel(usuario) is None:
         return None, "Este acceso es solo para enfermería o jefatura."
@@ -85,7 +87,7 @@ def intentar_ingreso(email, contrasena):
     Auditoria.registrar(usuario.id_usuario, "USUARIO",
                         usuario.id_usuario, Auditoria.LOGIN)
     db.session.commit()
-    iniciar_sesion(usuario)
+    iniciar_sesion(usuario, AMBITO_PERSONAL)
     return operador_actual(), None
 
 

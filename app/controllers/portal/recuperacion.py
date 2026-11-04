@@ -27,7 +27,7 @@ from itsdangerous import BadSignature, SignatureExpired, URLSafeTimedSerializer
 from sqlalchemy import func
 
 from app.controllers.portal.autenticacion import (
-    LARGO_MINIMO_CONTRASENA, hashear)
+    LARGO_MINIMO_CONTRASENA, correo_es_institucional, hashear)
 from app.models import db, Auditoria, Correo, Usuario
 
 HORAS_VIGENCIA = 2
@@ -53,7 +53,7 @@ def _firmador(usuario):
 
 def _usuario_por_correo(correo):
     correo = (correo or "").strip().lower()
-    if not correo:
+    if not correo or correo_es_institucional(correo):
         return None
     usuario = (Usuario.query
                .join(Correo, Correo.id_usuario == Usuario.id_usuario)
