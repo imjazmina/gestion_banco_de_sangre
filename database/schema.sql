@@ -54,6 +54,7 @@ CREATE TABLE perfil_personal (
     id_usuario integer NOT NULL,
     registro_profesional varchar(30) NOT NULL,
     correo_institucional varchar(120) NOT NULL,
+    contrasena varchar(64),
     fecha_alta_servicio date,
     CONSTRAINT uq_perfil_personal_usuario UNIQUE (id_usuario),
     CONSTRAINT uq_perfil_personal_registro UNIQUE (registro_profesional),

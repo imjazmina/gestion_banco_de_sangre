@@ -17,7 +17,8 @@ from sqlalchemy import func
 from sqlalchemy.exc import IntegrityError
 
 from app.controllers.portal.agenda import diferimiento_vigente
-from app.controllers.portal.autenticacion import hashear, verificar
+from app.controllers.portal.autenticacion import (
+    correo_es_institucional, hashear, verificar)
 from app.controllers.portal.recuperacion import validar_contrasena
 from app.models import (
     db, Usuario, Correo, Auditoria, Cita, Solicitud, HistorialSolicitud,
@@ -75,7 +76,7 @@ def agregar_correo(usuario, direccion):
     error = _error_direccion(direccion)
     if error:
         raise ErrorPerfil([error])
-    if _direccion_ocupada(direccion):
+    if _direccion_ocupada(direccion) or correo_es_institucional(direccion):
         raise ErrorPerfil(["Ese correo ya está registrado."])
 
     try:
@@ -107,7 +108,7 @@ def editar_correo(usuario, id_correo, direccion):
         raise ErrorPerfil([error])
     if direccion == fila.direccion:
         return
-    if _direccion_ocupada(direccion, fila.id_correo):
+    if _direccion_ocupada(direccion, fila.id_correo) or correo_es_institucional(direccion):
         raise ErrorPerfil(["Ese correo ya está registrado."])
 
     try:

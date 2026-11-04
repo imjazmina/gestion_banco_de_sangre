@@ -145,6 +145,8 @@ class PerfilPersonal(db.Model):
         nullable=False, unique=True)
     registro_profesional = db.Column(db.String(30), nullable=False, unique=True)
     correo_institucional = db.Column(db.String(120), nullable=False, unique=True)
+    # Clave del panel. La de donante sigue en usuario.contrasena.
+    contrasena = db.Column(db.String(64))
     fecha_alta_servicio = db.Column(db.Date)
 
     usuario = db.relationship("Usuario", lazy="joined")

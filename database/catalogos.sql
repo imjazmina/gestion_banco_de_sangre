@@ -172,7 +172,7 @@ INSERT INTO usuario (documento, nombre, apellido, fecha_nacimiento, genero,
                      contrasena, consentimiento_privacidad, estado,
                      cuenta_suprimida, fecha_alta)
 SELECT '10000001', 'María', 'Recalde', DATE '1988-04-12', 'Femenino',
-       '$2b$12$tywo9SOoAO7h2RdyK549pOQG91A7HbPik7i28IllrBfFOhNf2S25u',
+       NULL,
        true, true, false, timestamp '2020-03-01 08:00'
 WHERE NOT EXISTS (SELECT 1 FROM usuario WHERE documento = '10000001');
 
@@ -180,21 +180,25 @@ INSERT INTO usuario (documento, nombre, apellido, fecha_nacimiento, genero,
                      contrasena, consentimiento_privacidad, estado,
                      cuenta_suprimida, fecha_alta)
 SELECT '10000002', 'Jorge', 'Fernández', DATE '1976-11-03', 'Masculino',
-       '$2b$12$tywo9SOoAO7h2RdyK549pOQG91A7HbPik7i28IllrBfFOhNf2S25u',
+       NULL,
        true, true, false, timestamp '2018-06-01 08:00'
 WHERE NOT EXISTS (SELECT 1 FROM usuario WHERE documento = '10000002');
 
 INSERT INTO perfil_personal (id_usuario, registro_profesional,
-                             correo_institucional, fecha_alta_servicio)
-SELECT u.id_usuario, 'ENF-10000001', 'lic@hrl.gov.com', DATE '2020-03-01'
+                             correo_institucional, contrasena, fecha_alta_servicio)
+SELECT u.id_usuario, 'ENF-10000001', 'lic@hrl.gov.com',
+       '$2b$12$tywo9SOoAO7h2RdyK549pOQG91A7HbPik7i28IllrBfFOhNf2S25u',
+       DATE '2020-03-01'
   FROM usuario u
  WHERE u.documento = '10000001'
    AND NOT EXISTS (
        SELECT 1 FROM perfil_personal p WHERE p.id_usuario = u.id_usuario);
 
 INSERT INTO perfil_personal (id_usuario, registro_profesional,
-                             correo_institucional, fecha_alta_servicio)
-SELECT u.id_usuario, 'JEF-10000002', 'jef@hrl.gov.com', DATE '2018-06-01'
+                             correo_institucional, contrasena, fecha_alta_servicio)
+SELECT u.id_usuario, 'JEF-10000002', 'jef@hrl.gov.com',
+       '$2b$12$tywo9SOoAO7h2RdyK549pOQG91A7HbPik7i28IllrBfFOhNf2S25u',
+       DATE '2018-06-01'
   FROM usuario u
  WHERE u.documento = '10000002'
    AND NOT EXISTS (

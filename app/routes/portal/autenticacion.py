@@ -4,8 +4,8 @@ from flask import (Blueprint, current_app, render_template, request, redirect,
 
 from app import correo
 from app.controllers.portal import autenticacion, inicio, recuperacion
-from app.controllers.sesion import (iniciar_sesion, cerrar_sesion,
-                                    usuario_actual)
+from app.controllers.sesion import (AMBITO_PORTAL, iniciar_sesion,
+                                    cerrar_sesion, usuario_actual)
 
 auth_bp = Blueprint("auth", __name__)
 
@@ -34,7 +34,7 @@ def registro():
             except autenticacion.ErrorRegistro as e:
                 flash(str(e), "error")
             else:
-                iniciar_sesion(usuario)
+                iniciar_sesion(usuario, AMBITO_PORTAL)
                 flash("Tu cuenta fue creada correctamente.", "ok")
                 return redirect(url_for("main.index"))
 
@@ -64,7 +64,7 @@ def ingresar():
         if usuario:
             from app.controllers.portal import solicitudes as ctrl_solicitudes
             ctrl_solicitudes.avisar_abierta(usuario)
-            iniciar_sesion(usuario)
+            iniciar_sesion(usuario, AMBITO_PORTAL)
             return redirect(url_for("main.index"))
 
         # Un solo mensaje para "el correo no existe" y "la contraseña está
