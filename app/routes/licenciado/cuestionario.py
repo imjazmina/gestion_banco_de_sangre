@@ -19,7 +19,7 @@ def _cita_o_volver(cita_id):
 
 
 @licenciado_cuestionario_bp.get("/atencion/<int:cita_id>/cuestionario")
-@requiere("lic", "licenciado_auth.ingresar")
+@requiere("lic", "personal_auth.ingresar")
 def ver(cita_id):
     cita = _cita_o_volver(cita_id)
     if cita is None:
@@ -47,7 +47,7 @@ def ver(cita_id):
 
 
 @licenciado_cuestionario_bp.post("/atencion/<int:cita_id>/cuestionario")
-@requiere("lic", "licenciado_auth.ingresar")
+@requiere("lic", "personal_auth.ingresar")
 def guardar(cita_id):
     cita = _cita_o_volver(cita_id)
     if cita is None:

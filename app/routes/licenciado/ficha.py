@@ -10,7 +10,7 @@ licenciado_ficha_bp = Blueprint("licenciado_ficha", __name__, url_prefix="/licen
 
 
 @licenciado_ficha_bp.get("/ficha/<int:donor_id>")
-@requiere("lic", "licenciado_auth.ingresar")
+@requiere("lic", "personal_auth.ingresar")
 def ver(donor_id):
     datos = jornada.ficha(donor_id)
     if datos is None:
@@ -42,7 +42,7 @@ def _derivables(donor_id):
 
 
 @licenciado_ficha_bp.post("/ficha/<int:donor_id>/derivar")
-@requiere("lic", "licenciado_auth.ingresar")
+@requiere("lic", "personal_auth.ingresar")
 def derivar(donor_id):
     registro = db.session.get(RegistroDiferimiento, request.form.get("id_registro", type=int))
     if registro is None or registro.id_donante != donor_id:

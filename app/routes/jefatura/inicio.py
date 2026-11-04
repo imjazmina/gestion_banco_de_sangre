@@ -18,7 +18,7 @@ COLORES = {
 
 
 @jefatura_inicio_bp.get("/")
-@requiere("jef", "jefatura_auth.ingresar")
+@requiere("jef", "personal_auth.ingresar")
 def inicio():
     filas = consejeria.citaciones()
     orden = ["Pendiente", "Confirmada", "Realizada", "Ausente", "Cancelada"]

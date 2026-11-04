@@ -41,13 +41,13 @@ def _contexto(encontrado=None, diferimiento=None):
 
 
 @licenciado_inicio_bp.get("/")
-@requiere("lic", "licenciado_auth.ingresar")
+@requiere("lic", "personal_auth.ingresar")
 def inicio():
     return pintar("licenciado/inicio.html", **_contexto())
 
 
 @licenciado_inicio_bp.post("/espontaneo")
-@requiere("lic", "licenciado_auth.ingresar")
+@requiere("lic", "personal_auth.ingresar")
 def espontaneo():
     personal = operador_actual()["usuario"]
     documento = request.form.get("documento", "")

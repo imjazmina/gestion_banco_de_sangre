@@ -21,24 +21,28 @@ PANELES = {
         "rol": Rol.ENFERMERIA,
         "titulo": "Lic. Enfermería · HRL",
         "inicio": "licenciado_inicio.inicio",
-        "ingresar": "licenciado_auth.ingresar",
+        "ingresar": "personal_auth.ingresar",
         "salir": "licenciado_salir.salir",
     },
     Rol.JEFATURA: {
         "rol": Rol.JEFATURA,
         "titulo": "Jefatura · Banco de Sangre HRL",
         "inicio": "jefatura_inicio.inicio",
-        "ingresar": "jefatura_auth.ingresar",
+        "ingresar": "personal_auth.ingresar",
         "salir": "jefatura_salir.salir",
     },
 }
 
 
 def _codigo_panel(usuario):
-    """Jefatura gana si la persona tiene los dos roles."""
-    if usuario.tiene_rol(Rol.JEFATURA):
+    """Un cargo institucional. Donante puede convivir con ese cargo."""
+    es_jef = usuario.tiene_rol(Rol.JEFATURA)
+    es_lic = usuario.tiene_rol(Rol.ENFERMERIA)
+    if es_jef and es_lic:
+        return None
+    if es_jef:
         return Rol.JEFATURA
-    if usuario.tiene_rol(Rol.ENFERMERIA):
+    if es_lic:
         return Rol.ENFERMERIA
     return None
 
@@ -81,6 +85,8 @@ def intentar_ingreso(email, contrasena):
     if (usuario is None or not usuario.estado or usuario.cuenta_suprimida
             or not verificar(contrasena, perfil.contrasena)):
         return None, "Correo o contraseña incorrectos."
+    if (usuario.tiene_rol(Rol.JEFATURA) and usuario.tiene_rol(Rol.ENFERMERIA)):
+        return None, "La cuenta no puede ser enfermería y jefatura."
     if _codigo_panel(usuario) is None:
         return None, "Este acceso es solo para enfermería o jefatura."
 
@@ -99,7 +105,7 @@ _ALIAS_ROL = {"lic": Rol.ENFERMERIA, "jef": Rol.JEFATURA}
 
 
 def requiere(rol, ingresar_endpoint):
-    """Deja pasar solo el rol del módulo. El otro vuelve a su inicio."""
+    """Deja pasar solo el rol del módulo. Sin sesión, el login es único."""
     codigo = _ALIAS_ROL.get(rol, rol)
 
     def decorador(vista):

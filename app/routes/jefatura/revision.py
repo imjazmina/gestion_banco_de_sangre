@@ -12,7 +12,7 @@ jefatura_revision_bp = Blueprint("jefatura_revision", __name__, url_prefix="/jef
 
 
 @jefatura_revision_bp.route("/diferimientos/<int:cita_id>", methods=["GET", "POST"])
-@requiere("jef", "jefatura_auth.ingresar")
+@requiere("jef", "personal_auth.ingresar")
 def ver(cita_id):
     citacion = consejeria.citacion_por_id(cita_id)
     if citacion is None:

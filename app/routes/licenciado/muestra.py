@@ -67,7 +67,7 @@ def _filas(texto):
 
 @licenciado_muestra_bp.route(
     "/atencion/<int:cita_id>/muestra", methods=["GET", "POST"])
-@requiere("lic", "licenciado_auth.ingresar")
+@requiere("lic", "personal_auth.ingresar")
 def ver(cita_id):
     cita = jornada.cita_por_id(cita_id)
     if cita is None or cita.tipo_cita != jornada.Cita.MUESTRA:

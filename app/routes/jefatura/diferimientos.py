@@ -10,7 +10,7 @@ jefatura_diferimientos_bp = Blueprint(
 
 
 @jefatura_diferimientos_bp.get("/diferimientos")
-@requiere("jef", "jefatura_auth.ingresar")
+@requiere("jef", "personal_auth.ingresar")
 def lista():
     filas = []
     for citacion in consejeria.citaciones():

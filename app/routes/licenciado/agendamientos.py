@@ -15,7 +15,7 @@ ESTADOS = ["Pendiente", "Confirmada", "Completada", "Ausente", "No apto"]
 
 
 @licenciado_agendamientos_bp.get("/agendamientos")
-@requiere("lic", "licenciado_auth.ingresar")
+@requiere("lic", "personal_auth.ingresar")
 def lista():
     citas = jornada.pendientes_primero(
         [jornada.fila(c) for c in jornada.citas_del_dia()])
@@ -42,7 +42,7 @@ def lista():
 
 
 @licenciado_agendamientos_bp.post("/agendamientos/<int:cita_id>/ausente")
-@requiere("lic", "licenciado_auth.ingresar")
+@requiere("lic", "personal_auth.ingresar")
 def ausente(cita_id):
     cita = jornada.cita_por_id(cita_id)
     if cita is None:

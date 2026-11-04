@@ -9,4 +9,4 @@ licenciado_salir_bp = Blueprint("licenciado_salir", __name__, url_prefix="/licen
 @licenciado_salir_bp.get("/salir")
 def salir():
     cerrar_panel()
-    return redirect(url_for("licenciado_auth.ingresar"))
+    return redirect(url_for("personal_auth.ingresar"))
