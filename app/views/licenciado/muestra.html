@@ -1,0 +1,111 @@
+{% extends "comun/layout.html" %}
+{% from "comun/_ui.html" import crumb, alerta, btn %}
+{% from "comun/_iconos.html" import ico %}
+
+{% block titulo %}Extracción de muestra{% endblock %}
+
+{% block contenido %}
+<div class="page">
+  {% if extraccion %}
+  {{ crumb(url_for('licenciado_ficha.ver', donor_id=cita.id_usuario, cita=cita.id_cita), 'Ficha', 'Muestra') }}
+  {% call alerta('ok', 'Muestra registrada') %}
+    Quedó la extracción de muestra venosa para compatibilidad.
+    No se generó una unidad ni ingresa al inventario.
+    {% if resultado %}
+    Grupo {{ resultado.tipo_sangre.etiqueta }}. PAI {{ resultado.pai.nombre }}.
+    {% else %}
+    El resultado de laboratorio se simula en unos segundos. Actualizá la pantalla para verlo.
+    {% endif %}
+  {% endcall %}
+
+  <div class="summary" style="padding:16px;">
+    <p class="kicker" style="margin-bottom:12px;">Datos de la muestra</p>
+    <div class="data-grid" style="padding:0;gap:12px;">
+      <div><p class="data-label">Paciente</p><p class="data-value" style="font-weight:500;">{{ cita.donante.nombre_completo }}</p></div>
+      <div><p class="data-label">Cédula</p><p class="data-value mono" style="font-weight:500;">{{ cita.donante.documento_visible }}</p></div>
+      <div><p class="data-label">Código de extracción</p><p class="data-value mono" style="font-weight:500;">{{ extraccion.codigo_unico }}</p></div>
+      {% if muestra %}
+      <div><p class="data-label">Código de muestra</p><p class="data-value mono" style="font-weight:500;">{{ muestra.codigo }}</p></div>
+      {% endif %}
+      {% for etiqueta, valor in filas %}
+      {% if valor %}
+      <div><p class="data-label">{{ etiqueta }}</p><p class="data-value" style="font-weight:500;">{{ valor }}</p></div>
+      {% endif %}
+      {% endfor %}
+    </div>
+  </div>
+  <div class="row mt-5">
+    {{ btn('Volver a agendamientos', 'primary', 'md', url_for('licenciado_agendamientos.lista')) }}
+  </div>
+
+  {% else %}
+  {{ crumb(url_for('licenciado_evaluacion.ver', cita_id=cita.id_cita), 'Examen físico', 'Muestra') }}
+  <div class="section-head">
+    <div>
+      <h1>Extracción de muestra</h1>
+      <p>{{ cita.donante.nombre_completo }} · CI {{ cita.donante.documento_visible }}</p>
+    </div>
+  </div>
+
+  {% if not apto %}
+  {% call alerta('warn', 'Atención no habilitada') %}
+    Faltan mediciones o alguna no es apta. No se puede extraer la muestra.
+  {% endcall %}
+  <div class="mt-4">
+    {{ btn('Volver al examen físico', 'secondary', 'md', url_for('licenciado_evaluacion.ver', cita_id=cita.id_cita)) }}
+  </div>
+  {% else %}
+  <form method="post">
+    <div class="stack mb-4" style="gap:16px;">
+      <div class="card card-pad">
+        <h3 style="margin:0 0 12px;font-size:14px;font-weight:600;">Muestra venosa</h3>
+        <p class="muted" style="margin:0 0 12px;">Pequeña muestra para estudios de compatibilidad. No se registra volumen, unidades ni vencimiento.</p>
+        <div class="form-grid two">
+          <div class="field">
+            <label>Brazo</label>
+            <div class="radios">
+              {% for b in brazos %}
+              <label><input type="radio" name="brazo" value="{{ b }}" required> {{ b }}</label>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="field">
+            <label>Punción</label>
+            <div class="radios">
+              {% for p in punciones %}
+              <label><input type="radio" name="puncion" value="{{ p }}" required> {{ p }}</label>
+              {% endfor %}
+            </div>
+          </div>
+          <div class="field">
+            <label>Reacción</label>
+            <div class="radios">
+              {% for r in reacciones %}
+              <label><input type="radio" name="reaccion" value="{{ r }}" required> {{ r }}</label>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card card-pad">
+        <h3 style="margin:0 0 12px;font-size:14px;font-weight:600;">Horarios</h3>
+        <div class="form-grid two">
+          <div class="field">
+            <label>Hora de inicio</label>
+            <input class="control" type="time" name="hora_inicio" required>
+          </div>
+          <div class="field">
+            <label>Hora de finalización</label>
+            <input class="control" type="time" name="hora_fin" required>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="row-end">
+      <button class="btn btn-teal" type="submit">{{ ico('check', 14) }} Registrar muestra</button>
+    </div>
+  </form>
+  {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

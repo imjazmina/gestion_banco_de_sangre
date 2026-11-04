@@ -12,9 +12,7 @@
     <div class="card" style="border-top:3px solid var(--danger);">
       <p class="sub" style="margin-bottom:14px;">Esta acción es permanente y no se puede deshacer. Al confirmar:</p>
       <ul class="req-list" style="margin-bottom:18px;">
-        <li class="req-no">{{ ico('x') }} Se elimina tu acceso al portal</li>
-        <li class="req-no">{{ ico('x') }} Se borran tu correo y tu teléfono del sistema</li>
-        <li class="req-no">{{ ico('x') }} Si tenés una cita agendada, dejás de poder gestionarla desde acá</li>
+        <li class="req-no">{{ ico('x') }} El historial clínico queda, sin tus datos de contacto</li>
       </ul>
 
       <div class="banner info">
@@ -30,4 +28,28 @@
     </div>
   </div>
 </section>
+
+{% if mostrar_modal %}
+<div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="t-bloqueo">
+  <div class="modal-box">
+    <h3 id="t-bloqueo">No se puede suprimir la cuenta</h3>
+    <p>Hay operaciones abiertas. Tienen que finalizar antes de continuar. No se modificó ninguna cita, extracción ni solicitud.</p>
+    <ul class="req-list" style="margin-bottom:18px;">
+      {% for cita in operaciones.citas %}
+      <li>Cita {{ cita.estado }}{% if cita.fecha_cita %} del {{ cita.fecha_cita.strftime('%d/%m/%Y') }}{% endif %}</li>
+      {% endfor %}
+      {% for extraccion, unidad in operaciones.extracciones %}
+      <li>Extracción {{ extraccion.codigo_unico }}, pendiente de tipificación</li>
+      {% endfor %}
+      {% for solicitud in operaciones.solicitudes %}
+      <li>Solicitud publicada de {{ solicitud.unidades_requeridas }}
+        {{ 'unidades' if solicitud.unidades_requeridas != 1 else 'unidad' }}</li>
+      {% endfor %}
+    </ul>
+    <div class="modal-actions">
+      <a class="btn btn-primary" href="{{ url_for('perfil.confirmar_supresion') }}">Entendido</a>
+    </div>
+  </div>
+</div>
+{% endif %}
 {% endblock %}

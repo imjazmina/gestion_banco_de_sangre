@@ -23,13 +23,16 @@ from datetime import date, datetime
 from flask import current_app
 
 from app.controllers.portal import preguntas as catalogo
-from app.models import Cita, Cuestionario, Pregunta, db
+from app.models import Auditoria, Cita, Cuestionario, Pregunta, db
 
 SECCIONES = catalogo.SECCIONES
 
 SI = "Si"
 NO = "No"
 LARGO_DETALLE = 180
+ENUNCIADO_CONSENTIMIENTO = (
+    "He leído y acepto la declaración y consentimiento del donante")
+CAMPO_CONSENTIMIENTO = "acepta_declaracion"
 
 # Una pregunta lista para mostrar: la fila de la base más los datos de
 # formulario que el esquema no guarda.
@@ -62,6 +65,8 @@ def principales(filas):
     marcas = _aclaraciones()
     salida = []
     for fila in filas:
+        if fila.enunciado == ENUNCIADO_CONSENTIMIENTO:
+            continue
         if salida and _norm(fila.enunciado) in marcas:
             padre = salida[-1]
             padre.exige_detalle = True
@@ -159,13 +164,25 @@ def _mensaje_faltantes(ordenes, sin_detalle=()):
             f"Tus respuestas siguen en esta pantalla: completalas y volvé a enviarlo.")
 
 
+def _pregunta_consentimiento():
+    """La fila de parte A del consentimiento, o None si el catálogo no la tiene."""
+    return Pregunta.query.filter_by(
+        parte=Pregunta.PARTE_DONANTE,
+        enunciado=ENUNCIADO_CONSENTIMIENTO).first()
+
+
 def enviar(cita, usuario, formulario):
     """
-    Valida las 36 respuestas y, si están todas, las inserta y confirma la cita.
+    Valida las 36 respuestas y el consentimiento y, si están, los inserta
+    y confirma la cita.
 
-    Una sola transacción: o quedan las 36 filas y la cita en Confirmada, o
-    no queda nada. No actualiza respuestas que ya existían.
+    Una sola transacción: o quedan las 36 filas, el consentimiento y la cita
+    en Confirmada, o no queda nada. No actualiza respuestas que ya existían.
     """
+    if cita.estado != Cita.PENDIENTE:
+        raise ErrorCuestionario(
+            "Esta cita ya no se puede confirmar con el cuestionario.")
+
     items = preguntas()
     if not items:
         current_app.logger.error(
@@ -199,8 +216,22 @@ def enviar(cita, usuario, formulario):
             cita.id_cita, faltan, sin_detalle)
         raise ErrorCuestionario(_mensaje_faltantes(faltan, sin_detalle))
 
+    if (formulario.get(CAMPO_CONSENTIMIENTO) or "").strip() != SI:
+        raise ErrorCuestionario(
+            "No pudimos enviar el cuestionario. Tenés que aceptar la "
+            "declaración y consentimiento del donante.")
+
+    consentimiento = _pregunta_consentimiento()
+    if consentimiento is None:
+        current_app.logger.error(
+            "Cita %s: falta la pregunta de consentimiento en el catálogo",
+            cita.id_cita)
+        raise ErrorCuestionario(
+            "No pudimos enviar el cuestionario. Intentá de nuevo más tarde.")
+
     ya = respuestas(cita)
-    if any(p.id_pregunta in ya for p in items):
+    if (consentimiento.id_pregunta in ya
+            or any(p.id_pregunta in ya for p in items)):
         current_app.logger.error(
             "Cita %s: ya tiene respuestas del cuestionario del donante; "
             "no se sobrescriben", cita.id_cita)
@@ -208,12 +239,28 @@ def enviar(cita, usuario, formulario):
             "Este cuestionario ya fue enviado y no se puede modificar.")
 
     ahora = datetime.now()
+    estado_anterior = cita.estado
     try:
+        filas = []
         for pregunta, valor in cambios:
-            db.session.add(Cuestionario(
+            fila = Cuestionario(
                 id_cita=cita.id_cita, id_pregunta=pregunta.id_pregunta,
-                id_donante=usuario.id_usuario, valor=valor, fecha=ahora))
+                id_donante=usuario.id_usuario, valor=valor, fecha=ahora)
+            db.session.add(fila)
+            filas.append(fila)
+        fila = Cuestionario(
+            id_cita=cita.id_cita, id_pregunta=consentimiento.id_pregunta,
+            id_donante=usuario.id_usuario, valor=SI, fecha=ahora)
+        db.session.add(fila)
+        filas.append(fila)
         cita.estado = Cita.CONFIRMADA
+        db.session.flush()
+        for fila in filas:
+            Auditoria.registrar(usuario.id_usuario, "CUESTIONARIO",
+                                fila.id_cuestionario, Auditoria.ALTA)
+        if estado_anterior != Cita.CONFIRMADA:
+            Auditoria.registrar(usuario.id_usuario, "CITA", cita.id_cita,
+                                Auditoria.CAMBIO_ESTADO)
         db.session.commit()
     except Exception:
         db.session.rollback()
@@ -234,8 +281,20 @@ def completo(cita):
 
 
 def avance(cita):
-    """(respondidas, total) para la barra de progreso."""
-    return len(respuestas(cita)), len(preguntas())
+    """(respondidas, total) de las 36 preguntas, sin la fila de consentimiento."""
+    consentimiento = _pregunta_consentimiento()
+    extra = {consentimiento.id_pregunta} if consentimiento else set()
+    hechas = sum(1 for pid in respuestas(cita) if pid not in extra)
+    return hechas, len(preguntas())
+
+
+def consentimiento_aceptado(cita):
+    """El valor guardado del consentimiento, o None si esta cita no lo tiene."""
+    pregunta = _pregunta_consentimiento()
+    if pregunta is None:
+        return None
+    fila = respuestas(cita).get(pregunta.id_pregunta)
+    return fila.valor if fila else None
 
 
 def resumen(cita):
@@ -263,25 +322,20 @@ def habilitado(cita):
     """
     ¿Se puede responder el cuestionario de esta cita ahora?
 
-    Solo el mismo día. El cuestionario pregunta por el estado de salud de
-    hoy —si durmió bien, si tomó alcohol, si está con fiebre—, así que una
-    respuesta de hace tres días no dice nada sobre el donante que se
-    presenta. Por eso se habilita recién el día de la cita, que es cuando el
-    correo con el enlace también llega.
+    Desde que se agenda hasta el día de la cita, inclusive. El correo con
+    el enlace sale al reservar, y la cita pasa a Confirmada al enviarlo.
     """
     if cita is None or cita.estado not in Cita.ACTIVAS:
         return False
-    return cita.fecha_cita == date.today()
+    if cita.fecha_cita is None:
+        return False
+    return cita.fecha_cita >= date.today()
 
 
 def motivo_no_habilitado(cita):
     """Qué decirle a la persona cuando todavía no puede responderlo."""
     if cita is None or cita.estado not in Cita.ACTIVAS:
         return "No encontramos esa cita entre las tuyas."
-    if cita.fecha_cita > date.today():
-        return (f"El cuestionario se habilita el día de tu cita, el "
-                f"{cita.fecha_cita.strftime('%d/%m/%Y')}. Te va a llegar el "
-                f"enlace por correo unas horas antes.")
     return ("El día de esa cita ya pasó y el cuestionario quedó cerrado. "
             "Si necesitás ayuda, comunicate con el banco de sangre.")
 

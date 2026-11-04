@@ -98,6 +98,30 @@ TERMINOS = [
      'cuerpo': "El Hospital Regional de Luque se reserva el derecho de modificar los presentes Términos y Condiciones. Cualquier cambio relevante será notificado al usuario a través del canal de notificación registrado con una anticipación mínima de 15 días."},
 ]
 
+DECLARACION_DONANTE = [
+    {'titulo': "",
+     'cuerpo': (
+         "Dono voluntariamente mi sangre y consiento que se me extraiga la "
+         "cantidad adecuada de sangre, que será estudiada y utilizada como "
+         "el servicio de sangre considere apropiado.\n\n"
+         "Se me ha dado la oportunidad de realizar las preguntas que "
+         "considero necesarias para comprender el procedimiento de la "
+         "donación. Se me ha preguntado si me considero una persona con "
+         "riesgo de transmitir VIH/SIDA u otras enfermedades.\n\n"
+         "Declaro que no he recibido dinero ni otra compensación por donar "
+         "sangre y que he respondido sinceramente todas las preguntas que "
+         "se me han realizado.\n\n"
+         "Consiento expresamente que se me efectúen las pruebas necesarias "
+         "para el diagnóstico de anticuerpos del virus de la inmunodeficiencia "
+         "humana (VIH) y para la detección de otras enfermedades infecciosas "
+         "transmisibles por la sangre.\n\n"
+         "Dejo constancia de que se me ha asegurado la confidencialidad de "
+         "los resultados de los estudios y autorizo que se me cite para ser "
+         "informado personalmente por los médicos en caso de detectarse "
+         "alguna anomalía o resultado que requiera comunicación."
+     )},
+]
+
 
 MESES_LARGO = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio',
                'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']

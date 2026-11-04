@@ -35,6 +35,11 @@
         <h3>Personas que necesitan donantes</h3>
         <p>Mirá las solicitudes activas y ayudá a alguien puntual.</p>
       </a>
+      <a class="action-card" href="{{ url_for('consejeria.ver') }}">
+        <div class="ico" style="background:#EAF1FE; color:var(--info);">{{ ico('calendar') }}</div>
+        <h3>Consejería</h3>
+        <p>Si el banco te citó, elegí el día y el horario.</p>
+      </a>
       <a class="action-card" href="{{ url_for('mi_cita.ver') }}">
         <div class="ico" style="background:#E6F4F3; color:var(--teal-ink);">{{ ico('calendar') }}</div>
         <h3>Mi cita</h3>

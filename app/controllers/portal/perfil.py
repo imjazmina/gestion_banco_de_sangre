@@ -6,14 +6,25 @@ lo que lo identifica en el banco de sangre; el grupo sanguíneo tampoco,
 porque lo determina el laboratorio a partir de una extracción, no una
 declaración del donante.
 """
+import base64
 import calendar
+import hashlib
 import re
-from datetime import date
+import secrets
+from datetime import date, datetime
 
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 
 from app.controllers.portal.agenda import diferimiento_vigente
-from app.models import db, Usuario, Correo, Telefono, Auditoria, Cita
+from app.controllers.portal.autenticacion import (
+    correo_es_institucional, hashear, verificar)
+from app.controllers.portal.recuperacion import validar_contrasena
+from app.models import (
+    db, Usuario, Correo, Auditoria, Cita, Solicitud, HistorialSolicitud,
+    Notificacion, Extraccion, Unidad, Asignacion,
+    MuestraCompatibilidad, ResultadoCompatibilidad,
+)
 
 _CORREO = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
@@ -28,70 +39,132 @@ class ErrorPerfil(Exception):
     """Los datos no pasan las validaciones. El mensaje se le muestra al usuario."""
 
 
-def validar(nombre, apellido, correo):
-    errores = []
-    if not nombre:
-        errores.append("Ingresá tu nombre.")
-    elif len(nombre) > 80:
-        errores.append("El nombre es demasiado largo.")
-    if not apellido:
-        errores.append("Ingresá tu apellido.")
-    elif len(apellido) > 80:
-        errores.append("El apellido es demasiado largo.")
-    if not _CORREO.match(correo or ""):
-        errores.append("Ingresá un correo electrónico válido.")
-    elif len(correo) > 120:
-        errores.append("El correo es demasiado largo.")
-    return errores
+class ErrorSupresion(Exception):
+    """Hay citas, extracciones o solicitudes abiertas. No se tocó ningún registro."""
+
+    def __init__(self, operaciones):
+        self.operaciones = operaciones
 
 
-def actualizar(usuario, datos):
+def _direccion(texto):
+    return (texto or "").strip().lower()
+
+
+def _error_direccion(direccion):
+    if not _CORREO.match(direccion or ""):
+        return "Ingresá un correo electrónico válido."
+    if len(direccion) > 120:
+        return "El correo es demasiado largo."
+    return None
+
+
+def _correo_propio(usuario, id_correo):
+    return next((c for c in usuario.correos if c.id_correo == id_correo), None)
+
+
+def _direccion_ocupada(direccion, id_correo=None):
+    """uq_correo_direccion es única en toda la tabla, no por usuario."""
+    consulta = Correo.query.filter(func.lower(Correo.direccion) == direccion)
+    if id_correo is not None:
+        consulta = consulta.filter(Correo.id_correo != id_correo)
+    return consulta.first() is not None
+
+
+def agregar_correo(usuario, direccion):
+    """Agrega un correo secundario. El de alta sigue siendo el principal."""
+    direccion = _direccion(direccion)
+    error = _error_direccion(direccion)
+    if error:
+        raise ErrorPerfil([error])
+    if _direccion_ocupada(direccion) or correo_es_institucional(direccion):
+        raise ErrorPerfil(["Ese correo ya está registrado."])
+
+    try:
+        db.session.add(Correo(
+            id_usuario=usuario.id_usuario,
+            direccion=direccion,
+            es_principal=not usuario.correos,
+        ))
+        Auditoria.registrar(usuario.id_usuario, "USUARIO",
+                            usuario.id_usuario, Auditoria.MODIFICACION)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ErrorPerfil(["Ese correo ya está registrado."])
+    except Exception:
+        db.session.rollback()
+        raise
+
+
+def editar_correo(usuario, id_correo, direccion):
+    """Cambia la dirección. Si es la principal, el login pasa a usar la nueva."""
+    fila = _correo_propio(usuario, id_correo)
+    if fila is None:
+        raise ErrorPerfil(["No encontramos ese correo."])
+
+    direccion = _direccion(direccion)
+    error = _error_direccion(direccion)
+    if error:
+        raise ErrorPerfil([error])
+    if direccion == fila.direccion:
+        return
+    if _direccion_ocupada(direccion, fila.id_correo) or correo_es_institucional(direccion):
+        raise ErrorPerfil(["Ese correo ya está registrado."])
+
+    try:
+        fila.direccion = direccion
+        Auditoria.registrar(usuario.id_usuario, "USUARIO",
+                            usuario.id_usuario, Auditoria.MODIFICACION)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ErrorPerfil(["Ese correo ya está registrado."])
+    except Exception:
+        db.session.rollback()
+        raise
+
+
+def hacer_principal(usuario, id_correo):
     """
-    Guarda nombre, apellido, correo y teléfono principal en una transacción.
+    Deja un solo principal.
 
-    Lanza ErrorPerfil si el correo ya pertenece a otra cuenta.
+    Primero se apaga el anterior y se hace flush: el índice parcial
+    uq_correo_principal no admite dos filas con es_principal a la vez.
     """
-    nombre = (datos.get("nombre") or "").strip()
-    apellido = (datos.get("apellido") or "").strip()
-    correo = (datos.get("correo") or "").strip().lower()
-    telefono = (datos.get("telefono") or "").strip()
+    fila = _correo_propio(usuario, id_correo)
+    if fila is None:
+        raise ErrorPerfil(["No encontramos ese correo."])
+    if fila.es_principal:
+        return
 
-    errores = validar(nombre, apellido, correo)
+    try:
+        for otro in usuario.correos:
+            if otro.es_principal:
+                otro.es_principal = False
+        db.session.flush()
+        fila.es_principal = True
+        Auditoria.registrar(usuario.id_usuario, "USUARIO",
+                            usuario.id_usuario, Auditoria.MODIFICACION)
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        raise ErrorPerfil(["No se pudo cambiar el correo principal. Intentá de nuevo."])
+    except Exception:
+        db.session.rollback()
+        raise
+
+
+def cambiar_contrasena(usuario, actual, nueva, repetida):
+    """Reemplaza el hash. La actual se verifica; la nueva usa las mismas reglas que el alta."""
+    if not verificar(actual or "", usuario.contrasena):
+        raise ErrorPerfil(["La contraseña actual no es correcta."])
+
+    errores = validar_contrasena(nueva, repetida)
     if errores:
         raise ErrorPerfil(errores)
 
-    # uq_correo_direccion es único en toda la tabla, no por usuario: el correo
-    # de otra cuenta no se puede reutilizar. Se comprueba acá para dar un
-    # mensaje claro en lugar de dejar que explote la restricción.
-    ocupado = (Correo.query
-               .filter(func.lower(Correo.direccion) == correo,
-                       Correo.id_usuario != usuario.id_usuario)
-               .first())
-    if ocupado:
-        raise ErrorPerfil(["Ese correo ya está registrado en otra cuenta."])
-
     try:
-        usuario.nombre = nombre
-        usuario.apellido = apellido
-
-        principal = usuario.correo_principal
-        if principal:
-            principal.direccion = correo
-        else:
-            db.session.add(Correo(id_usuario=usuario.id_usuario,
-                                  direccion=correo, es_principal=True))
-
-        actual = usuario.telefono_principal
-        if telefono:
-            if actual:
-                actual.numero = telefono
-            else:
-                db.session.add(Telefono(id_usuario=usuario.id_usuario,
-                                        numero=telefono, es_principal=True))
-        elif actual:
-            # Sin número, la fila no tiene sentido: numero es NOT NULL.
-            db.session.delete(actual)
-
+        usuario.contrasena = hashear(nueva)
         Auditoria.registrar(usuario.id_usuario, "USUARIO",
                             usuario.id_usuario, Auditoria.MODIFICACION)
         db.session.commit()
@@ -100,23 +173,126 @@ def actualizar(usuario, datos):
         raise
 
 
+def eliminar_correo(usuario, id_correo):
+    fila = _correo_propio(usuario, id_correo)
+    if fila is None:
+        raise ErrorPerfil(["No encontramos ese correo."])
+    if len(usuario.correos) <= 1:
+        raise ErrorPerfil(["Tenés que conservar al menos un correo."])
+    if fila.es_principal:
+        raise ErrorPerfil(["Elegí otro correo como principal antes de eliminar este."])
+
+    try:
+        db.session.delete(fila)
+        Auditoria.registrar(usuario.id_usuario, "USUARIO",
+                            usuario.id_usuario, Auditoria.MODIFICACION)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+
+
+# 16 bytes de sal + digest SHA-256 (32). En base64 ocupan 64 caracteres,
+# el largo de usuario.documento.
+_SALT_BYTES = 16
+_DIGEST_BYTES = 32
+
+
+def _documento_pseudonimo(documento):
+    """
+    SHA-256 del documento con sal aleatoria.
+
+    La sal se guarda delante del hash. No entra el id ni ningún otro dato.
+    Cada supresión sale distinta, así la clave única no choca si la misma
+    cédula vuelve a registrarse.
+    """
+    salt = secrets.token_bytes(_SALT_BYTES)
+    digest = hashlib.sha256(salt + documento.encode("utf-8")).digest()
+    return base64.b64encode(salt + digest).decode("ascii")
+
+
+def verificar_documento(documento, almacenado):
+    """True si el documento es el que originó el hash guardado con su sal."""
+    if not documento or not almacenado:
+        return False
+    try:
+        crudo = base64.b64decode(almacenado, validate=True)
+    except (ValueError, TypeError):
+        return False
+    if len(crudo) != _SALT_BYTES + _DIGEST_BYTES:
+        return False
+    salt, digest = crudo[:_SALT_BYTES], crudo[_SALT_BYTES:]
+    calculado = hashlib.sha256(salt + documento.encode("utf-8")).digest()
+    return secrets.compare_digest(calculado, digest)
+
+
+def operaciones_abiertas(usuario):
+    """
+    Citas sin atender, extracciones sin tipificar y solicitudes publicadas.
+
+    La tipificación la carga el laboratorio al salir de «En laboratorio».
+    «Registrada» es el instante previo y también queda pendiente.
+    """
+    citas = (Cita.query
+             .filter(Cita.id_usuario == usuario.id_usuario,
+                     Cita.estado.in_(Cita.ACTIVAS))
+             .all())
+    extracciones = (db.session.query(Extraccion, Unidad)
+                    .join(Unidad, Unidad.id_extraccion == Extraccion.id_extraccion)
+                    .filter(Unidad.id_donante == usuario.id_usuario,
+                            Unidad.estado.in_((Unidad.REGISTRADA,
+                                               Unidad.EN_LABORATORIO)))
+                    .all())
+    solicitudes = (Solicitud.query
+                   .filter(Solicitud.id_solicitante == usuario.id_usuario,
+                           Solicitud.estado.in_(Solicitud.ABIERTAS))
+                   .all())
+    return {"citas": citas, "extracciones": extracciones,
+            "solicitudes": solicitudes}
+
+
+def hay_operaciones_abiertas(operaciones):
+    return bool(operaciones["citas"] or operaciones["extracciones"]
+                or operaciones["solicitudes"])
+
+
+def _quitar_avisos_operativos(usuario):
+    """Conserva la citación genérica del resultado reactivo."""
+    (Notificacion.query
+     .filter(Notificacion.id_usuario == usuario.id_usuario,
+             Notificacion.tipo != Notificacion.CITACION_GENERICA)
+     .delete(synchronize_session=False))
+
+
 def suprimir_cuenta(usuario):
     """
     Supresión de cuenta (Ley N.º 1682/01).
 
-    No se borra la fila: se anula el acceso y se conserva el rastro clínico,
-    que el banco de sangre está obligado a guardar. El CHECK
-    ck_usuario_supresion exige que la contraseña quede nula.
+    Si hay una cita activa, una extracción sin tipificar o una solicitud
+    publicada, no cambia nada. Si no las hay, la fila y el id_usuario quedan:
+    de ellos cuelgan extracción, unidad, diferimiento y la citación por
+    resultado reactivo. Se borran contacto,
+    nombre y credencial. El documento pasa a hash. Fecha de nacimiento,
+    género y tipo de sangre se mantienen para las métricas y el rastro
+    clínico. El CHECK ck_usuario_supresion exige contraseña nula.
     """
+    if usuario.cuenta_suprimida:
+        return
+    abiertas = operaciones_abiertas(usuario)
+    if hay_operaciones_abiertas(abiertas):
+        raise ErrorSupresion(abiertas)
     try:
-        usuario.cuenta_suprimida = True
-        usuario.estado = False
-        usuario.contrasena = None
+        _quitar_avisos_operativos(usuario)
 
-        for correo in usuario.correos:
+        for correo in list(usuario.correos):
             db.session.delete(correo)
-        for telefono in usuario.telefonos:
-            db.session.delete(telefono)
+
+        usuario.documento = _documento_pseudonimo(usuario.documento)
+        usuario.nombre = None
+        usuario.apellido = None
+        usuario.contrasena = None
+        usuario.estado = False
+        usuario.cuenta_suprimida = True
 
         Auditoria.registrar(usuario.id_usuario, "USUARIO",
                             usuario.id_usuario, Auditoria.SUPRESION_CUENTA)
@@ -225,13 +401,86 @@ def historial_citas(usuario, limite=10):
     return citas[:limite]
 
 
+def solicitud_con_resultado(usuario):
+    """
+    La solicitud propia del donante cuyo resultado de laboratorio de
+    compatibilidad ya se registró, o None.
+
+    El resultado cuelga de la muestra (muestra_compatibilidad → solicitud).
+    Sin ese resultado la tarjeta del perfil no se muestra. Si hubiera más de
+    una, se toma la más reciente.
+    """
+    return (Solicitud.query
+            .join(MuestraCompatibilidad,
+                  MuestraCompatibilidad.id_solicitud == Solicitud.id_solicitud)
+            .join(ResultadoCompatibilidad,
+                  ResultadoCompatibilidad.id_muestra
+                  == MuestraCompatibilidad.id_muestra)
+            .filter(Solicitud.id_solicitante == usuario.id_usuario)
+            .order_by(Solicitud.fecha_creacion.desc())
+            .first())
+
+
+def donaciones_recibidas(solicitud):
+    """Unidades efectivamente asignadas a la solicitud. Es el historial de
+    donaciones recibidas; la revocación no lo toca."""
+    if solicitud is None:
+        return 0
+    return (Asignacion.query
+            .filter_by(id_solicitud=solicitud.id_solicitud)
+            .count())
+
+
+def puede_revocar(solicitud):
+    """Hay consentimiento vigente que revocar: solo mientras sigue abierta."""
+    return (solicitud is not None
+            and solicitud.consentimiento_publicacion
+            and solicitud.estado in Solicitud.ABIERTAS)
+
+
+def revocar_consentimiento(usuario):
+    """
+    Revoca el consentimiento de publicación de la solicitud propia.
+
+    No borra la solicitud ni toca las donaciones ya recibidas: solo retira el
+    permiso de publicación. La solicitud pasa a «Revocada» —el estado que
+    exige ck_solicitud_publicacion al quedar sin consentimiento— y el cambio
+    queda en el historial inmutable. No se puede volver a publicar desde acá.
+    """
+    solicitud = solicitud_con_resultado(usuario)
+    if solicitud is None:
+        raise ErrorPerfil(["No encontramos una solicitud para revocar."])
+    if solicitud.estado == Solicitud.REVOCADA:
+        return
+    if not puede_revocar(solicitud):
+        raise ErrorPerfil(["Esta solicitud ya no admite revocación."])
+
+    try:
+        anterior = solicitud.estado
+        solicitud.consentimiento_publicacion = False
+        solicitud.estado = Solicitud.REVOCADA
+        db.session.add(HistorialSolicitud(
+            id_solicitud=solicitud.id_solicitud,
+            estado_anterior=anterior,
+            estado_nuevo=Solicitud.REVOCADA,
+            fecha_hora=datetime.now(),
+        ))
+        Auditoria.registrar(usuario.id_usuario, "SOLICITUD",
+                            solicitud.id_solicitud, Auditoria.CAMBIO_ESTADO)
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        raise
+
+
 def resumen(usuario):
     """Datos que muestra la pantalla de perfil."""
     ultima = ultima_donacion(usuario)
+    solicitud = solicitud_con_resultado(usuario)
     return {
         "usuario": usuario,
-        "correo": usuario.correo_principal.direccion if usuario.correo_principal else "",
-        "telefono": usuario.telefono_principal.numero if usuario.telefono_principal else "",
+        "correos": sorted(usuario.correos,
+                          key=lambda c: (not c.es_principal, c.direccion)),
         "grupo": usuario.tipo_sangre.etiqueta if usuario.tipo_sangre else None,
         "roles": [r.nombre for r in usuario.roles],
         "ultima_donacion": ultima,
@@ -239,4 +488,9 @@ def resumen(usuario):
         "habilitacion": habilitacion(usuario),
         "historial": historial_citas(usuario),
         "intervalo": INTERVALO_MESES.get(usuario.genero, INTERVALO_POR_DEFECTO),
+        "solicitud": solicitud,
+        "donaciones_recibidas": donaciones_recibidas(solicitud),
+        "puede_revocar": puede_revocar(solicitud),
+        "solicitud_revocada": solicitud is not None
+                              and solicitud.estado == Solicitud.REVOCADA,
     }

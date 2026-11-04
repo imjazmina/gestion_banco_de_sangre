@@ -11,7 +11,7 @@ licenciado_evaluacion_bp = Blueprint(
 
 
 @licenciado_evaluacion_bp.route("/atencion/<int:cita_id>/evaluacion", methods=["GET", "POST"])
-@requiere("lic", "licenciado_auth.ingresar")
+@requiere("lic", "personal_auth.ingresar")
 def ver(cita_id):
     cita = jornada.cita_por_id(cita_id)
     if cita is None:
@@ -31,10 +31,19 @@ def ver(cita_id):
                 return redirect(url_for("licenciado_ficha.ver",
                                         donor_id=cita.id_usuario, cita=cita.id_cita))
             jornada.guardar_mediciones(cita, personal, request.form)
-            flash("Signos registrados. La aptitud de cada medición la calculó el sistema.", "ok")
+            if jornada.mediciones_aptas(cita):
+                destino = ("licenciado_muestra.ver"
+                           if cita.tipo_cita == jornada.Cita.MUESTRA
+                           else "licenciado_extraccion.ver")
+                return redirect(url_for(destino, cita_id=cita_id))
         except ErrorJornada as exc:
             flash(str(exc), "error")
         return redirect(url_for("licenciado_evaluacion.ver", cita_id=cita_id))
+    if jornada.mediciones_de(cita) and jornada.mediciones_aptas(cita):
+        destino = ("licenciado_muestra.ver"
+                   if cita.tipo_cita == jornada.Cita.MUESTRA
+                   else "licenciado_extraccion.ver")
+        return redirect(url_for(destino, cita_id=cita_id))
     return pintar(
         "licenciado/evaluacion.html",
         cita=cita,

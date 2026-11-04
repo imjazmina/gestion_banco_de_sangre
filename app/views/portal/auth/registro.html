@@ -53,11 +53,7 @@
           <label for="correo">Correo electrónico *</label>
           <input type="email" id="correo" name="correo" value="{{ datos.correo or '' }}"
                  maxlength="120" required>
-        </div>
-
-        <div class="field">
-          <label for="telefono">Teléfono</label>
-          <input type="tel" id="telefono" name="telefono" value="{{ datos.telefono or '' }}" maxlength="30">
+          <div class="hint">Ingresá solo el correo principal. Con ese vas a iniciar sesión. Después podés agregar otros en Mi perfil.</div>
         </div>
 
         <div class="field">

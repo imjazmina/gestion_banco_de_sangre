@@ -6,7 +6,7 @@ son los del CHECK de `cita`. «Diferido» de la maqueta queda como `No apto`
 más un `registro_diferimiento`. No se agregan columnas.
 """
 import secrets
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timedelta
 
 from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
@@ -15,8 +15,8 @@ from app import calendario
 from app.controllers.portal.agenda import diferimiento_vigente
 from app.models import (
     Auditoria, Cita, Cuestionario, Diferimiento, Extraccion, HorarioDisponible,
-    Medicion, Notificacion, Pregunta, RegistroDiferimiento, TipoMedicion,
-    TransicionEstado, Unidad, Usuario, db,
+    Medicion, MuestraCompatibilidad, Notificacion, Pregunta, RegistroDiferimiento,
+    TipoMedicion, TransicionEstado, Unidad, Usuario, db,
 )
 
 INSTITUCION_LOCAL = "Hospital Regional de Luque"
@@ -26,6 +26,7 @@ ETIQUETA_TIPO = {
     Cita.REPOSICION: "Reposición",
     Cita.SOLIDARIA: "Solidaria",
     Cita.COMPATIBILIDAD: "Compatibilidad",
+    Cita.MUESTRA: "Muestra",
 }
 
 CAUSA_POR_MEDICION = {
@@ -86,13 +87,14 @@ def fila(cita):
         "id": cita.id_cita,
         "hora": cita.horario.hora_inicio.strftime("%H:%M"),
         "donante": cita.donante.nombre_completo,
-        "ci": cita.donante.documento,
+        "ci": cita.donante.documento_visible,
         "tipo": etiqueta_tipo(cita.tipo_cita),
         "estado": cita.estado,
         "donorId": cita.id_usuario,
         "tipoAgendamiento": (
-            "Extracción de compatibilidad"
-            if cita.tipo_cita == Cita.COMPATIBILIDAD else "Donación"),
+            "Extracción de muestra" if cita.tipo_cita == Cita.MUESTRA
+            else "Extracción de compatibilidad" if cita.tipo_cita == Cita.COMPATIBILIDAD
+            else "Donación"),
         "origen": "Espontáneo" if es_espontanea(cita) else "Agendada",
         "solicitudId": cita.id_solicitud or "",
         "grupo": grupo,
@@ -124,8 +126,8 @@ def _exigir_ajeno(cita, personal):
 
 
 def marcar_ausente(cita, personal):
-    if cita.estado not in Cita.ACTIVAS:
-        raise ErrorJornada("Esa cita ya no está pendiente de atención.")
+    if cita.estado != Cita.CONFIRMADA:
+        raise ErrorJornada("Solo una cita confirmada puede quedar ausente.")
     _exigir_ajeno(cita, personal)
     cita.estado = Cita.AUSENTE
     cita.id_personal = personal.id_usuario
@@ -167,6 +169,8 @@ def guardar_parte_b(cita, personal, formulario):
 
     ahora = datetime.now()
     existentes = respuestas_de(cita)
+    nuevas = []
+    modificadas = []
     for pregunta in preguntas:
         valor = (formulario.get(f"p{pregunta.id_pregunta}") or "").strip()
         if valor not in ("Si", "No"):
@@ -181,20 +185,29 @@ def guardar_parte_b(cita, personal, formulario):
             valor = _valor(valor, detalle)
         fila_resp = existentes.get(pregunta.id_pregunta)
         if fila_resp is None:
-            db.session.add(Cuestionario(
+            fila_resp = Cuestionario(
                 id_cita=cita.id_cita,
                 id_pregunta=pregunta.id_pregunta,
                 id_donante=cita.id_usuario,
                 id_personal=personal.id_usuario,
                 valor=valor,
                 fecha=ahora,
-            ))
+            )
+            db.session.add(fila_resp)
+            nuevas.append(fila_resp)
         else:
             fila_resp.valor = valor
             fila_resp.id_personal = personal.id_usuario
             fila_resp.fecha = ahora
-    cita.estado = Cita.CONFIRMADA
+            modificadas.append(fila_resp)
     cita.id_personal = personal.id_usuario
+    db.session.flush()
+    for fila in nuevas:
+        Auditoria.registrar(personal.id_usuario, "CUESTIONARIO",
+                            fila.id_cuestionario, Auditoria.ALTA)
+    for fila in modificadas:
+        Auditoria.registrar(personal.id_usuario, "CUESTIONARIO",
+                            fila.id_cuestionario, Auditoria.MODIFICACION)
     _commit()
 
 
@@ -224,21 +237,28 @@ def guardar_mediciones(cita, personal, formulario):
 
     tipos = tipos_medicion()
     ahora = datetime.now()
+    filas = []
     for tipo in tipos:
         texto = (formulario.get(tipo.codigo) or "").strip().replace(",", ".")
         try:
             valor = float(texto)
         except ValueError:
             raise ErrorJornada(f"Ingresá un número para {tipo.nombre}.")
-        db.session.add(Medicion(
+        fila = Medicion(
             id_cita=cita.id_cita,
             id_personal=personal.id_usuario,
             id_tipo_medicion=tipo.id_tipo_medicion,
             valor=valor,
             apto=False,
             fecha=ahora,
-        ))
+        )
+        db.session.add(fila)
+        filas.append(fila)
     cita.id_personal = personal.id_usuario
+    db.session.flush()
+    for fila in filas:
+        Auditoria.registrar(personal.id_usuario, "MEDICION",
+                            fila.id_medicion, Auditoria.ALTA)
     _commit()
 
 
@@ -267,10 +287,10 @@ def registrar_diferimiento(cita, personal, id_diferimiento, origen, institucion)
                       RegistroDiferimiento.MEDICION):
         raise ErrorJornada("Ese origen no corresponde a esta pantalla.")
     institucion = (institucion or "").strip() or INSTITUCION_LOCAL
-    if cita.estado not in (Cita.PENDIENTE, Cita.CONFIRMADA):
-        raise ErrorJornada("Esta cita ya está cerrada.")
+    if cita.estado != Cita.CONFIRMADA:
+        raise ErrorJornada("Solo una cita confirmada puede quedar no apta.")
 
-    db.session.add(RegistroDiferimiento(
+    registro = RegistroDiferimiento(
         id_donante=cita.id_usuario,
         id_diferimiento=causa.id_diferimiento,
         id_cita=cita.id_cita,
@@ -278,9 +298,13 @@ def registrar_diferimiento(cita, personal, id_diferimiento, origen, institucion)
         origen=origen,
         institucion_diagnostico=institucion,
         fecha_inicio=date.today(),
-    ))
+    )
+    db.session.add(registro)
+    db.session.flush()
     cita.estado = Cita.NO_APTO
     cita.id_personal = personal.id_usuario
+    Auditoria.registrar(personal.id_usuario, "REGISTRO_DIFERIMIENTO",
+                        registro.id_registro, Auditoria.ALTA)
     Auditoria.registrar(personal.id_usuario, "CITA", cita.id_cita,
                         Auditoria.CAMBIO_ESTADO)
     _commit()
@@ -295,70 +319,150 @@ def extraccion_de(cita):
     return Extraccion.query.filter_by(id_cita=cita.id_cita).first()
 
 
-def unidad_de(cita):
+def unidades_de(cita):
     extraccion = extraccion_de(cita)
     if extraccion is None:
-        return None
-    return Unidad.query.filter_by(id_extraccion=extraccion.id_extraccion).first()
+        return []
+    return (Unidad.query
+            .filter_by(id_extraccion=extraccion.id_extraccion)
+            .order_by(Unidad.id_unidad)
+            .all())
 
 
-def registrar_extraccion(cita, personal, observacion):
+def registrar_extraccion(cita, personal, observacion, n_unidades=0):
+    """
+    Cierra la cita y deja la extracción.
+    Cada unidad completada pasa a laboratorio, con vencimiento a 30 días.
+    Si no se completó ninguna, no hay fila en unidad ni código de unidad.
+    """
     _exigir_ajeno(cita, personal)
+    if cita.tipo_cita == Cita.MUESTRA:
+        raise ErrorJornada("Esta cita registra una muestra, no unidades.")
     if extraccion_de(cita) is not None:
         raise ErrorJornada("Esta cita ya tiene una extracción.")
     if not mediciones_aptas(cita):
         raise ErrorJornada(
             "No se extrae si falta una medición o alguna no es apta.")
-    if cita.estado not in (Cita.PENDIENTE, Cita.CONFIRMADA):
-        raise ErrorJornada("Esta cita ya está cerrada.")
+    if cita.estado != Cita.CONFIRMADA:
+        raise ErrorJornada("Solo una cita confirmada puede completarse.")
+    if n_unidades < 0:
+        raise ErrorJornada("La cantidad de unidades no es válida.")
 
     observacion = (observacion or "").strip()
     if not observacion:
         observacion = "Sin incidentes."
 
+    fecha = datetime.now()
     extraccion = Extraccion(
         id_cita=cita.id_cita,
         id_personal=personal.id_usuario,
         codigo_unico=_codigo("EX"),
-        fecha=datetime.now(),
+        fecha=fecha,
         observacion=observacion,
     )
     db.session.add(extraccion)
     db.session.flush()
+    Auditoria.registrar(personal.id_usuario, "EXTRACCION",
+                        extraccion.id_extraccion, Auditoria.ALTA)
 
-    unidad = Unidad(
-        id_extraccion=extraccion.id_extraccion,
-        id_donante=cita.id_usuario,
-        codigo=_codigo("UN"),
-        componente="sangre_total",
-        estado=Unidad.REGISTRADA,
-    )
-    db.session.add(unidad)
-    db.session.flush()
+    unidades = []
+    vencimiento = fecha.date() + timedelta(days=30)
+    for _ in range(n_unidades):
+        unidad = Unidad(
+            id_extraccion=extraccion.id_extraccion,
+            id_donante=cita.id_usuario,
+            codigo=_codigo("UN"),
+            estado=Unidad.REGISTRADA,
+            fecha_vencimiento=vencimiento,
+        )
+        db.session.add(unidad)
+        db.session.flush()
+        db.session.add(TransicionEstado(
+            id_unidad=unidad.id_unidad,
+            id_personal=personal.id_usuario,
+            estado_origen=Unidad.REGISTRADA,
+            estado_destino=Unidad.EN_LABORATORIO,
+            fecha=fecha,
+        ))
+        unidad.estado = Unidad.EN_LABORATORIO
+        Auditoria.registrar(personal.id_usuario, "UNIDAD", unidad.id_unidad,
+                            Auditoria.CAMBIO_ESTADO)
+        unidades.append(unidad)
 
-    # La base solo admite la transición Registrada → En laboratorio.
-    # El alta es la fila en Registrada; no hay una fila con origen «Alta».
-    db.session.add(TransicionEstado(
-        id_unidad=unidad.id_unidad,
-        id_personal=personal.id_usuario,
-        estado_origen=Unidad.REGISTRADA,
-        estado_destino=Unidad.EN_LABORATORIO,
-        fecha=datetime.now(),
-    ))
-    unidad.estado = Unidad.EN_LABORATORIO
+    if unidades:
+        db.session.add(Notificacion(
+            id_usuario=cita.id_usuario,
+            id_cita=cita.id_cita,
+            tipo=Notificacion.AGRADECIMIENTO,
+            mensaje="Gracias por donar. Tu extracción quedó registrada en el banco de sangre.",
+        ))
+
     cita.estado = Cita.COMPLETADA
     cita.id_personal = personal.id_usuario
-
-    db.session.add(Notificacion(
-        id_usuario=cita.id_usuario,
-        id_cita=cita.id_cita,
-        tipo=Notificacion.AGRADECIMIENTO,
-        mensaje="Gracias por donar. Tu extracción quedó registrada en el banco de sangre.",
-    ))
-    Auditoria.registrar(personal.id_usuario, "UNIDAD", unidad.id_unidad,
+    Auditoria.registrar(personal.id_usuario, "CITA", cita.id_cita,
                         Auditoria.CAMBIO_ESTADO)
     _commit()
-    return unidad
+    return unidades
+
+
+def muestra_de(cita):
+    extraccion = extraccion_de(cita)
+    if extraccion is None:
+        return None
+    return (MuestraCompatibilidad.query
+            .filter_by(id_extraccion=extraccion.id_extraccion)
+            .first())
+
+
+def registrar_muestra(cita, personal, observacion):
+    """Cierra la cita con una muestra. No crea unidades ni vencimiento."""
+    _exigir_ajeno(cita, personal)
+    if cita.tipo_cita != Cita.MUESTRA:
+        raise ErrorJornada("Esta cita no es una extracción de muestra.")
+    from app.models import Solicitud
+    solicitud = (Solicitud.query
+                 .filter_by(id_solicitante=cita.id_usuario, estado=Solicitud.CREADA)
+                 .order_by(Solicitud.fecha_creacion.desc())
+                 .first())
+    if solicitud is None:
+        raise ErrorJornada("La muestra no está asociada a una solicitud creada.")
+    if extraccion_de(cita) is not None:
+        raise ErrorJornada("Esta cita ya tiene una extracción.")
+    if not mediciones_aptas(cita):
+        raise ErrorJornada(
+            "No se extrae si falta una medición o alguna no es apta.")
+    if cita.estado != Cita.CONFIRMADA:
+        raise ErrorJornada("Solo una cita confirmada puede completarse.")
+
+    observacion = (observacion or "").strip() or "Muestra venosa sin incidentes."
+    fecha = datetime.now()
+    extraccion = Extraccion(
+        id_cita=cita.id_cita,
+        id_personal=personal.id_usuario,
+        codigo_unico=_codigo("EX"),
+        fecha=fecha,
+        observacion=observacion,
+    )
+    db.session.add(extraccion)
+    db.session.flush()
+    Auditoria.registrar(personal.id_usuario, "EXTRACCION",
+                        extraccion.id_extraccion, Auditoria.ALTA)
+    muestra = MuestraCompatibilidad(
+        id_extraccion=extraccion.id_extraccion,
+        id_solicitud=solicitud.id_solicitud,
+        codigo=_codigo("MC"),
+        fecha=fecha,
+    )
+    db.session.add(muestra)
+    db.session.flush()
+    Auditoria.registrar(personal.id_usuario, "MUESTRA_COMPATIBILIDAD",
+                        muestra.id_muestra, Auditoria.ALTA)
+    cita.estado = Cita.COMPLETADA
+    cita.id_personal = personal.id_usuario
+    Auditoria.registrar(personal.id_usuario, "CITA", cita.id_cita,
+                        Auditoria.CAMBIO_ESTADO)
+    _commit()
+    return muestra
 
 
 def buscar_donante(documento):
@@ -410,6 +514,8 @@ def abrir_espontanea(donante, personal):
     )
     db.session.add(cita)
     db.session.flush()
+    Auditoria.registrar(personal.id_usuario, "CITA", cita.id_cita,
+                        Auditoria.ALTA)
     db.session.add(Notificacion(
         id_usuario=donante.id_usuario,
         id_cita=cita.id_cita,

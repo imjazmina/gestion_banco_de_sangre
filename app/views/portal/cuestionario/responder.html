@@ -65,6 +65,17 @@
           </fieldset>
         {% endfor %}
 
+        {% if loop.last %}
+        <label class="check-row" style="margin:18px 0 8px;">
+          <input type="checkbox" name="acepta_declaracion" value="Si" required
+                 {% if formulario and formulario.get('acepta_declaracion') == 'Si' %}checked{% endif %}>
+          <span>He leído y acepto la declaración y consentimiento del donante</span>
+        </label>
+        <p style="margin:0 0 4px 26px;">
+          <a class="muted-link" href="{{ url_for('legal.declaracion_donante') }}" target="_blank" rel="noopener">Leer declaración y consentimiento del donante</a>
+        </p>
+        {% endif %}
+
         <div class="q-acciones">
           {% if loop.index > 1 %}
           <button class="btn btn-ghost" type="button" data-ir="{{ loop.index - 1 }}">
@@ -192,8 +203,24 @@
       mostrar(incompleto);
       const paso = pasos.find(function (p) { return Number(p.dataset.paso) === incompleto; });
       const aviso = paso && paso.querySelector('.q-aviso');
-      if (aviso) aviso.hidden = false;
+      if (aviso) {
+        aviso.textContent = 'Respondé todas las preguntas de este paso para continuar.';
+        aviso.hidden = false;
+      }
       if (paso) paso.scrollIntoView({block: 'start'});
+      return;
+    }
+    const acepta = form.querySelector('input[name="acepta_declaracion"]');
+    if (acepta && !acepta.checked) {
+      e.preventDefault();
+      mostrar(pasos.length);
+      const paso = pasos[pasos.length - 1];
+      const aviso = paso && paso.querySelector('.q-aviso');
+      if (aviso) {
+        aviso.textContent = 'Tenés que aceptar la declaración y consentimiento del donante.';
+        aviso.hidden = false;
+      }
+      acepta.focus();
       return;
     }
     salir = true;

@@ -4,6 +4,7 @@ from flask import (Blueprint, render_template, request, redirect,
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.controllers.portal import agenda, cuestionario
+from app.controllers.portal.programacion import programador
 from app.controllers.sesion import requiere_login, usuario_actual
 from app.models import db
 
@@ -43,6 +44,9 @@ def reprogramar():
     if cita is None:
         flash("No tenés una cita vigente para reprogramar.", "error")
         return redirect(url_for("mi_cita.ver"))
+    if cuestionario.completo(cita):
+        flash("No podés reprogramar porque el cuestionario ya fue enviado.", "error")
+        return redirect(url_for("mi_cita.ver"))
 
     fecha = agenda.parsear_fecha(request.args.get("fecha"))
     dias = agenda.dias(fecha)
@@ -79,6 +83,7 @@ def reprogramar_confirmar():
         flash(agenda.mensaje_de_error(e), "error")
         return redirect(url_for("mi_cita.reprogramar", fecha=fecha.isoformat()))
 
+    programador.agendar(cita, request.url_root.rstrip("/"))
     flash("Tu cita fue reprogramada.", "ok")
     return redirect(url_for("mi_cita.ver"))
 
@@ -94,6 +99,7 @@ def cancelar():
 
     try:
         agenda.cancelar(cita)
+        programador.cancelar(cita.id_cita)
     except (agenda.ErrorAgenda, SQLAlchemyError) as e:
         db.session.rollback()
         flash(agenda.mensaje_de_error(e), "error")

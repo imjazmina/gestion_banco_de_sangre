@@ -73,6 +73,11 @@ img, svg { display: block; }
 .stripe { height: 2px; background: linear-gradient(90deg, var(--blood), var(--teal), var(--navy-700)); }
 .main { flex: 1; min-height: 0; overflow-y: auto; }
 
+.nav-bell {
+  display: grid; place-items: center; width: 32px; height: 32px;
+  border-radius: 6px; color: #fff;
+}
+.nav-bell:hover { background: var(--navy-800); }
 .user-menu { position: relative; }
 .avatar-btn {
   display: flex; align-items: center; gap: 4px; height: 32px;
@@ -389,6 +394,9 @@ td.empty { text-align: center; padding: 40px 12px; color: var(--ink-3); }
   gap: 2px; min-width: 0; height: 100%;
 }
 .kpi b { font-size: 20px; line-height: 1; font-variant-numeric: tabular-nums; }
+.inf-tabla { width: 100%; border-collapse: collapse; font-size: 12px; }
+.inf-tabla th, .inf-tabla td { text-align: left; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.inf-tabla th { font-size: 10px; color: var(--ink-2); font-weight: 600; text-transform: uppercase; }
 .kpi span { font-size: 10px; font-weight: 500; color: var(--ink-2); text-transform: uppercase; letter-spacing: .04em; text-align: center; }
 .chart { padding: 12px; min-width: 0; height: 100%; display: flex; flex-direction: column; }
 .chart h4 { margin: 0 0 8px; font-size: 11px; font-weight: 600; color: var(--ink-2); text-transform: uppercase; letter-spacing: .04em; }

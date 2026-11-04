@@ -17,15 +17,17 @@ db = SQLAlchemy()
 # Los módulos se importan al final para que db ya exista cuando se definan
 # las clases.
 from app.models.usuarios import (      # noqa: E402
-    Rol, Usuario, UsuarioRol, PerfilPersonal, Telefono, Correo,
+    Rol, Usuario, UsuarioRol, PerfilPersonal, Correo,
 )
 from app.models.catalogos import (     # noqa: E402
     TipoSangre, CompatibilidadAboRh, TipoMedicion, Pregunta,
     Diferimiento, HorarioDisponible, ContenidoPortal,
 )
 from app.models.donacion import (      # noqa: E402
-    Solicitud, Cita, Cuestionario, Medicion, RegistroDiferimiento,
-    Extraccion, Unidad, TransicionEstado, ResultadoLaboratorio,
+    Solicitud, HistorialSolicitud, Cita, HistorialCita, HistorialCitaConsejeria,
+    Cuestionario, Medicion, RegistroDiferimiento,
+    Extraccion, MuestraCompatibilidad, ResultadoCompatibilidad,
+    Unidad, TransicionEstado, ResultadoLaboratorio,
     Asignacion, CitacionConsejeria, Derivacion,
 )
 from app.models.comunicacion import (  # noqa: E402
@@ -34,11 +36,13 @@ from app.models.comunicacion import (  # noqa: E402
 
 __all__ = [
     "db",
-    "Rol", "Usuario", "UsuarioRol", "PerfilPersonal", "Telefono", "Correo",
+    "Rol", "Usuario", "UsuarioRol", "PerfilPersonal", "Correo",
     "TipoSangre", "CompatibilidadAboRh", "TipoMedicion", "Pregunta",
     "Diferimiento", "HorarioDisponible", "ContenidoPortal",
-    "Solicitud", "Cita", "Cuestionario", "Medicion", "RegistroDiferimiento",
-    "Extraccion", "Unidad", "TransicionEstado", "ResultadoLaboratorio",
+    "Solicitud", "HistorialSolicitud", "Cita", "HistorialCita",
+    "HistorialCitaConsejeria", "Cuestionario", "Medicion", "RegistroDiferimiento",
+    "Extraccion", "MuestraCompatibilidad", "ResultadoCompatibilidad",
+    "Unidad", "TransicionEstado", "ResultadoLaboratorio",
     "Asignacion", "CitacionConsejeria", "Derivacion",
     "Notificacion", "Buzon", "Auditoria",
 ]

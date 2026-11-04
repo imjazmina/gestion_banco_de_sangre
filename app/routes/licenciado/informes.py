@@ -22,7 +22,7 @@ def _tab(datos):
 
 
 @licenciado_informes_bp.get("/informes")
-@requiere("lic", "licenciado_auth.ingresar")
+@requiere("lic", "personal_auth.ingresar")
 def ver():
     datos = _vista()
     return pintar(
@@ -36,7 +36,7 @@ def ver():
 
 
 @licenciado_informes_bp.get("/informes/exportar")
-@requiere("lic", "licenciado_auth.ingresar")
+@requiere("lic", "personal_auth.ingresar")
 def exportar():
     datos = _vista()
     tab = _tab(datos)
@@ -49,7 +49,7 @@ def exportar():
 
 
 @licenciado_informes_bp.post("/informes/vencer")
-@requiere("lic", "licenciado_auth.ingresar")
+@requiere("lic", "personal_auth.ingresar")
 def vencer():
     n = marcar_vencidas(operador_actual()["usuario"])
     flash(f"Unidades pasadas a vencidas: {n}. No se calculó una vida útil.", "ok")

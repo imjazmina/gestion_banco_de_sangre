@@ -38,6 +38,7 @@
           <a class="nav-link {{ 'active' if activo == 'donar' }}" href="{{ url_for('donar.agendar') }}">Donar</a>
           <a class="nav-link {{ 'active' if activo == 'solicitudes' }}" href="{{ url_for('solicitudes.listar') }}">Solicitudes</a>
           <a class="nav-link {{ 'active' if activo == 'mi-cita' }}" href="{{ url_for('mi_cita.ver') }}">Mi cita</a>
+          <a class="nav-link {{ 'active' if activo == 'consejeria' }}" href="{{ url_for('consejeria.ver') }}">Consejería</a>
           <a class="nav-link {{ 'active' if activo == 'informacion' }}" href="{{ url_for('informacion.ver') }}">Información</a>
         </nav>
         <div class="header-actions">
@@ -71,6 +72,7 @@
         <a href="{{ url_for('donar.agendar') }}">{{ ico('drop') }} Donar</a>
         <a href="{{ url_for('solicitudes.listar') }}">{{ ico('users') }} Solicitudes</a>
         <a href="{{ url_for('mi_cita.ver') }}">{{ ico('calendar') }} Mi cita</a>
+        <a href="{{ url_for('consejeria.ver') }}">{{ ico('calendar') }} Consejería</a>
         <a href="{{ url_for('informacion.ver') }}">{{ ico('info') }} Información</a>
         <a href="{{ url_for('buzon.formulario') }}">{{ ico('megaphone') }} Buzón de sugerencias</a>
         <a href="{{ url_for('auth.salir') }}">{{ ico('logout') }} Cerrar sesión</a>

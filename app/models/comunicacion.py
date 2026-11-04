@@ -35,6 +35,9 @@ class Notificacion(db.Model):
     ASIGNACION_SOLICITANTE = "ASIGNACION_SOLICITANTE"
     META_COMPLETA = "META_COMPLETA"
     CITACION_GENERICA = "CITACION_GENERICA"
+    SOLICITUD_ABIERTA = "SOLICITUD_ABIERTA"
+    SOLICITUD_VENCIDA = "SOLICITUD_VENCIDA"
+    PRESELECCION_COMPATIBLE = "PRESELECCION_COMPATIBLE"
 
 
 class Buzon(db.Model):
@@ -49,6 +52,7 @@ class Buzon(db.Model):
     id_mensaje = db.Column(db.Integer, primary_key=True)
     id_usuario = db.Column(
         db.Integer, db.ForeignKey("usuario.id_usuario"), nullable=False)
+    tipo = db.Column(db.String(40))
     mensaje = db.Column(db.Text, nullable=False)
     fecha = db.Column(db.DateTime, nullable=False, default=datetime.now)
 

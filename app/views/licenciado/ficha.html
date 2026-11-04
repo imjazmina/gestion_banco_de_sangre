@@ -43,7 +43,7 @@
       <div style="min-width:0;">
         <h1 style="margin:0;font-size:22px;font-weight:600;">{{ donante.nombre_completo }}</h1>
         <div class="row" style="margin-top:4px;gap:12px;">
-          <span class="muted">CI {{ donante.documento }}</span>
+          <span class="muted">CI {{ donante.documento_visible }}</span>
           {% if edad is not none %}<span style="color:var(--line);">|</span><span class="muted">{{ edad }} años</span>{% endif %}
           {% if donante.tipo_sangre %}<span style="color:var(--line);">|</span>{{ badge(donante.tipo_sangre.etiqueta, 'navy') }}{% endif %}
           {% if es_ausente %}{{ badge_cita('Ausente') }}{% endif %}
@@ -63,7 +63,7 @@
       <div class="data-grid">
         <div>
           <p class="data-label">Cédula de identidad</p>
-          <p class="data-value mono">{{ donante.documento }}</p>
+          <p class="data-value mono">{{ donante.documento_visible }}</p>
         </div>
         <div>
           <p class="data-label">Fecha de nacimiento</p>
@@ -72,10 +72,6 @@
         <div>
           <p class="data-label">Sexo</p>
           <p class="data-value">{{ donante.genero }}</p>
-        </div>
-        <div>
-          <p class="data-label">Teléfono</p>
-          <p class="data-value">{{ donante.telefono_principal.numero if donante.telefono_principal else '—' }}</p>
         </div>
         <div>
           <p class="data-label">Correo electrónico</p>
@@ -134,6 +130,26 @@
           {% endfor %}
         </div>
         {% endif %}
+
+        {% if derivables %}
+        <h3 class="kicker" style="margin-top:20px;">Derivación</h3>
+        <p class="muted" style="font-size:12px;">Solo el licenciado la registra, y solo si el diagnóstico es de otro establecimiento.</p>
+        {% for d in derivables %}
+        <form method="post" action="{{ url_for('licenciado_ficha.derivar', donor_id=donante.id_usuario) }}" class="summary" style="margin-top:12px;">
+          <p style="margin:0 0 8px;font-weight:500;">{{ d.causa.nombre }} · {{ d.institucion_diagnostico }}</p>
+          <input type="hidden" name="id_registro" value="{{ d.id_registro }}">
+          <div class="field">
+            <label>Establecimiento de destino</label>
+            <input class="control" name="establecimiento" required>
+          </div>
+          <div class="field">
+            <label>Motivo interno</label>
+            <textarea class="control" name="motivo" rows="2"></textarea>
+          </div>
+          <button class="btn btn-primary" type="submit">Registrar derivación</button>
+        </form>
+        {% endfor %}
+        {% endif %}
       </div>
     </div>
 
@@ -144,7 +160,7 @@
         <div class="summary">
           <div class="split">
             <strong class="mono">{{ u.codigo }}</strong>
-            {{ badge(u.estado, {'Registrada':'gray','En laboratorio':'info','En stock':'ok','Asignada':'navy','Utilizada':'gray','Descartada':'danger','Vencida':'danger'}.get(u.estado, 'gray')) }}
+            {{ badge(u.estado, {'Registrada':'gray','En laboratorio':'info','En stock':'ok','Asignada':'navy''Descartada':'danger','Vencida':'danger'}.get(u.estado, 'gray')) }}
           </div>
           {% set trans = transiciones|selectattr('id_unidad', 'equalto', u.id_unidad)|list %}
           {% if trans %}
@@ -157,7 +173,7 @@
           {% for r in resultados if r.id_unidad == u.id_unidad %}
           <p style="margin:8px 0 0;font-size:12px;">Resultado simulado: {{ badge(r.resultado, 'danger' if r.resultado == 'Reactivo' else 'ok') }}</p>
           {% for d in diferimientos if d.id_resultado == r.id_resultado %}
-          <p class="faint" style="margin:4px 0 0;font-size:12px;">{{ d.causa.nombre }}</p>
+          <p class="faint" style="margin:4px 0 0;font-size:12px;">{{ d.causa.nombre }} · {{ d.institucion_diagnostico }}</p>
           {% endfor %}
           {% endfor %}
         </div>

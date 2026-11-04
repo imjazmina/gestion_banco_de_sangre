@@ -1,8 +1,8 @@
 """Sesión del personal de salud.
 
-Usa la misma cookie que el portal (`id_usuario` en sesion.py). El correo
-de ingreso es `perfil_personal.correo_institucional` y la contraseña es el
-hash de `usuario`. No hay usuarios de demostración en este archivo.
+Comparte la cookie con el portal, con ámbito `personal`. El correo de
+ingreso es `perfil_personal.correo_institucional` y la contraseña es el
+hash de ese perfil. No hay usuarios de demostración en este archivo.
 """
 from functools import wraps
 
@@ -10,7 +10,9 @@ from flask import redirect, render_template, request, url_for
 from sqlalchemy import func
 
 from app.controllers.portal.autenticacion import verificar
-from app.controllers.sesion import cerrar_sesion, iniciar_sesion, usuario_actual
+from app.controllers.sesion import (
+    AMBITO_PERSONAL, cerrar_sesion, iniciar_sesion, usuario_en_ambito,
+)
 from app.models import Auditoria, PerfilPersonal, Rol, db
 
 
@@ -19,31 +21,35 @@ PANELES = {
         "rol": Rol.ENFERMERIA,
         "titulo": "Lic. Enfermería · HRL",
         "inicio": "licenciado_inicio.inicio",
-        "ingresar": "licenciado_auth.ingresar",
+        "ingresar": "personal_auth.ingresar",
         "salir": "licenciado_salir.salir",
     },
     Rol.JEFATURA: {
         "rol": Rol.JEFATURA,
         "titulo": "Jefatura · Banco de Sangre HRL",
         "inicio": "jefatura_inicio.inicio",
-        "ingresar": "jefatura_auth.ingresar",
+        "ingresar": "personal_auth.ingresar",
         "salir": "jefatura_salir.salir",
     },
 }
 
 
 def _codigo_panel(usuario):
-    """Jefatura gana si la persona tiene los dos roles."""
-    if usuario.tiene_rol(Rol.JEFATURA):
+    """Un cargo institucional. Donante puede convivir con ese cargo."""
+    es_jef = usuario.tiene_rol(Rol.JEFATURA)
+    es_lic = usuario.tiene_rol(Rol.ENFERMERIA)
+    if es_jef and es_lic:
+        return None
+    if es_jef:
         return Rol.JEFATURA
-    if usuario.tiene_rol(Rol.ENFERMERIA):
+    if es_lic:
         return Rol.ENFERMERIA
     return None
 
 
 def operador_actual():
     """Dict para la plantilla, o None si no hay personal con sesión válida."""
-    usuario = usuario_actual()
+    usuario = usuario_en_ambito(AMBITO_PERSONAL)
     if usuario is None:
         return None
     codigo = _codigo_panel(usuario)
@@ -77,15 +83,17 @@ def intentar_ingreso(email, contrasena):
 
     usuario = perfil.usuario
     if (usuario is None or not usuario.estado or usuario.cuenta_suprimida
-            or not verificar(contrasena, usuario.contrasena)):
+            or not verificar(contrasena, perfil.contrasena)):
         return None, "Correo o contraseña incorrectos."
+    if (usuario.tiene_rol(Rol.JEFATURA) and usuario.tiene_rol(Rol.ENFERMERIA)):
+        return None, "La cuenta no puede ser enfermería y jefatura."
     if _codigo_panel(usuario) is None:
         return None, "Este acceso es solo para enfermería o jefatura."
 
     Auditoria.registrar(usuario.id_usuario, "USUARIO",
                         usuario.id_usuario, Auditoria.LOGIN)
     db.session.commit()
-    iniciar_sesion(usuario)
+    iniciar_sesion(usuario, AMBITO_PERSONAL)
     return operador_actual(), None
 
 
@@ -97,7 +105,7 @@ _ALIAS_ROL = {"lic": Rol.ENFERMERIA, "jef": Rol.JEFATURA}
 
 
 def requiere(rol, ingresar_endpoint):
-    """Deja pasar solo el rol del módulo. El otro vuelve a su inicio."""
+    """Deja pasar solo el rol del módulo. Sin sesión, el login es único."""
     codigo = _ALIAS_ROL.get(rol, rol)
 
     def decorador(vista):

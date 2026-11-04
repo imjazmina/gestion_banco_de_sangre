@@ -72,7 +72,7 @@
             <td>
               <div class="row" style="flex-wrap:wrap;gap:6px;">
                 {{ btn('Abrir', 'teal', 'sm', url_for('licenciado_ficha.ver', donor_id=c.donorId, cita=c.id), 'eye') }}
-                {% if c.estado in ('Pendiente', 'Confirmada') and c.origen == 'Agendada' %}
+                {% if c.estado == 'Confirmada' and c.origen == 'Agendada' %}
                 <form method="post" action="{{ url_for('licenciado_agendamientos.ausente', cita_id=c.id) }}">
                   <button class="btn btn-ghost btn-sm" type="submit">{{ ico('user-x', 12) }} Ausente</button>
                 </form>

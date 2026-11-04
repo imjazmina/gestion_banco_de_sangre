@@ -10,16 +10,18 @@ jefatura_inicio_bp = Blueprint("jefatura_inicio", __name__, url_prefix="/jefatur
 
 COLORES = {
     "Pendiente": "#2563EB",
+    "Confirmada": "#0891B2",
     "Realizada": "#059669",
     "Ausente": "#D97706",
+    "Cancelada": "#6B7280",
 }
 
 
 @jefatura_inicio_bp.get("/")
-@requiere("jef", "jefatura_auth.ingresar")
+@requiere("jef", "personal_auth.ingresar")
 def inicio():
     filas = consejeria.citaciones()
-    orden = ["Pendiente", "Realizada", "Ausente"]
+    orden = ["Pendiente", "Confirmada", "Realizada", "Ausente", "Cancelada"]
     total = len(filas) or 1
     resumen = []
     for estado in orden:
@@ -41,7 +43,8 @@ def _fila(citacion):
     donante = db.session.get(Usuario, citacion.id_donante)
     return {
         "id": citacion.id_citacion,
-        "hora": citacion.horario.hora_inicio.strftime("%H:%M") if citacion.horario else "—",
+        "hora": citacion.fecha_hora.strftime("%d/%m %H:%M") if citacion.fecha_hora else (
+            citacion.horario.hora_inicio.strftime("%H:%M") if citacion.horario else "—"),
         "donante": donante.nombre_completo if donante else "—",
         "ci": donante.documento if donante else "",
         "estado": citacion.estado,

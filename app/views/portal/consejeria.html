@@ -1,0 +1,89 @@
+{% extends "portal/layout.html" %}
+{% from "portal/_ui.html" import ico %}
+{% from "portal/_agenda.html" import tira_fechas, grilla_horarios %}
+{% set activo = 'consejeria' %}
+{% block titulo %}Consejería · Banco de sangre{% endblock %}
+
+{% block contenido %}
+<section class="block" style="padding-top:32px;">
+  <div class="wrap center-narrow">
+    <div class="section-head">
+      <h1>Consejería</h1>
+      <p class="sub">Elegí día y horario. No hay cuestionario. El motivo se conversa en el banco.</p>
+    </div>
+
+    {% if not id_resultado and not id_citacion %}
+      {% if not pares %}
+      <div class="empty">
+        <div class="ico">{{ ico('calendar') }}</div>
+        <h3>No tenés una consejería</h3>
+        <p>Cuando el banco te avise, vas a poder elegir el horario desde acá.</p>
+      </div>
+      {% endif %}
+      {% for caso in pares %}
+      {% set resultado = caso.resultado %}
+      {% set citacion = caso.citacion %}
+      <div class="card" style="margin-bottom:16px;">
+        {% if citacion and citacion.estado in ('Pendiente', 'Confirmada') %}
+        <div class="flex-between" style="margin-bottom:12px;">
+          <h2>Cita de consejería</h2>
+          <span class="badge {{ 'badge-conf' if citacion.estado == 'Confirmada' else 'badge-pend' }}">
+            <span class="badge-dot"></span>{{ citacion.estado }}
+          </span>
+        </div>
+        <p><b>{{ citacion.fecha_hora.strftime('%d/%m/%Y') if citacion.fecha_hora else 'Sin fecha' }}</b>
+          {% if citacion.horario %} · {{ citacion.horario.hora_inicio.strftime('%H:%M') }}{% endif %}</p>
+        <p class="sub">Banco de sangre, Hospital Regional de Luque.</p>
+        {% if citacion.estado == 'Pendiente' %}
+        <div style="display:flex; gap:12px; flex-wrap:wrap;">
+          {% if citacion.fecha_hora and citacion.fecha_hora.date() == hoy %}
+          <form method="post" action="{{ url_for('consejeria.confirmar', id_citacion=citacion.id_citacion) }}">
+            <button class="btn btn-primary" type="submit">Confirmar asistencia</button>
+          </form>
+          {% else %}
+          <p class="meta">La confirmás el día de la atención.</p>
+          {% endif %}
+          <a class="btn btn-secondary" href="{{ url_for('consejeria.reprogramar', id_citacion=citacion.id_citacion) }}">Reprogramar</a>
+          <form method="post" action="{{ url_for('consejeria.cancelar', id_citacion=citacion.id_citacion) }}">
+            <button class="btn btn-danger" type="submit">Cancelar</button>
+          </form>
+        </div>
+        {% else %}
+        <p class="meta">Ya confirmaste. La asistencia la cierra el personal del banco.</p>
+        {% endif %}
+        {% elif citacion and citacion.estado == 'Cancelada' %}
+        <h2>Consejería cancelada</h2>
+        <p class="sub">Podés volver a elegir un horario. Es la misma consejería.</p>
+        <a class="btn btn-primary" href="{{ url_for('consejeria.agendar_muestra' if caso.muestra else 'consejeria.agendar', id_resultado=caso.id_agenda) }}">Agendar de nuevo</a>
+        {% elif not citacion %}
+        <h2>Tenés una consejería para agendar</h2>
+        <p class="sub">Elegí el día y el horario. El aviso no incluye el motivo.</p>
+        <a class="btn btn-primary" href="{{ url_for('consejeria.agendar_muestra' if caso.muestra else 'consejeria.agendar', id_resultado=caso.id_agenda) }}">Elegir horario</a>
+        {% else %}
+        <h2>Consejería {{ citacion.estado|lower }}</h2>
+        <p class="sub">Esta cita ya no se agenda de nuevo.</p>
+        {% endif %}
+      </div>
+      {% endfor %}
+    {% else %}
+      {% set endpoint = 'consejeria.reprogramar' if id_citacion else ('consejeria.agendar_muestra' if muestra else 'consejeria.agendar') %}
+      {% set extra = {'id_citacion': id_citacion} if id_citacion else {'id_resultado': id_resultado} %}
+      <div class="card" style="margin-bottom:20px;">
+        <h2 style="margin-bottom:14px;">1. Elegí una fecha</h2>
+        {{ tira_fechas(dias, endpoint, extra) }}
+        {% if fecha %}
+        <h2 style="margin:20px 0 14px;">2. Elegí un horario</h2>
+        {{ grilla_horarios(franjas, sin_horarios, fecha, horario, endpoint, extra) }}
+        {% endif %}
+      </div>
+      {% if horario %}
+      <form method="post" action="{{ url_for(endpoint, **extra) }}">
+        <input type="hidden" name="fecha" value="{{ fecha.isoformat() }}">
+        <input type="hidden" name="horario" value="{{ horario.id_horario }}">
+        <button class="btn btn-primary" type="submit">Confirmar horario</button>
+      </form>
+      {% endif %}
+    {% endif %}
+  </div>
+</section>
+{% endblock %}

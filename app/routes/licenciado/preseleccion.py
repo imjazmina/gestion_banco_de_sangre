@@ -1,4 +1,4 @@
-"""Preselección ABO/Rh. Lista candidatos. No envía un aviso nuevo."""
+"""Preselección ABO/Rh. Lista candidatos. El aviso sale con el resultado de laboratorio."""
 from flask import Blueprint
 
 from app.controllers.comun.acceso import pintar, requiere
@@ -9,7 +9,7 @@ licenciado_preseleccion_bp = Blueprint(
 
 
 @licenciado_preseleccion_bp.get("/preseleccion")
-@requiere("lic", "licenciado_auth.ingresar")
+@requiere("lic", "personal_auth.ingresar")
 def ver():
     solicitudes = solicitudes_publicadas()
     grupos = [(s, candidatos_de(s)) for s in solicitudes]

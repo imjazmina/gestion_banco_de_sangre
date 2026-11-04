@@ -37,7 +37,6 @@
       <p class="muted">No hay citaciones pendientes. Aparecen cuando la simulación de laboratorio marca un resultado reactivo.</p>
       {% endif %}
       <a class="link" href="{{ url_for('jefatura_diferimientos.lista') }}">Ver citaciones {{ ico('chevron-right', 14) }}</a>
-      <a class="link" href="{{ url_for('jefatura_buzon.lista') }}">Buzón {{ ico('chevron-right', 14) }}</a>
     </div>
   </section>
   {% set colectas = previa.colectas %}

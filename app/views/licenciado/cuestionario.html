@@ -10,7 +10,7 @@
   <div class="section-head">
     <div>
       <h1>Revisión del cuestionario</h1>
-      <p>{{ cita.donante.nombre_completo }} · CI {{ cita.donante.documento }}</p>
+      <p>{{ cita.donante.nombre_completo }} · CI {{ cita.donante.documento_visible }}</p>
     </div>
     {% if atencion_a %}
     {{ badge(atencion_a|length ~ ' respuesta' ~ ('s' if atencion_a|length != 1) ~ ' a revisar', 'warn', 'sm') }}
@@ -52,6 +52,18 @@
   </div>
   {% endfor %}
 
+  {% if consentimiento == 'Si' %}
+  <div class="mb-4">
+    <p class="kicker" style="margin-bottom:8px;">Declaración y consentimiento del donante</p>
+    <div class="card q">
+      <div class="q-top">
+        <p style="margin:0;flex:1;min-width:0;">He leído y acepto la declaración y consentimiento del donante</p>
+        {{ badge('Sí', 'navy') }}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="mb-4">
     <p class="kicker" style="margin-bottom:8px;">Parte B · condiciones del día</p>
     <form method="post" id="parte-b" class="q-grid">
@@ -77,9 +89,6 @@
           <input class="control" type="text" id="p{{ p.id_pregunta }}_detalle"
                  name="p{{ p.id_pregunta }}_detalle" value="{{ detalle }}" maxlength="180">
         </div>
-        {% endif %}
-        {% if p.preselecciona_exclusion %}
-        <p class="faint" style="font-size:12px;margin:4px 0 0 24px;">Un «sí» sugiere revisar diferimiento. No lo aplica solo.</p>
         {% endif %}
       </div>
       {% else %}

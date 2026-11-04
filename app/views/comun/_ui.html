@@ -32,7 +32,7 @@
 {% endmacro %}
 
 {% macro badge_solicitud(estado) %}
-  {{ badge(estado, 'ok' if estado == 'Completa' else 'info') }}
+  {{ badge(estado, 'ok' if estado == 'Cerrada' else 'info') }}
 {% endmacro %}
 
 {% macro alerta(tipo, titulo=none) %}

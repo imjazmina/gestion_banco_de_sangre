@@ -20,14 +20,25 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from app import create_app                                   # noqa: E402
 from app.controllers.portal import preguntas as catalogo     # noqa: E402
+from app.controllers.portal.cuestionario import (             # noqa: E402
+    ENUNCIADO_CONSENTIMIENTO)
 from app.models import Pregunta                              # noqa: E402
 
 
 def main():
     app = create_app()
     with app.app_context():
-        en_base = {p.enunciado for p in Pregunta.query.filter_by(
-            parte=Pregunta.PARTE_DONANTE).all()}
+        filas = Pregunta.query.filter_by(parte=Pregunta.PARTE_DONANTE).all()
+        en_base = {p.enunciado for p in filas}
+        if ENUNCIADO_CONSENTIMIENTO not in en_base:
+            print("\nFalta en la base la pregunta de consentimiento del donante.")
+            return 1
+        consentimiento = next(
+            p for p in filas if p.enunciado == ENUNCIADO_CONSENTIMIENTO)
+        if consentimiento.preselecciona_exclusion:
+            print("\nEl consentimiento no debe preseleccionar exclusión.")
+            return 1
+        en_base.discard(ENUNCIADO_CONSENTIMIENTO)
         en_codigo = {p.enunciado for p in catalogo.PREGUNTAS}
 
         print(f"Parte A en la base:    {len(en_base)}")

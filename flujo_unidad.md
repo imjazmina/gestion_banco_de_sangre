@@ -40,7 +40,7 @@ Registra el resultado sintético del análisis de una unidad, incluyendo su fech
 | `id_unidad` | INTEGER | No | UK, FK → `UNIDAD` | Unidad analizada. Solo se permite un resultado por unidad. |
 | `id_diferimiento` | INTEGER | Sí | FK → `DIFERIMIENTO` | Causa de diferimiento del catálogo asociada al resultado reactivo. |
 | `id_registro_diferimiento` | INTEGER | Sí | FK → `REGISTRO_DIFERIMIENTO` | Registro del diferimiento permanente confirmado para el donante. |
-| `id_tipo_sangre` | INTEGER | No | FK → `TIPO_SANGRE` | Tipo de sangre determinado por el laboratorio. Se copia al perfil del donante y a la unidad. |
+| `id_tipo_sangre` | INTEGER | No | FK → `TIPO_SANGRE` | Tipificación del laboratorio. Se copia a la unidad. Si el donante ya tiene un resultado, se reutiliza ese grupo. |
 | `resultado` | VARCHAR(20) | No | CK | Resultado del análisis: `No reactivo` o `Reactivo`. |
 | `fecha` | TIMESTAMP | No | — | Fecha y hora de creación del resultado. |
 

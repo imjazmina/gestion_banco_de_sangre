@@ -8,58 +8,108 @@
   <div class="wrap center-narrow">
     <div class="section-head"><h1>Mi perfil</h1></div>
 
-    {% if editando %}
-    <div class="card">
-      <h2 style="margin-bottom:16px;">Editar mis datos</h2>
-      <form method="post" action="{{ url_for('perfil.guardar') }}">
-        <div class="two-col">
-          <div class="field">
-            <label for="nombre">Nombre *</label>
-            <input type="text" id="nombre" name="nombre" value="{{ usuario.nombre }}"
-                   maxlength="80" required autofocus>
-          </div>
-          <div class="field">
-            <label for="apellido">Apellido *</label>
-            <input type="text" id="apellido" name="apellido" value="{{ usuario.apellido }}"
-                   maxlength="80" required>
-          </div>
-        </div>
-        <div class="field">
-          <label for="correo">Correo electrónico *</label>
-          <input type="email" id="correo" name="correo" value="{{ correo }}" maxlength="120" required>
-        </div>
-        <div class="field">
-          <label for="telefono">Teléfono</label>
-          <input type="tel" id="telefono" name="telefono" value="{{ telefono }}" maxlength="30">
-          <div class="hint">Dejalo vacío si no querés registrar un número.</div>
-        </div>
-        <div style="display:flex; gap:12px; flex-wrap:wrap;">
-          <button class="btn btn-primary" type="submit">Guardar cambios</button>
-          <a class="btn btn-ghost" href="{{ url_for('perfil.ver') }}">Cancelar</a>
-        </div>
-      </form>
-    </div>
-
-    {% else %}
+   
     <div class="card">
       <div class="flex-between" style="margin-bottom:16px;">
         <h2>Datos personales</h2>
-        <a class="btn btn-ghost btn-sm" href="{{ url_for('perfil.ver', editar=1) }}">{{ ico('edit') }} Editar</a>
       </div>
       <table class="data" style="width:100%;">
         <tbody>
           <tr><td style="color:var(--ink2);">Nombre</td><td style="text-align:right; font-weight:600;">{{ usuario.nombre_completo }}</td></tr>
-          <tr><td style="color:var(--ink2);">Documento</td><td style="text-align:right; font-weight:600;">{{ usuario.documento }}</td></tr>
+          <tr><td style="color:var(--ink2);">Documento</td><td style="text-align:right; font-weight:600;">{{ usuario.documento_visible }}</td></tr>
           <tr><td style="color:var(--ink2);">Fecha de nacimiento</td><td style="text-align:right; font-weight:600;">{{ usuario.fecha_nacimiento.strftime('%d/%m/%Y') }}</td></tr>
           <tr><td style="color:var(--ink2);">Género</td><td style="text-align:right; font-weight:600;">{{ usuario.genero }}</td></tr>
-          <tr><td style="color:var(--ink2);">Correo</td><td style="text-align:right; font-weight:600;">{{ correo or '—' }}</td></tr>
-          <tr><td style="color:var(--ink2);">Teléfono</td><td style="text-align:right; font-weight:600;">{{ telefono or '—' }}</td></tr>
           <tr><td style="color:var(--ink2);">Rol</td><td style="text-align:right; font-weight:600;">{{ roles | join(', ') or '—' }}</td></tr>
         </tbody>
       </table>
     </div>
 
     <div class="card" style="margin-top:20px;">
+      <span class="card-eyebrow">Acceso y seguridad</span>
+      <h2 style="margin-bottom:6px;">Correos</h2>
+      <p class="sub">Con el principal iniciás sesión y recuperás la contraseña.</p>
+      {% for c in correos %}
+      <div class="divider" style="margin:14px 0;"></div>
+      <form method="post" action="{{ url_for('perfil.editar_correo', id_correo=c.id_correo) }}">
+        <div class="field" style="margin-bottom:10px;">
+          <label for="correo-{{ c.id_correo }}">
+            Correo
+            {% if c.es_principal %}<span class="badge badge-comp">Principal</span>{% endif %}
+          </label>
+          <input type="email" id="correo-{{ c.id_correo }}" name="direccion"
+                 value="{{ c.direccion }}" maxlength="120" required>
+        </div>
+        <button class="btn btn-ghost btn-sm" type="submit">Guardar</button>
+      </form>
+      {% if not c.es_principal %}
+      <div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:8px;">
+        <form method="post" action="{{ url_for('perfil.principal_correo', id_correo=c.id_correo) }}">
+          <button class="btn btn-ghost btn-sm" type="submit">Hacer principal</button>
+        </form>
+        <form method="post" action="{{ url_for('perfil.eliminar_correo', id_correo=c.id_correo) }}">
+          <button class="btn btn-danger btn-sm" type="submit">{{ ico('trash') }} Eliminar</button>
+        </form>
+      </div>
+      {% elif correos|length > 1 %}
+      <div class="hint">Para eliminarlo, primero elegí otro como principal.</div>
+      {% endif %}
+      {% endfor %}
+      <div class="divider" style="margin:16px 0;"></div>
+      <form method="post" action="{{ url_for('perfil.agregar_correo') }}">
+        <div class="field">
+          <label for="nuevo-correo">Agregar otro correo</label>
+          <input type="email" id="nuevo-correo" name="direccion" maxlength="120" required>
+          <div class="hint">No reemplaza al principal.</div>
+        </div>
+        <button class="btn btn-ghost btn-sm" type="submit">Agregar</button>
+      </form>
+
+      <div class="divider" style="margin:20px 0 16px;"></div>
+      <div class="setting-row">
+        <div>
+          <div class="ui-label">Contraseña</div>
+          <p class="hint" style="margin-top:3px;">Pedimos la actual para confirmar que sos vos.</p>
+        </div>
+        <button class="btn btn-secondary btn-sm" type="button"
+                onclick="document.getElementById('modal-clave').hidden=false">
+          {{ ico('shield') }} Actualizar contraseña
+        </button>
+      </div>
+    </div>
+
+    <div id="modal-clave" class="modal-overlay" role="dialog" aria-modal="true"
+         aria-labelledby="t-clave" {% if not abrir_clave %}hidden{% endif %}>
+      <div class="modal-box">
+        <h3 id="t-clave">Actualizar contraseña</h3>
+        <p>Ingresá la contraseña actual y elegí una nueva. Tiene que tener al menos 8 caracteres.</p>
+        <form method="post" action="{{ url_for('perfil.cambiar_contrasena') }}">
+          <div class="field">
+            <label for="clave-actual">Contraseña actual</label>
+            <input type="password" id="clave-actual" name="actual"
+                   autocomplete="current-password" required {% if abrir_clave %}autofocus{% endif %}>
+          </div>
+          <div class="field">
+            <label for="clave-nueva">Nueva contraseña</label>
+            <input type="password" id="clave-nueva" name="nueva" minlength="8"
+                   autocomplete="new-password" required>
+            <div class="hint">Al menos 8 caracteres.</div>
+          </div>
+          <div class="field">
+            <label for="clave-repetir">Confirmá la nueva contraseña</label>
+            <input type="password" id="clave-repetir" name="repetir" minlength="8"
+                   autocomplete="new-password" required>
+          </div>
+          <div class="modal-actions" style="flex-wrap:wrap;">
+            <button class="btn btn-ghost" type="button"
+                    onclick="document.getElementById('modal-clave').hidden=true">Cancelar</button>
+            <button class="btn btn-primary" type="submit">Actualizar contraseña</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:20px;">
+      <span class="card-eyebrow">Donación</span>
       <h2 style="margin-bottom:14px;">Estado de donación</h2>
       <div class="stat-row">
         <div class="blood-tag" style="font-size:16px; min-width:44px; height:36px;">{{ grupo or '—' }}</div>
@@ -133,7 +183,81 @@
       {% endif %}
     </div>
 
+    {% if solicitud %}
     <div class="card" style="margin-top:20px;">
+      <span class="card-eyebrow">Solicitud</span>
+      <h2 style="margin-bottom:6px;">Mi solicitud de donación</h2>
+      <p class="sub" style="margin-bottom:18px;">El estado de tu pedido de unidades y las donaciones que recibió.</p>
+
+      {# Estado de solicitud: barra de estado visual. El recorrido normal es
+         Creada → Publicada → Cerrada; «Revocada» y «Vencida» son desvíos
+         terminales y se muestran con una insignia aparte. #}
+      {% set pasos = ['Creada', 'Publicada', 'Cerrada'] %}
+      {% set terminal = solicitud.estado in ['Revocada', 'Vencida'] %}
+      {% set actual_idx = pasos.index(solicitud.estado) if solicitud.estado in pasos else 0 %}
+      <div class="estado-bar" role="list">
+        {% for paso in pasos %}
+        <div class="paso {{ 'actual' if loop.index0 == actual_idx and not terminal else ('hecho' if loop.index0 < actual_idx else '') }}" role="listitem">
+          <span class="punto">{{ loop.index }}</span>
+          <span class="et">{{ paso }}</span>
+        </div>
+        {% endfor %}
+      </div>
+      {% if terminal %}
+      <div style="margin-top:14px; text-align:center;">
+        <span class="badge badge-{{ solicitud.estado | lower }}">{{ solicitud.estado }}</span>
+      </div>
+      {% endif %}
+
+      <table class="data" style="width:100%; margin-top:18px;">
+        <tbody>
+          <tr>
+            <td style="color:var(--ink2);">Estado actual</td>
+            <td style="text-align:right; font-weight:600;">{{ solicitud.estado }}</td>
+          </tr>
+          <tr>
+            <td style="color:var(--ink2);">Donaciones recibidas</td>
+            <td style="text-align:right; font-weight:600;">{{ donaciones_recibidas }} de {{ solicitud.unidades_requeridas }}</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="divider" style="margin:18px 0 14px;"></div>
+      {% if solicitud_revocada %}
+      <div class="banner info">
+        {{ ico('info') }}
+        <p><b>Consentimiento revocado</b>La solicitud ya no está disponible para publicación porque revocaste el consentimiento.</p>
+      </div>
+      {% elif puede_revocar %}
+      <h3 style="font-size:14.5px; margin-bottom:8px;">Consentimiento de publicación</h3>
+      <p class="sub" style="margin-bottom:12px;">Podés retirar el permiso para publicar tu solicitud. No elimina la solicitud ni afecta las donaciones ya recibidas.</p>
+      <button class="btn btn-danger btn-sm" type="button"
+              onclick="document.getElementById('modal-revocar').hidden=false">
+        {{ ico('x') }} Revocar consentimiento
+      </button>
+      {% endif %}
+    </div>
+
+    {% if puede_revocar %}
+    <div id="modal-revocar" class="modal-overlay" role="dialog" aria-modal="true"
+         aria-labelledby="t-revocar" hidden>
+      <div class="modal-box">
+        <h3 id="t-revocar">Revocar consentimiento</h3>
+        <p>¿Estás seguro de que deseas revocar el consentimiento de publicación?</p>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" type="button"
+                  onclick="document.getElementById('modal-revocar').hidden=true">Cancelar</button>
+          <form method="post" action="{{ url_for('perfil.revocar_consentimiento') }}">
+            <button class="btn btn-danger" type="submit">Confirmar</button>
+          </form>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+    {% endif %}
+
+    <div class="card" style="margin-top:20px;">
+      <span class="card-eyebrow">Historial</span>
       <h2 style="margin-bottom:6px;">Historial de citas</h2>
       <p class="sub" style="margin-bottom:14px;">Tus últimas citas agendadas, con el estado en que quedó cada una.</p>
       {% if historial %}
@@ -171,11 +295,11 @@
     </div>
 
     <div class="card" style="margin-top:20px; border-top:3px solid var(--danger);">
+      <span class="card-eyebrow" style="color:var(--danger);">Zona de riesgo</span>
       <h2 style="margin-bottom:6px;">Eliminar cuenta</h2>
       <p class="sub" style="margin-bottom:16px;">Elimina tu acceso al portal y tus datos de contacto, conforme a la Ley N.º 1682/01. El historial de donaciones se conserva por obligación sanitaria, desvinculado de tus datos de contacto.</p>
       <a class="btn btn-danger btn-sm" href="{{ url_for('perfil.confirmar_supresion') }}">{{ ico('trash') }} Suprimir mi cuenta</a>
     </div>
-    {% endif %}
   </div>
 </section>
 {% endblock %}

@@ -30,13 +30,16 @@
       </table>
 
       <div style="display:flex; gap:12px; flex-wrap:wrap;">
+        {% if not cuestionario.completo %}
         <a class="btn btn-secondary" href="{{ url_for('mi_cita.reprogramar') }}">{{ ico('calendar') }} Reprogramar</a>
+        {% endif %}
+        {% if cita.estado == 'Pendiente' %}
         <a class="btn btn-danger" href="{{ url_for('mi_cita.ver', confirmar='cancelar') }}">{{ ico('x') }} Cancelar cita</a>
+        {% endif %}
       </div>
     </div>
 
-    {# El cuestionario se habilita el día de la cita: pregunta por el estado
-       de salud de hoy, así que una respuesta de hace días no sirve. #}
+    {# El cuestionario se responde desde el alta hasta el día de la cita. #}
     <div class="card" style="margin-top:20px;">
       <div class="flex-between" style="margin-bottom:8px;">
         <h2>Cuestionario previo</h2>
@@ -48,9 +51,8 @@
       </div>
 
       <p class="sub" style="margin-bottom:16px;">
-        Antes de tu cita, completa un breve cuestionario de salud en tres pasos.
-        También recibirás un recordatorio por correo unas horas antes, para que
-        puedas responderlo con anticipación y agilizar el proceso.
+        El cuestionario llega por correo tres horas antes de la cita.
+        Si faltan menos, te lo enviamos al agendar. Completalo para confirmar.
       </p>
 
       {% if cuestionario.completo %}
@@ -65,10 +67,8 @@
       {% else %}
       <div class="banner info" style="margin:0;">
         {{ ico('clock') }}
-        <p><b>Se habilita el día de tu cita</b>
-          El {{ cita.fecha_cita.strftime('%d/%m/%Y') }} vas a poder responderlo
-          desde acá o desde el enlace que te llega por correo. Pregunta por tu
-          estado de salud de ese día, por eso no se puede completar antes.</p>
+        <p><b>El cuestionario ya cerró</b>
+          El día de la cita pasó y no se puede completar desde el portal.</p>
       </div>
       {% endif %}
     </div>
@@ -109,7 +109,7 @@
 
 {# Confirmación de cancelación. Va con ?confirmar=cancelar para que funcione
    igual sin JavaScript. #}
-{% if cita and confirmar == 'cancelar' %}
+{% if cita and cita.estado == 'Pendiente' and confirmar == 'cancelar' %}
 <div class="modal-overlay" role="dialog" aria-modal="true" aria-labelledby="t-cancelar">
   <div class="modal-box">
     <h3 id="t-cancelar">Cancelar cita</h3>

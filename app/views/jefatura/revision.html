@@ -8,7 +8,7 @@
   {{ crumb(url_for('jefatura_diferimientos.lista'), 'Citaciones', 'Revisión') }}
   <div class="section-head">
     <h1>{{ donante.nombre_completo }}</h1>
-    <p>Documento {{ donante.documento }} · {{ badge_cita(citacion.estado) }}</p>
+    <p>Documento {{ donante.documento_visible }} · {{ badge_cita(citacion.estado) }}</p>
   </div>
   {% call alerta('info') %}La citación que ve el donante es genérica. El resultado no se le envía por la plataforma.{% endcall %}
 
@@ -20,28 +20,42 @@
   </div>
   {% endif %}
 
-  {% if citacion.estado == 'Pendiente' %}
+  <p class="muted mt-4">
+    {% if citacion.fecha_hora %}Atención {{ citacion.fecha_hora.strftime('%d/%m/%Y %H:%M') }}.{% endif %}
+  </p>
+  {% if puede_cerrar %}
   <form method="post" class="row mt-4">
     <button class="btn btn-primary" name="estado" value="Realizada" type="submit">Marcar realizada</button>
     <button class="btn btn-ghost" name="estado" value="Ausente" type="submit">Marcar ausente</button>
   </form>
   {% endif %}
 
-  {% if puede_derivar %}
-  <form method="post" class="card card-pad mt-4">
-    <h2 class="kicker">Derivación</h2>
-    <p class="muted">El diagnóstico no es de este banco. No hay integración con el otro establecimiento.</p>
-    <input type="hidden" name="accion" value="derivar">
-    <div class="field">
-      <label>Establecimiento de destino</label>
-      <input class="control" name="establecimiento" required>
-    </div>
-    <div class="field">
-      <label>Motivo interno</label>
-      <textarea class="control" name="motivo" rows="3"></textarea>
-    </div>
-    <button class="btn btn-primary" type="submit">Registrar derivación</button>
-  </form>
-  {% endif %}
+  <div class="card card-pad mt-4">
+    <h2 class="kicker">Estados</h2>
+    <p class="muted">Cada cambio queda en el historial. No se pisa ni se borra. El esquema no guarda motivo ni la franja anterior.</p>
+    {% if estados %}
+    <ul>
+      {% for fila in estados %}
+      <li>{{ fila.fecha_hora.strftime('%d/%m/%Y %H:%M') }} · {{ fila.estado_anterior or 'Alta' }} → {{ fila.estado_nuevo }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">Esta citación no tiene filas de historial.</p>
+    {% endif %}
+  </div>
+
+  <div class="card card-pad mt-4">
+    <h2 class="kicker">Auditoría</h2>
+    <p class="muted">Usuario, acción y momento. Una reprogramación figura como modificación y no cambia el estado.</p>
+    {% if acciones %}
+    <ul>
+      {% for fila in acciones %}
+      <li>{{ fila.fecha.strftime('%d/%m/%Y %H:%M') }} · {{ fila.accion }} · {{ responsables[fila.id_usuario].nombre_completo if responsables[fila.id_usuario] else fila.id_usuario }}</li>
+      {% endfor %}
+    </ul>
+    {% else %}
+    <p class="muted">Todavía no hay auditoría de esta citación.</p>
+    {% endif %}
+  </div>
 </div>
 {% endblock %}

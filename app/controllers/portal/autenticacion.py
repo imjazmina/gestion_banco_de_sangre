@@ -10,7 +10,7 @@ from datetime import date, datetime
 import bcrypt
 from sqlalchemy import func
 
-from app.models import db, Usuario, Rol, UsuarioRol, Correo, Telefono, Auditoria
+from app.models import db, Usuario, Rol, UsuarioRol, Correo, Auditoria, PerfilPersonal
 
 EDAD_MINIMA = 18
 EDAD_MAXIMA = 65
@@ -119,7 +119,8 @@ def registrar_donante(datos, contrasena):
 
     if Usuario.query.filter_by(documento=documento).first():
         raise ErrorRegistro("Ya existe una cuenta con ese número de documento.")
-    if Correo.query.filter(func.lower(Correo.direccion) == correo).first():
+    if (Correo.query.filter(func.lower(Correo.direccion) == correo).first()
+            or correo_es_institucional(correo)):
         raise ErrorRegistro("Ese correo ya está registrado.")
 
     rol_donante = Rol.query.filter_by(codigo=Rol.DONANTE).first()
@@ -154,11 +155,6 @@ def registrar_donante(datos, contrasena):
         db.session.add(Correo(id_usuario=usuario.id_usuario,
                               direccion=correo, es_principal=True))
 
-        telefono = (datos.get("telefono") or "").strip()
-        if telefono:
-            db.session.add(Telefono(id_usuario=usuario.id_usuario,
-                                    numero=telefono, es_principal=True))
-
         Auditoria.registrar(usuario.id_usuario, "USUARIO",
                             usuario.id_usuario, Auditoria.ALTA)
         db.session.commit()
@@ -169,15 +165,26 @@ def registrar_donante(datos, contrasena):
 
 
 # ----------------------------------------------------------------- acceso
+def correo_es_institucional(direccion):
+    """El correo del panel no identifica a un donante."""
+    direccion = (direccion or "").strip().lower()
+    if not direccion:
+        return False
+    return (PerfilPersonal.query
+            .filter(func.lower(PerfilPersonal.correo_institucional) == direccion)
+            .first()) is not None
+
+
 def autenticar(correo, contrasena):
     """
-    Devuelve el Usuario si las credenciales sirven, o None.
+    Devuelve el Usuario si las credenciales de donante sirven, o None.
 
-    Se busca por el correo principal. Una cuenta suprimida o dada de baja no
-    entra aunque la contraseña sea correcta.
+    Se busca por el correo principal y se verifica usuario.contrasena.
+    El correo institucional y la clave del perfil no abren el portal.
+    Una cuenta suprimida, dada de baja o sin rol DONANTE no entra.
     """
     correo = (correo or "").strip().lower()
-    if not correo or not contrasena:
+    if not correo or not contrasena or correo_es_institucional(correo):
         return None
 
     usuario = (Usuario.query
@@ -187,6 +194,8 @@ def autenticar(correo, contrasena):
                .first())
 
     if usuario is None or not usuario.estado or usuario.cuenta_suprimida:
+        return None
+    if not usuario.tiene_rol(Rol.DONANTE):
         return None
     if not verificar(contrasena, usuario.contrasena):
         return None

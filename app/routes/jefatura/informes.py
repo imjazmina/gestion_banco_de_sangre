@@ -21,7 +21,7 @@ def _tab(datos):
 
 
 @jefatura_informes_bp.get("/informes")
-@requiere("jef", "jefatura_auth.ingresar")
+@requiere("jef", "personal_auth.ingresar")
 def ver():
     datos = _vista()
     return pintar(
@@ -35,7 +35,7 @@ def ver():
 
 
 @jefatura_informes_bp.get("/informes/exportar")
-@requiere("jef", "jefatura_auth.ingresar")
+@requiere("jef", "personal_auth.ingresar")
 def exportar():
     datos = _vista()
     tab = _tab(datos)
@@ -48,7 +48,7 @@ def exportar():
 
 
 @jefatura_informes_bp.post("/informes/vencer")
-@requiere("jef", "jefatura_auth.ingresar")
+@requiere("jef", "personal_auth.ingresar")
 def vencer():
     n = marcar_vencidas(operador_actual()["usuario"])
     flash(f"Unidades pasadas a vencidas: {n}. No se calculó una vida útil.", "ok")

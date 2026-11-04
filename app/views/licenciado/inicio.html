@@ -66,7 +66,7 @@
       <div class="card card-pad stack" style="flex:1;">
         <p class="muted" style="font-size:12px;margin:0;">Donante sin cita · búsqueda por cédula. Verifica diferimiento y cupo.</p>
         <form method="post" action="{{ url_for('licenciado_inicio.espontaneo') }}" class="search-row">
-          <input class="control" name="documento" placeholder="Cédula" value="{{ encontrado.documento if encontrado else '' }}" required>
+          <input class="control" name="documento" placeholder="Cédula" value="{{ encontrado.documento_visible if encontrado else '' }}" required>
           <button class="btn btn-primary" type="submit">{{ ico('search', 14) }} Buscar</button>
         </form>
 
@@ -76,13 +76,13 @@
             <div class="person-ico">{{ ico('user', 18) }}</div>
             <div style="min-width:0;flex:1;">
               <p class="truncate" style="margin:0;font-weight:600;">{{ encontrado.nombre_completo }}</p>
-              <p class="muted" style="margin:0;font-size:12px;">CI {{ encontrado.documento }}</p>
+              <p class="muted" style="margin:0;font-size:12px;">CI {{ encontrado.documento_visible }}</p>
             </div>
             {% if diferimiento %}
             <a class="btn btn-ghost btn-sm" href="{{ url_for('licenciado_ficha.ver', donor_id=encontrado.id_usuario, de='inicio') }}">Ver ficha</a>
             {% else %}
             <form method="post" action="{{ url_for('licenciado_inicio.espontaneo') }}">
-              <input type="hidden" name="documento" value="{{ encontrado.documento }}">
+              <input type="hidden" name="documento" value="{{ encontrado.documento_visible }}">
               <input type="hidden" name="abrir" value="1">
               <button class="btn btn-primary btn-sm" type="submit">Abrir ficha</button>
             </form>

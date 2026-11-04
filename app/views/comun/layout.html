@@ -13,6 +13,7 @@
       </div>
       <div class="spacer"></div>
       {% if operador %}
+      <a class="nav-bell" href="{{ url_for('jefatura_buzon.lista') }}" aria-label="Buzón">{{ ico('bell', 18) }}</a>
       <div class="user-menu" id="menu-usuario">
         <button type="button" class="avatar-btn" aria-expanded="false" aria-haspopup="menu" aria-label="Menú de usuario">
           <span class="avatar">{{ operador.iniciales }}</span>

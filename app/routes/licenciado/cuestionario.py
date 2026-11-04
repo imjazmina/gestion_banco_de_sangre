@@ -19,7 +19,7 @@ def _cita_o_volver(cita_id):
 
 
 @licenciado_cuestionario_bp.get("/atencion/<int:cita_id>/cuestionario")
-@requiere("lic", "licenciado_auth.ingresar")
+@requiere("lic", "personal_auth.ingresar")
 def ver(cita_id):
     cita = _cita_o_volver(cita_id)
     if cita is None:
@@ -38,6 +38,7 @@ def ver(cita_id):
         secciones_a=secciones_a,
         atencion_a=atencion,
         parte_a_completa=parte_a.completo(cita),
+        consentimiento=parte_a.consentimiento_aceptado(cita),
         preguntas=jornada.preguntas_parte_b(),
         respuestas=jornada.respuestas_de(cita),
         causas=jornada.catalogo_diferimientos(),
@@ -46,7 +47,7 @@ def ver(cita_id):
 
 
 @licenciado_cuestionario_bp.post("/atencion/<int:cita_id>/cuestionario")
-@requiere("lic", "licenciado_auth.ingresar")
+@requiere("lic", "personal_auth.ingresar")
 def guardar(cita_id):
     cita = _cita_o_volver(cita_id)
     if cita is None:
@@ -67,5 +68,4 @@ def guardar(cita_id):
     except ErrorJornada as exc:
         flash(str(exc), "error")
         return redirect(url_for("licenciado_cuestionario.ver", cita_id=cita_id))
-    flash("Parte B guardada.", "ok")
     return redirect(url_for("licenciado_evaluacion.ver", cita_id=cita_id))
