@@ -73,6 +73,11 @@ img, svg { display: block; }
 .stripe { height: 2px; background: linear-gradient(90deg, var(--blood), var(--teal), var(--navy-700)); }
 .main { flex: 1; min-height: 0; overflow-y: auto; }
 
+.nav-bell {
+  display: grid; place-items: center; width: 32px; height: 32px;
+  border-radius: 6px; color: #fff;
+}
+.nav-bell:hover { background: var(--navy-800); }
 .user-menu { position: relative; }
 .avatar-btn {
   display: flex; align-items: center; gap: 4px; height: 32px;

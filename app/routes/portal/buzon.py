@@ -60,7 +60,6 @@ def enviar():
             id_usuario=usuario.id_usuario,
             tipo=tipo,
             mensaje=mensaje,
-            estado=Buzon.RECIBIDO,
         )
         db.session.add(mensaje_buzon)
         db.session.flush()

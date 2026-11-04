@@ -21,11 +21,11 @@ def citacion_por_id(id_citacion):
 
 
 def marcar(citacion, estado, personal):
-    """Desde el día de atención marca ausente o completada. No confirma ni cancela."""
+    """Desde el día de atención marca ausente o realizada. No confirma ni cancela."""
     if estado not in (
-            CitacionConsejeria.AUSENTE, CitacionConsejeria.COMPLETADA):
+            CitacionConsejeria.AUSENTE, CitacionConsejeria.REALIZADA):
         raise ErrorConsejeria(
-            "La confirmación la hace el donante. Jefatura marca ausente o completada.")
+            "La confirmación la hace el donante. Jefatura marca ausente o realizada.")
     if citacion.estado not in CitacionConsejeria.ABIERTAS:
         raise ErrorConsejeria("Esa citación ya fue cerrada.")
     if citacion.estado == estado:

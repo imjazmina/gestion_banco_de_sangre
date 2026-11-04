@@ -9,7 +9,7 @@
   <div class="section-head"><h1>Buzón</h1></div>
   {% for m in mensajes %}
   <article class="card card-pad mb-4">
-    <p class="kicker">{{ m.fecha.strftime('%d/%m/%Y %H:%M') }} · {{ m.tipo }} · {{ m.estado }} · {{ m.autor }}</p>
+    <p class="kicker">{{ m.fecha.strftime('%d/%m/%Y %H:%M') }} · {{ m.tipo }} · {{ m.autor }}</p>
     <p>{{ m.mensaje }}</p>
   </article>
   {% else %}
