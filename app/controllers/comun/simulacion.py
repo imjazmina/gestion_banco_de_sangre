@@ -49,6 +49,9 @@ _en_curso_lock = threading.Lock()
 
 INSTITUCION_LOCAL = "Hospital Regional de Luque"
 DOCUMENTO_SOLICITANTE = "00000001"
+# Cubre AUDITORIA.id_usuario y TRANSICION_ESTADO.id_personal en procesos
+# automáticos. Sin rol ni clave: no entra al portal ni al panel.
+DOCUMENTO_SISTEMA = "00000002"
 MEDICOS = (
     "Dra. Liz Montiel",
     "Dr. Ramón Espínola",
@@ -73,6 +76,28 @@ _FLUJO = {
     (Unidad.ASIGNADA, Unidad.EN_STOCK),
     (Unidad.ASIGNADA, Unidad.VENCIDA),
 }
+
+
+def usuario_sistema():
+    """Usuario de servicio que firma vencimientos. No tiene rol ni clave."""
+    usuario = Usuario.query.filter_by(documento=DOCUMENTO_SISTEMA).first()
+    if usuario is not None:
+        return usuario
+    usuario = Usuario(
+        documento=DOCUMENTO_SISTEMA,
+        nombre="Sistema",
+        apellido=None,
+        fecha_nacimiento=date(2000, 1, 1),
+        genero="Femenino",
+        contrasena=None,
+        consentimiento_privacidad=True,
+        estado=True,
+        cuenta_suprimida=False,
+        fecha_alta=datetime.now(),
+    )
+    db.session.add(usuario)
+    db.session.flush()
+    return usuario
 
 
 def _transicion(unidad, personal, destino, motivo=None):
@@ -377,6 +402,8 @@ def _liberar_unidades(solicitud, personal):
         unidad.id_solicitud = None
         asignacion = Asignacion.query.filter_by(id_unidad=unidad.id_unidad).first()
         if asignacion is not None:
+            Auditoria.registrar(personal.id_usuario, "ASIGNACION",
+                                asignacion.id_asignacion, Auditoria.BAJA)
             db.session.delete(asignacion)
     db.session.flush()
     solicitud.unidades_asignadas = (Asignacion.query
@@ -396,20 +423,22 @@ def fecha_de_publicacion(solicitud):
     return solicitud.fecha_creacion.date()
 
 
-def vencer_publicadas(personal, hoy=None):
+def vencer_publicadas(hoy=None):
     """
     A los 7 días de publicada, si sigue Publicada: pasa a Vencida,
     libera sus unidades asignadas y avisa al solicitante. Una sola vez.
+    Lo firma Sistema, no un operador.
     """
     from app.controllers.comun.estados import solicitud_vencida
 
+    sistema = usuario_sistema()
     hoy = hoy or date.today()
     vencidas = 0
     for solicitud in Solicitud.query.filter_by(estado=Solicitud.PUBLICADA).all():
         if not solicitud_vencida(fecha_de_publicacion(solicitud), hoy):
             continue
-        _liberar_unidades(solicitud, personal)
-        _cambiar_estado(solicitud, Solicitud.VENCIDA, personal)
+        _liberar_unidades(solicitud, sistema)
+        _cambiar_estado(solicitud, Solicitud.VENCIDA, sistema)
         db.session.add(Notificacion(
             id_usuario=solicitud.id_solicitante,
             id_solicitud=solicitud.id_solicitud,
@@ -417,8 +446,6 @@ def vencer_publicadas(personal, hoy=None):
             mensaje="Tu solicitud venció a los 7 días de publicada y no se completó.",
         ))
         vencidas += 1
-    if vencidas:
-        db.session.commit()
     return vencidas
 
 
@@ -695,8 +722,9 @@ def simular_compatibilidad(id_muestra):
         raise ErrorSimulacion(str(getattr(exc, "orig", exc)).splitlines()[0]) from exc
 
 
-def marcar_vencidas(personal):
+def marcar_vencidas():
     """Pasa a Vencida una unidad cuya fecha ya se superó. Sale del stock."""
+    sistema = usuario_sistema()
     hoy = date.today()
     unidades = (Unidad.query
                 .filter(Unidad.fecha_vencimiento.isnot(None),
@@ -704,12 +732,18 @@ def marcar_vencidas(personal):
                         Unidad.estado.in_((Unidad.EN_STOCK, Unidad.ASIGNADA)))
                 .all())
     for unidad in unidades:
-        _transicion(unidad, personal, Unidad.VENCIDA,
+        _transicion(unidad, sistema, Unidad.VENCIDA,
                     motivo="Fecha de vencimiento ya cargada, superada.")
-    if unidades:
-        try:
-            db.session.commit()
-        except SQLAlchemyError as exc:
-            db.session.rollback()
-            raise ErrorSimulacion(str(getattr(exc, "orig", exc)).splitlines()[0])
     return len(unidades)
+
+
+def aplicar_vencimientos(hoy=None):
+    """Cierra solicitudes y unidades vencidas. Las firma Sistema."""
+    try:
+        n_sol = vencer_publicadas(hoy)
+        n_uni = marcar_vencidas()
+        db.session.commit()
+        return n_sol, n_uni
+    except SQLAlchemyError as exc:
+        db.session.rollback()
+        raise ErrorSimulacion(str(getattr(exc, "orig", exc)).splitlines()[0]) from exc

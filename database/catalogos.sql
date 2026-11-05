@@ -167,6 +167,16 @@ SELECT u.id_usuario, r.id_rol
        SELECT 1 FROM usuario_rol ur
         WHERE ur.id_usuario = u.id_usuario AND ur.id_rol = r.id_rol);
 
+-- Actor de procesos automáticos (vencimientos). Sin rol, correo ni clave:
+-- no entra al portal ni al panel. Cubre AUDITORIA.id_usuario y
+-- TRANSICION_ESTADO.id_personal, ambos NOT NULL.
+INSERT INTO usuario (documento, nombre, apellido, fecha_nacimiento, genero,
+                     contrasena, consentimiento_privacidad, estado,
+                     cuenta_suprimida, fecha_alta)
+SELECT '00000002', 'Sistema', NULL, DATE '2000-01-01', 'Femenino',
+       NULL, true, true, false, timestamp '2020-01-01 08:00'
+WHERE NOT EXISTS (SELECT 1 FROM usuario WHERE documento = '00000002');
+
 -- ---------- Enfermería y jefatura ----------
 INSERT INTO usuario (documento, nombre, apellido, fecha_nacimiento, genero,
                      contrasena, consentimiento_privacidad, estado,

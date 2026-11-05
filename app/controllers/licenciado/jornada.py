@@ -205,12 +205,12 @@ def guardar_parte_b(cita, personal, formulario):
             fila_resp.fecha = ahora
             modificadas.append(fila_resp)
     db.session.flush()
-    for fila in nuevas:
+    if nuevas:
         Auditoria.registrar(personal.id_usuario, "CUESTIONARIO",
-                            fila.id_cuestionario, Auditoria.ALTA)
-    for fila in modificadas:
+                            nuevas[0].id_cuestionario, Auditoria.ALTA)
+    elif modificadas:
         Auditoria.registrar(personal.id_usuario, "CUESTIONARIO",
-                            fila.id_cuestionario, Auditoria.MODIFICACION)
+                            modificadas[0].id_cuestionario, Auditoria.MODIFICACION)
     _commit()
 
 
@@ -379,6 +379,8 @@ def registrar_extraccion(cita, personal, observacion, n_unidades=0):
         )
         db.session.add(unidad)
         db.session.flush()
+        Auditoria.registrar(personal.id_usuario, "UNIDAD", unidad.id_unidad,
+                            Auditoria.ALTA)
         db.session.add(TransicionEstado(
             id_unidad=unidad.id_unidad,
             id_personal=personal.id_usuario,

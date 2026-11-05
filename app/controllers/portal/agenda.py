@@ -23,8 +23,8 @@ from app import calendario
 from app.models import (db, Auditoria, Cita, HorarioDisponible, MuestraCompatibilidad,
                         Notificacion, RegistroDiferimiento, Solicitud)
 
-# Usuario de servicio de los vencimientos automáticos. No se graba en
-# cita.id_personal ni en citacion_consejeria.id_personal.
+# Usuario de servicio del mostrador en la maqueta. No firma vencimientos:
+# esos los graba Sistema (documento 00000002).
 DOCUMENTO_PERSONAL_DE_TURNO = "00000000"
 
 # Los tipos que el donante puede elegir. La extracción de muestra queda
@@ -251,6 +251,8 @@ def crear(usuario, fecha, id_horario, tipo, id_solicitud=None,
             raise ErrorAgenda(
                 "Indicá si autorizás publicar la solicitud.")
         solicitud.consentimiento_publicacion = bool(consentimiento_publicacion)
+        Auditoria.registrar(usuario.id_usuario, "SOLICITUD",
+                            solicitud.id_solicitud, Auditoria.MODIFICACION)
         # La cita no apunta a la solicitud propia: lo impide RN03.
         # El vínculo queda en muestra_compatibilidad.
         id_solicitud = None

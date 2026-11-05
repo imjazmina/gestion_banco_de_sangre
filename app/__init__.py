@@ -46,8 +46,10 @@ def create_app(config_class=Config, inicializar=True):
             _inicializar_base_de_datos(app)
             # El recargador de depuración arranca el proceso dos veces.
             if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-                from app.controllers.comun.simulacion import reponer_laboratorio
+                from app.controllers.comun.simulacion import (
+                    aplicar_vencimientos, reponer_laboratorio)
                 reponer_laboratorio()
+                aplicar_vencimientos()
                 _arrancar_programador(app)
 
     return app
