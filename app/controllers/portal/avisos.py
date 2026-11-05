@@ -229,4 +229,13 @@ def correr(url_base, ahora=None):
     except Exception as exc:
         db.session.rollback()
         lineas.append(f"  vencimientos: FALLÓ — {exc}")
+
+    from app.controllers.comun.ausencias import marcar
+
+    try:
+        n_aus = marcar(ahora)
+        lineas.append(f"  citas y consejerías ausentes: {n_aus}")
+    except Exception as exc:
+        db.session.rollback()
+        lineas.append(f"  ausencias: FALLÓ — {exc}")
     return lineas
