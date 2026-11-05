@@ -48,7 +48,6 @@
             <th>Hora</th>
             <th>Nombre completo</th>
             <th>Cédula</th>
-            <th>Origen</th>
             <th>Tipo</th>
             <th>Estado</th>
             <th>Acciones</th>
@@ -63,12 +62,12 @@
               {% if c.ci %}<span class="mono muted" style="font-size:12px;">{{ c.ci }}</span>
               {% else %}<span class="faint" style="font-size:12px;">—</span>{% endif %}
             </td>
-            <td>{{ badge(c.origen, 'teal' if c.origen == 'Espontáneo' else 'gray') }}</td>
             <td>
-              {% if c.tipoAgendamiento == 'Donación' %}{{ badge('Donación', 'gray') }}
-              {% else %}{{ badge('Extracción', 'teal') }}{% endif %}
+              {% set tono = 'teal' if c.tipoAgendamiento == 'Extracción de muestra para compatibilidad'
+                else 'info' if c.tipoAgendamiento == 'Donación solidaria' else 'gray' %}
+              {{ badge(c.tipoAgendamiento, tono) }}
             </td>
-            <td>{{ badge_cita(c.estado) }}</td>
+            <td>{{ badge_cita(c.estadoLista) }}</td>
             <td>
               <div class="row" style="flex-wrap:wrap;gap:6px;">
                 {{ btn('Abrir', 'teal', 'sm', url_for('licenciado_ficha.ver', donor_id=c.donorId, cita=c.id), 'eye') }}

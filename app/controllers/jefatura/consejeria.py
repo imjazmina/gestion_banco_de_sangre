@@ -1,6 +1,7 @@
 """Citaciones a consejería: cierre del día y consulta del historial."""
 from datetime import date
 
+from app.controllers.comun.estados import CITACION_CERRADA, id_al_cerrar
 from app.models import (
     Auditoria, Buzon, CitacionConsejeria, HistorialCitaConsejeria,
     RegistroDiferimiento, Usuario, db,
@@ -32,8 +33,9 @@ def marcar(citacion, estado, personal):
         raise ErrorConsejeria("La citación ya está en ese estado.")
     if citacion.fecha_hora is None or citacion.fecha_hora.date() > date.today():
         raise ErrorConsejeria("Ese estado se registra el día de atención, no antes.")
+    citacion.id_personal = id_al_cerrar(
+        estado, personal, CITACION_CERRADA, ErrorConsejeria)
     citacion.estado = estado
-    citacion.id_personal = personal.id_usuario
     Auditoria.registrar(personal.id_usuario, "CITACION_CONSEJERIA",
                         citacion.id_citacion, Auditoria.CAMBIO_ESTADO)
     db.session.commit()

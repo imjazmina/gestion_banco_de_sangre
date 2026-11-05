@@ -7,7 +7,7 @@
 --  Cómo correrlo (pgAdmin): Query Tool sobre gestion_donantes → pegar → Ejecutar.
 --
 --  Decisiones de la maqueta:
---  * Diagnóstico se guarda como Reposicion.
+--  * Diagnóstico y reposición de la maqueta se guardan como Donacion altruista.
 --  * Totales históricos de donantes se completan con citas sintéticas.
 --  * Causa «Otro» de diferimientos no se carga.
 --  * Pacientes con CI repetido: 80000001 Pedro, 80000002 Rosa, 80000003 Fulgencio.
@@ -172,7 +172,7 @@ INSERT INTO usuario (documento, nombre, apellido, fecha_nacimiento, genero,
                      contrasena, consentimiento_privacidad, estado,
                      cuenta_suprimida, fecha_alta)
 SELECT '10000001', 'María', 'Recalde', DATE '1988-04-12', 'Femenino',
-       NULL,
+       '$2b$12$tywo9SOoAO7h2RdyK549pOQG91A7HbPik7i28IllrBfFOhNf2S25u',
        true, true, false, timestamp '2020-03-01 08:00'
 WHERE NOT EXISTS (SELECT 1 FROM usuario WHERE documento = '10000001');
 
@@ -180,7 +180,7 @@ INSERT INTO usuario (documento, nombre, apellido, fecha_nacimiento, genero,
                      contrasena, consentimiento_privacidad, estado,
                      cuenta_suprimida, fecha_alta)
 SELECT '10000002', 'Jorge', 'Fernández', DATE '1976-11-03', 'Masculino',
-       NULL,
+       '$2b$12$tywo9SOoAO7h2RdyK549pOQG91A7HbPik7i28IllrBfFOhNf2S25u',
        true, true, false, timestamp '2018-06-01 08:00'
 WHERE NOT EXISTS (SELECT 1 FROM usuario WHERE documento = '10000002');
 
@@ -216,6 +216,25 @@ INSERT INTO usuario_rol (id_usuario, id_rol)
 SELECT u.id_usuario, r.id_rol
   FROM usuario u, rol r
  WHERE u.documento = '10000002' AND r.codigo = 'JEFATURA'
+   AND NOT EXISTS (
+       SELECT 1 FROM usuario_rol ur
+        WHERE ur.id_usuario = u.id_usuario AND ur.id_rol = r.id_rol);
+
+-- Correo y clave personales: abren el portal. El institucional queda en el perfil.
+INSERT INTO correo (id_usuario, direccion, es_principal)
+SELECT u.id_usuario, v.correo, true
+  FROM (VALUES
+          ('10000001', 'maria.recalde@gmail.com'),
+          ('10000002', 'jorge.fernandez@gmail.com')
+       ) AS v(documento, correo)
+  JOIN usuario u ON u.documento = v.documento
+ WHERE NOT EXISTS (SELECT 1 FROM correo c WHERE c.direccion = v.correo);
+
+INSERT INTO usuario_rol (id_usuario, id_rol)
+SELECT u.id_usuario, r.id_rol
+  FROM usuario u, rol r
+ WHERE u.documento IN ('10000001', '10000002')
+   AND r.codigo = 'DONANTE'
    AND NOT EXISTS (
        SELECT 1 FROM usuario_rol ur
         WHERE ur.id_usuario = u.id_usuario AND ur.id_rol = r.id_rol);
@@ -351,16 +370,20 @@ DECLARE
   v_res timestamp;
 BEGIN
   SELECT id_usuario INTO v_user FROM usuario WHERE documento = p_doc;
-  SELECT id_usuario INTO v_pers FROM usuario WHERE documento = COALESCE(p_personal, '00000000');
   v_hor := maqueta_id_horario(p_fecha, p_hora);
+  v_pers := NULL;
+  IF p_estado IN ('Ausente', 'Completada', 'No apto') THEN
+    SELECT id_usuario INTO v_pers FROM usuario WHERE documento = p_personal;
+  END IF;
   -- 00:01 del mismo día es la marca de quien llega sin reserva.
   IF p_espontanea THEN
     v_res := p_fecha::timestamp + time '00:01';
   ELSE
     v_res := maqueta_reserva(p_fecha);
   END IF;
-  IF v_user IS NULL OR v_pers IS NULL OR v_hor IS NULL THEN
-    RAISE EXCEPTION 'cita: faltan usuario/personal/horario % % %', p_doc, p_fecha, p_hora;
+  IF v_user IS NULL OR v_hor IS NULL
+     OR (p_estado IN ('Ausente', 'Completada', 'No apto') AND v_pers IS NULL) THEN
+    RAISE EXCEPTION 'cita: faltan usuario/horario/personal % % %', p_doc, p_fecha, p_hora;
   END IF;
   IF p_sol_doc IS NOT NULL THEN
     SELECT s.id_solicitud INTO v_sol
@@ -793,7 +816,7 @@ SELECT maqueta_donacion('6123456', 'Donacion altruista', DATE '2025-10-05', TIME
 SELECT maqueta_donacion('1876543', 'Donacion altruista', DATE '2026-06-15', TIME '11:30', 'UN-2026-0623', 'AB+', 'No reactivo', 'Utilizada', NULL, NULL, NULL);
 SELECT maqueta_donacion('1876543', 'Donacion altruista', DATE '2025-12-28', TIME '11:30', 'UN-2025-2567', 'AB+', 'No reactivo', 'Utilizada', NULL, NULL, NULL);
 SELECT maqueta_donacion('5678901', 'Donacion solidaria', DATE '2025-07-22', TIME '12:00', 'UN-2025-1345', 'O+', 'No reactivo', 'Utilizada', NULL, NULL, '1234567');
-SELECT maqueta_donacion('5678901', 'Reposicion', DATE '2024-11-05', TIME '11:30', 'UN-2024-1987', 'O+', 'No reactivo', 'Utilizada', NULL, NULL, NULL);
+SELECT maqueta_donacion('5678901', 'Donacion altruista', DATE '2024-11-05', TIME '11:30', 'UN-2024-1987', 'O+', 'No reactivo', 'Utilizada', NULL, NULL, NULL);
 SELECT maqueta_donacion('7111111', 'Donacion altruista', DATE '2026-04-02', TIME '08:00', 'UN-2026-0402', 'A+', 'No reactivo', 'Utilizada', NULL, NULL, NULL);
 SELECT maqueta_donacion('7111111', 'Donacion altruista', DATE '2025-08-19', TIME '08:00', 'UN-2025-1510', 'A+', 'No reactivo', 'Utilizada', NULL, NULL, NULL);
 SELECT maqueta_donacion('7222222', 'Donacion altruista', DATE '2025-12-18', TIME '10:30', 'UN-2025-2410', 'O+', 'No reactivo', 'Utilizada', NULL, NULL, NULL);
@@ -859,10 +882,10 @@ SELECT maqueta_donacion('7444444', 'Donacion altruista', DATE '2023-06-26', TIME
 -- Citas del 2026-09-10 (donación y compatibilidad)
 
 SELECT maqueta_cita('3456789', 'Donacion altruista', DATE '2026-09-10', TIME '07:30', 'Pendiente', NULL, '00000000');
-SELECT maqueta_cita('4123456', 'Reposicion', DATE '2026-09-10', TIME '08:00', 'Pendiente', NULL, '00000000');
+SELECT maqueta_cita('4123456', 'Donacion altruista', DATE '2026-09-10', TIME '08:00', 'Pendiente', NULL, '00000000');
 SELECT maqueta_cita('3789012', 'Donacion altruista', DATE '2026-09-10', TIME '09:30', 'Ausente', NULL, '10000001');
-SELECT maqueta_cita('4567890', 'Reposicion', DATE '2026-09-10', TIME '10:00', 'Pendiente', NULL, '00000000');
-SELECT maqueta_cita('6123456', 'Reposicion', DATE '2026-09-10', TIME '11:00', 'Pendiente', NULL, '00000000');
+SELECT maqueta_cita('4567890', 'Donacion altruista', DATE '2026-09-10', TIME '10:00', 'Pendiente', NULL, '00000000');
+SELECT maqueta_cita('6123456', 'Donacion altruista', DATE '2026-09-10', TIME '11:00', 'Pendiente', NULL, '00000000');
 SELECT maqueta_cita('1876543', 'Donacion altruista', DATE '2026-09-10', TIME '11:30', 'Pendiente', NULL, '00000000');
 SELECT maqueta_cita('5678901', 'Donacion solidaria', DATE '2026-09-10', TIME '12:00', 'Ausente', '1234567', '10000001');
 -- Compatibilidad: donantes del padrón (no el paciente). RN03 impide citarse por solicitud propia.
@@ -870,7 +893,37 @@ SELECT maqueta_cita('90000009', 'Extraccion de muestra para compatibilidad', DAT
 SELECT maqueta_cita('90000010', 'Extraccion de muestra para compatibilidad', DATE '2026-09-10', TIME '08:00', 'Completada', '80000001', '10000001');
 SELECT maqueta_cita('90000011', 'Extraccion de muestra para compatibilidad', DATE '2026-09-10', TIME '08:30', 'Pendiente', '80000002', '00000000');
 SELECT maqueta_cita('90000012', 'Extraccion de muestra para compatibilidad', DATE '2026-09-10', TIME '09:00', 'Pendiente', '80000003', '00000000');
-SELECT maqueta_donacion('90000010', 'Extraccion de muestra para compatibilidad', DATE '2026-09-10', TIME '08:00', 'UN-2026-EC02', 'A+', 'No reactivo', 'Asignada', NULL, NULL, '80000001');
+-- La cita ya existe: esa extracción admite una muestra, no una unidad.
+INSERT INTO extraccion (id_cita, id_personal, codigo_unico, fecha, observacion)
+SELECT c.id_cita, p.id_usuario, 'EX-2026-EC02',
+       TIMESTAMP '2026-09-10 08:00',
+       'Extracción de muestra para compatibilidad.'
+  FROM cita c
+  JOIN usuario u ON u.id_usuario = c.id_usuario
+  JOIN horario_disponible h ON h.id_horario = c.id_horario
+  JOIN usuario p ON p.documento = '10000001'
+ WHERE u.documento = '90000010'
+   AND c.tipo_cita = 'Extraccion de muestra para compatibilidad'
+   AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-09-10')
+   AND h.hora_inicio = TIME '08:00'
+   AND NOT EXISTS (SELECT 1 FROM extraccion e WHERE e.id_cita = c.id_cita);
+
+INSERT INTO muestra_compatibilidad (id_extraccion, id_solicitud, codigo, fecha)
+SELECT e.id_extraccion, c.id_solicitud, 'MC-2026-EC02', e.fecha
+  FROM extraccion e
+  JOIN cita c ON c.id_cita = e.id_cita
+ WHERE e.codigo_unico = 'EX-2026-EC02'
+   AND c.id_solicitud IS NOT NULL
+   AND NOT EXISTS (
+       SELECT 1 FROM muestra_compatibilidad m WHERE m.id_extraccion = e.id_extraccion);
+
+INSERT INTO resultado_compatibilidad (id_muestra, id_tipo_sangre, id_diferimiento, fecha)
+SELECT m.id_muestra, maqueta_id_tipo('O+'), d.id_diferimiento, m.fecha
+  FROM muestra_compatibilidad m
+  JOIN diferimiento d ON d.nombre = 'PAI negativo'
+ WHERE m.codigo = 'MC-2026-EC02'
+   AND NOT EXISTS (
+       SELECT 1 FROM resultado_compatibilidad r WHERE r.id_muestra = m.id_muestra);
 
 -- Citas no aptas y diferimientos
 
@@ -896,7 +949,7 @@ SELECT maqueta_diferimiento('5485567', 'VIH 1/2', (SELECT c.id_cita FROM cita c 
 
 INSERT INTO citacion_consejeria (id_donante, id_personal, id_horario, id_resultado, fecha_hora, estado, observaciones)
 SELECT don.id_usuario,
-       (SELECT id_usuario FROM usuario WHERE documento = '10000002'),
+       NULL,
        maqueta_id_horario(DATE '2026-09-10', v.hora),
        r.id_resultado,
        DATE '2026-09-10' + v.hora,
@@ -1069,7 +1122,7 @@ BEGIN
         NULL, v_doc || '@maqueta.local', v_grupo, v_fecha::timestamp + v_hora);
 
       IF v_esc IN (1, 7, 10) THEN
-        v_tipo_cita := CASE WHEN v_esc = 10 THEN 'Reposicion' ELSE 'Donacion altruista' END;
+        v_tipo_cita := 'Donacion altruista';
         v_con_res := NOT (v_esc = 1 AND v_fecha >= CURRENT_DATE - 10 AND v_i % 4 = 0);
         PERFORM maqueta_donacion(
           v_doc, v_tipo_cita, v_fecha, v_hora, 'UN-A-' || v_doc, v_grupo,
@@ -1102,10 +1155,9 @@ BEGIN
           'Hospital Regional de Luque', v_fecha, NULL, NULL);
         INSERT INTO citacion_consejeria (
             id_donante, id_personal, id_horario, id_resultado, estado)
-        SELECT don.id_usuario, jef.id_usuario,
+        SELECT don.id_usuario, NULL,
                maqueta_id_horario(v_fecha, v_hora), r.id_resultado, 'Pendiente'
           FROM usuario don
-          JOIN usuario jef ON jef.documento = '10000002'
           JOIN unidad un ON un.codigo = 'UN-A-' || v_doc
           JOIN resultado_laboratorio r ON r.id_unidad = un.id_unidad
          WHERE don.documento = v_doc
@@ -1234,11 +1286,10 @@ BEGIN
                   WHERE r.id_resultado_compatibilidad = rc.id_resultado_compatibilidad);
           INSERT INTO citacion_consejeria (
               id_donante, id_personal, id_horario, id_resultado_compatibilidad, estado)
-          SELECT don.id_usuario, jef.id_usuario,
+          SELECT don.id_usuario, NULL,
                  maqueta_id_horario(v_fecha, v_hora),
                  rc.id_resultado_compatibilidad, 'Pendiente'
             FROM usuario don
-            JOIN usuario jef ON jef.documento = '10000002'
             JOIN muestra_compatibilidad m ON m.codigo = 'MC-A-' || v_doc
             JOIN resultado_compatibilidad rc ON rc.id_muestra = m.id_muestra
            WHERE don.documento = v_doc

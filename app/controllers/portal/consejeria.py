@@ -14,8 +14,9 @@ cambia: queda en auditoría como MODIFICACION. No hay columna de motivo.
 from datetime import date, datetime, time, timedelta
 
 from app import calendario
+from app.controllers.comun.estados import CITACION_CERRADA, id_al_cerrar
 from app.controllers.portal.agenda import (
-    DOW_CORTO, ErrorAgenda, personal_de_turno, parsear_fecha,
+    DOW_CORTO, ErrorAgenda, parsear_fecha,
 )
 from app.models import (
     Auditoria, Cita, CitacionConsejeria, Diferimiento, Extraccion,
@@ -215,13 +216,11 @@ def agendar(usuario, id_resultado, fecha, id_horario, muestra=False):
         raise ErrorConsejeria("Esa consejería ya fue cerrada.")
 
     try:
-        responsable = personal_de_turno()
         franja = _bloquear(id_horario, fecha)
         momento = _momento(fecha, franja)
         if citacion is None:
             citacion = CitacionConsejeria(
                 id_donante=usuario.id_usuario,
-                id_personal=responsable.id_usuario,
                 id_horario=id_horario,
                 id_resultado=None if muestra else resultado.id_resultado,
                 id_resultado_compatibilidad=(
@@ -237,7 +236,7 @@ def agendar(usuario, id_resultado, fecha, id_horario, muestra=False):
             citacion.estado = CitacionConsejeria.PENDIENTE
             citacion.id_horario = id_horario
             citacion.fecha_hora = momento
-            citacion.id_personal = responsable.id_usuario
+            citacion.id_personal = None
             db.session.flush()
             Auditoria.registrar(usuario.id_usuario, "CITACION_CONSEJERIA",
                                 citacion.id_citacion, Auditoria.CAMBIO_ESTADO)
@@ -266,10 +265,6 @@ def reprogramar(citacion, usuario, fecha, id_horario):
         franja = _bloquear(id_horario, fecha, excepto_id=citacion.id_citacion)
         citacion.id_horario = id_horario
         citacion.fecha_hora = _momento(fecha, franja)
-        try:
-            citacion.id_personal = personal_de_turno().id_usuario
-        except ErrorAgenda as exc:
-            raise ErrorConsejeria(str(exc)) from exc
         Auditoria.registrar(usuario.id_usuario, "CITACION_CONSEJERIA",
                             citacion.id_citacion, Auditoria.MODIFICACION)
         _aviso(usuario, citacion,

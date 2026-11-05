@@ -12,6 +12,7 @@ from sqlalchemy import func
 from sqlalchemy.exc import SQLAlchemyError
 
 from app import calendario
+from app.controllers.comun.estados import CITA_CERRADA, id_al_cerrar
 from app.controllers.portal.agenda import diferimiento_vigente
 from app.models import (
     Auditoria, Cita, Cuestionario, Diferimiento, Extraccion, HorarioDisponible,
@@ -23,10 +24,15 @@ INSTITUCION_LOCAL = "Hospital Regional de Luque"
 
 ETIQUETA_TIPO = {
     Cita.ALTRUISTA: "Altruista",
-    Cita.REPOSICION: "Reposición",
     Cita.SOLIDARIA: "Solidaria",
     Cita.COMPATIBILIDAD: "Compatibilidad",
     Cita.MUESTRA: "Muestra",
+}
+
+ETIQUETA_AGENDAMIENTO = {
+    Cita.ALTRUISTA: "Donación altruista",
+    Cita.SOLIDARIA: "Donación solidaria",
+    Cita.MUESTRA: "Extracción de muestra para compatibilidad",
 }
 
 CAUSA_POR_MEDICION = {
@@ -91,10 +97,8 @@ def fila(cita):
         "tipo": etiqueta_tipo(cita.tipo_cita),
         "estado": cita.estado,
         "donorId": cita.id_usuario,
-        "tipoAgendamiento": (
-            "Extracción de muestra" if cita.tipo_cita == Cita.MUESTRA
-            else "Extracción de compatibilidad" if cita.tipo_cita == Cita.COMPATIBILIDAD
-            else "Donación"),
+        "tipoAgendamiento": ETIQUETA_AGENDAMIENTO.get(
+            cita.tipo_cita, cita.tipo_cita),
         "origen": "Espontáneo" if es_espontanea(cita) else "Agendada",
         "solicitudId": cita.id_solicitud or "",
         "grupo": grupo,
@@ -129,8 +133,8 @@ def marcar_ausente(cita, personal):
     if cita.estado != Cita.CONFIRMADA:
         raise ErrorJornada("Solo una cita confirmada puede quedar ausente.")
     _exigir_ajeno(cita, personal)
+    cita.id_personal = id_al_cerrar(Cita.AUSENTE, personal, CITA_CERRADA, ErrorJornada)
     cita.estado = Cita.AUSENTE
-    cita.id_personal = personal.id_usuario
     Auditoria.registrar(personal.id_usuario, "CITA", cita.id_cita,
                         Auditoria.CAMBIO_ESTADO)
     _commit()
@@ -200,7 +204,6 @@ def guardar_parte_b(cita, personal, formulario):
             fila_resp.id_personal = personal.id_usuario
             fila_resp.fecha = ahora
             modificadas.append(fila_resp)
-    cita.id_personal = personal.id_usuario
     db.session.flush()
     for fila in nuevas:
         Auditoria.registrar(personal.id_usuario, "CUESTIONARIO",
@@ -254,7 +257,6 @@ def guardar_mediciones(cita, personal, formulario):
         )
         db.session.add(fila)
         filas.append(fila)
-    cita.id_personal = personal.id_usuario
     db.session.flush()
     for fila in filas:
         Auditoria.registrar(personal.id_usuario, "MEDICION",
@@ -301,8 +303,8 @@ def registrar_diferimiento(cita, personal, id_diferimiento, origen, institucion)
     )
     db.session.add(registro)
     db.session.flush()
+    cita.id_personal = id_al_cerrar(Cita.NO_APTO, personal, CITA_CERRADA, ErrorJornada)
     cita.estado = Cita.NO_APTO
-    cita.id_personal = personal.id_usuario
     Auditoria.registrar(personal.id_usuario, "REGISTRO_DIFERIMIENTO",
                         registro.id_registro, Auditoria.ALTA)
     Auditoria.registrar(personal.id_usuario, "CITA", cita.id_cita,
@@ -397,8 +399,8 @@ def registrar_extraccion(cita, personal, observacion, n_unidades=0):
             mensaje="Gracias por donar. Tu extracción quedó registrada en el banco de sangre.",
         ))
 
+    cita.id_personal = id_al_cerrar(Cita.COMPLETADA, personal, CITA_CERRADA, ErrorJornada)
     cita.estado = Cita.COMPLETADA
-    cita.id_personal = personal.id_usuario
     Auditoria.registrar(personal.id_usuario, "CITA", cita.id_cita,
                         Auditoria.CAMBIO_ESTADO)
     _commit()
@@ -457,8 +459,8 @@ def registrar_muestra(cita, personal, observacion):
     db.session.flush()
     Auditoria.registrar(personal.id_usuario, "MUESTRA_COMPATIBILIDAD",
                         muestra.id_muestra, Auditoria.ALTA)
+    cita.id_personal = id_al_cerrar(Cita.COMPLETADA, personal, CITA_CERRADA, ErrorJornada)
     cita.estado = Cita.COMPLETADA
-    cita.id_personal = personal.id_usuario
     Auditoria.registrar(personal.id_usuario, "CITA", cita.id_cita,
                         Auditoria.CAMBIO_ESTADO)
     _commit()
@@ -507,7 +509,6 @@ def abrir_espontanea(donante, personal):
     cita = Cita(
         tipo_cita=Cita.ALTRUISTA,
         id_usuario=donante.id_usuario,
-        id_personal=personal.id_usuario,
         id_horario=elegida.id_horario,
         fecha_hora_creacion=datetime.combine(hoy, HORA_ESPONTANEA),
         estado=Cita.CONFIRMADA,

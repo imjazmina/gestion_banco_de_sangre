@@ -13,7 +13,7 @@ No es un script SQL. El script deberá respetar sin cambios
 - Institución local: **Hospital Regional de Luque (HRL)**.
 - Personal de enfermería: **María Recalde**, documento `10000001`.
 - Personal de jefatura: **Jorge Fernández**, documento `10000002`.
-- Personal de servicio para citas todavía no asignadas: documento `00000000`.
+- Las citas y citaciones abiertas no tienen personal: `id_personal` queda NULL hasta el cierre.
 - Los documentos deben guardarse sin puntos para facilitar las búsquedas.
 - El script debe ser idempotente: identificar usuarios por `documento` y usar
   comprobaciones `NOT EXISTS` o `ON CONFLICT` donde exista una restricción

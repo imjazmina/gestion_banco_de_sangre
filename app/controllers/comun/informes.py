@@ -147,12 +147,10 @@ _MESES = (
 # cada serie, y por eso viven acá y no en la base.
 COLOR_TIPO = {
     Cita.ALTRUISTA: "#0F766E",
-    Cita.REPOSICION: "#120C61",
     Cita.SOLIDARIA: "#2563EB",
 }
 ETIQUETA_TIPO = {
     Cita.ALTRUISTA: "Altruista",
-    Cita.REPOSICION: "Reposición",
     Cita.SOLIDARIA: "Solicitud",
 }
 RANGOS = ((18, 25), (26, 35), (36, 45), (46, 55), (56, 65))
@@ -189,7 +187,7 @@ def _por_tipo(filas):
         conteo[cita.tipo_cita] = conteo.get(cita.tipo_cita, 0) + 1
     return [{"label": ETIQUETA_TIPO.get(t, t), "n": conteo.get(t, 0),
              "color": COLOR_TIPO[t]}
-            for t in (Cita.ALTRUISTA, Cita.REPOSICION, Cita.SOLIDARIA)]
+            for t in (Cita.ALTRUISTA, Cita.SOLIDARIA)]
 
 
 def _por_genero(filas):

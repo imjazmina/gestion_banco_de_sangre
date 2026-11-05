@@ -21,21 +21,17 @@ from sqlalchemy import func, text
 
 from app import calendario
 from app.models import (db, Auditoria, Cita, HorarioDisponible, MuestraCompatibilidad,
-                        Notificacion, RegistroDiferimiento, Solicitud, Usuario)
+                        Notificacion, RegistroDiferimiento, Solicitud)
 
-# Documento del usuario de servicio «Personal de turno». `cita.id_personal`
-# es NOT NULL y al reservar todavía no se sabe quién va a atender, así que
-# queda este y el panel lo reemplaza por la persona real en el mostrador.
+# Usuario de servicio de los vencimientos automáticos. No se graba en
+# cita.id_personal ni en citacion_consejeria.id_personal.
 DOCUMENTO_PERSONAL_DE_TURNO = "00000000"
 
-# Los tipos que el donante puede elegir. 'Extraccion de compatibilidad' queda
+# Los tipos que el donante puede elegir. La extracción de muestra queda
 # afuera a propósito: la indica el personal, no se pide desde el portal.
 TIPOS = [
     ("Donacion altruista", "Altruista",
      "Donás sin destinatario específico, para la reserva general del banco.",
-     False),
-    ("Reposicion", "Reposición",
-     "Donás para reponer unidades que usó un familiar o conocido.",
      False),
     ("Donacion solidaria", "Solidaria",
      "Donás para una persona concreta de la lista de solicitudes.",
@@ -224,23 +220,6 @@ def tiene_muestra(solicitud):
             .first() is not None)
 
 
-def personal_de_turno():
-    """
-    El usuario de servicio que queda como responsable al reservar.
-
-    Lo carga database/catalogos.sql. Si no está, se avisa en lugar de
-    inventar un responsable: `cita.id_personal` no admite nulos y poner a
-    cualquiera sería atribuirle a una persona un trabajo que no hizo.
-    """
-    usuario = Usuario.query.filter_by(
-        documento=DOCUMENTO_PERSONAL_DE_TURNO).first()
-    if usuario is None:
-        raise ErrorAgenda(
-            "Falta el usuario «Personal de turno» en la base. "
-            "Ejecutá: python database/cargar_catalogos.py")
-    return usuario
-
-
 # --------------------------------------------------------------- escritura
 def crear(usuario, fecha, id_horario, tipo, id_solicitud=None,
          consentimiento_publicacion=None):
@@ -280,14 +259,11 @@ def crear(usuario, fecha, id_horario, tipo, id_solicitud=None,
     elif tipo not in TIPOS_VALIDOS:
         raise ErrorAgenda("Ese tipo de cita no está disponible.")
 
-    responsable = personal_de_turno()
-
     try:
         franja = _bloquear_franja(id_horario, fecha)
         cita = Cita(tipo_cita=tipo,
                     id_usuario=usuario.id_usuario,
                     id_solicitud=id_solicitud,
-                    id_personal=responsable.id_usuario,
                     id_horario=id_horario,
                     fecha_hora_creacion=datetime.now(),
                     estado=Cita.PENDIENTE)

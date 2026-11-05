@@ -66,12 +66,9 @@ class Cita(db.Model):
         db.Integer, db.ForeignKey("usuario.id_usuario"), nullable=False)
     id_solicitud = db.Column(
         db.Integer, db.ForeignKey("solicitud.id_solicitud"))
-    # NOT NULL en el esquema: toda cita nombra a quien atiende. Al reservar
-    # por el portal todavía no se sabe quién va a ser, así que queda el
-    # usuario de servicio «Personal de turno» y el panel lo reemplaza por la
-    # persona real en el mostrador.
+    # NULL hasta Ausente, No apto o Completada. Ahí se graba quien cerró.
     id_personal = db.Column(
-        db.Integer, db.ForeignKey("usuario.id_usuario"), nullable=False)
+        db.Integer, db.ForeignKey("usuario.id_usuario"))
     id_horario = db.Column(
         db.Integer, db.ForeignKey("horario_disponible.id_horario"), nullable=False)
     fecha_hora_creacion = db.Column(
@@ -115,7 +112,6 @@ class Cita(db.Model):
         return instante is not None and instante < datetime.now()
 
     ALTRUISTA = "Donacion altruista"
-    REPOSICION = "Reposicion"
     SOLIDARIA = "Donacion solidaria"
     COMPATIBILIDAD = "Extraccion de muestra para compatibilidad"
     MUESTRA = "Extraccion de muestra para compatibilidad"
@@ -366,8 +362,9 @@ class CitacionConsejeria(db.Model):
     id_citacion = db.Column(db.Integer, primary_key=True)
     id_donante = db.Column(
         db.Integer, db.ForeignKey("usuario.id_usuario"), nullable=False)
+    # NULL hasta Ausente o Realizada. Ahí se graba quien cerró.
     id_personal = db.Column(
-        db.Integer, db.ForeignKey("usuario.id_usuario"), nullable=False)
+        db.Integer, db.ForeignKey("usuario.id_usuario"))
     id_horario = db.Column(
         db.Integer, db.ForeignKey("horario_disponible.id_horario"), nullable=False)
     id_resultado = db.Column(

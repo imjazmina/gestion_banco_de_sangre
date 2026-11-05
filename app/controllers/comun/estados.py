@@ -42,6 +42,19 @@ def transicion_valida(pares, origen, destino):
     return (origen, destino) in pares
 
 
+CITA_CERRADA = frozenset({"Ausente", "Completada", "No apto"})
+CITACION_CERRADA = frozenset({"Ausente", "Realizada"})
+
+
+def id_al_cerrar(estado, personal, cerrados, error):
+    """El id de quien cierra. Antes de ese estado la columna queda en NULL."""
+    if estado not in cerrados:
+        raise error("El personal se asigna al terminar la atención.")
+    if personal is None:
+        raise error("Falta el personal que cierra la atención.")
+    return personal.id_usuario
+
+
 def solicitud_vencida(fecha_publicacion, hoy, dias=DIAS_VIGENCIA_SOLICITUD):
     """True cuando ya se cumplieron los días desde la publicación."""
     return fecha_publicacion + timedelta(days=dias) <= hoy
