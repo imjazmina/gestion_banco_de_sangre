@@ -1,8 +1,8 @@
 """Sesión del personal de salud.
 
-Comparte la cookie con el portal, con ámbito `personal`. El correo de
-ingreso es `perfil_personal.correo_institucional` y la contraseña es el
-hash de ese perfil. No hay usuarios de demostración en este archivo.
+Usa la misma sesión en memoria que el portal, con ámbito `personal`. El
+correo de ingreso es `perfil_personal.correo_institucional` y la contraseña
+es el hash de ese perfil. No hay usuarios de demostración en este archivo.
 """
 from functools import wraps
 
