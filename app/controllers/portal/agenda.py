@@ -11,7 +11,8 @@ De ahí salen dos cosas que este módulo hace y conviene entender:
     semana; a partir del octavo día se repetiría y dos lunes distintos
     apuntarían a la misma franja.
   * Las reglas (una cita activa por donante, cupo de la franja, diferimiento
-    vigente) las hace cumplir este código, no la base. El alta toma un
+    vigente e intervalo mínimo desde la última donación) las hace cumplir
+    este código, no la base. El alta toma un
     bloqueo sobre la fila de la franja para contar y grabar sin que dos
     reservas simultáneas pasen el cupo.
 """
@@ -220,6 +221,20 @@ def franja_elegida(fecha, id_horario, ahora=None):
                  if f["id_horario"] == id_horario and f["libres"] > 0), None)
 
 
+def intervalo_pendiente(usuario):
+    """
+    El intervalo mínimo todavía no se cumplió, o None.
+
+    Los meses son los del perfil: 3 para masculino y 4 para femenino.
+    Un diferimiento activo no entra acá: lo resuelve diferimiento_vigente.
+    """
+    from app.controllers.portal.perfil import habilitacion
+    dato = habilitacion(usuario)
+    if dato["motivo"] == "intervalo" and not dato["apto"]:
+        return dato
+    return None
+
+
 def solicitud_abierta(usuario):
     """RN23: Creada o Publicada impide agendar una donación."""
     return (Solicitud.query
@@ -286,6 +301,9 @@ def crear(usuario, fecha, id_horario, tipo, id_solicitud=None,
         raise ErrorAgenda("No podés agendar mientras tengas una solicitud abierta.")
     elif tipo not in TIPOS_VALIDOS:
         raise ErrorAgenda("Ese tipo de cita no está disponible.")
+    elif intervalo_pendiente(usuario):
+        raise ErrorAgenda(
+            "Todavía no se cumplió el intervalo mínimo desde tu última donación.")
 
     try:
         franja = _bloquear_franja(id_horario, fecha)

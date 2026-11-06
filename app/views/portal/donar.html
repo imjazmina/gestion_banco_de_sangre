@@ -55,9 +55,14 @@
         </div>
       </div>
     </div>
+    {% elif intervalo %}
+    <div class="card" style="border-top:3px solid var(--warn); margin-bottom:20px;">
+      <h2 style="margin-bottom:6px;">Agendamiento no disponible</h2>
+      <p class="sub">Todavía no se cumplió el intervalo mínimo desde tu última donación. Podés volver a agendar a partir del {{ intervalo.fecha.strftime('%d/%m/%Y') }}.</p>
+    </div>
     {% endif %}
 
-    <div class="{{ 'form-locked' if diferimiento or (solicitud_abierta and not solo_muestra) }}" {% if diferimiento or (solicitud_abierta and not solo_muestra) %}aria-disabled="true"{% endif %}>
+    <div class="{{ 'form-locked' if diferimiento or intervalo or (solicitud_abierta and not solo_muestra) }}" {% if diferimiento or intervalo or (solicitud_abierta and not solo_muestra) %}aria-disabled="true"{% endif %}>
 
       {# ---------- pasos 1 y 2 ---------- #}
       <div class="card" style="margin-bottom:20px;">

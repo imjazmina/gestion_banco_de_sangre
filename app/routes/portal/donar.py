@@ -82,12 +82,15 @@ def agendar():
         if tipo != agenda.TIPO_MUESTRA:
             solicitud = None
 
+    intervalo = None if solo_muestra else agenda.intervalo_pendiente(usuario)
     puede_confirmar = bool(
-        horario and tipo and (tipo not in agenda.NECESITA_SOLICITUD or solicitud))
+        horario and tipo and (tipo not in agenda.NECESITA_SOLICITUD or solicitud)
+        and not intervalo and not diferimiento)
 
     return render_template(
         "portal/donar.html",
         diferimiento=diferimiento,
+        intervalo=intervalo,
         solicitud_abierta=solicitud_abierta,
         dias=dias, fecha=fecha,
         franjas=franjas, sin_horarios=sin_horarios, horario=horario,
