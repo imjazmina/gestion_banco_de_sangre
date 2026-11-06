@@ -55,19 +55,45 @@ def etiqueta_tipo(clave):
 
 
 # ------------------------------------------------------------------ estado
+def diferimientos_vigentes(usuario):
+    """
+    Todos los diferimientos que hoy siguen bloqueando al donante.
+
+    Activo: permanente (`fecha_fin` nula) o temporal con fin posterior a hoy.
+    Cada fila conserva su causa, tipo y fechas.
+    """
+    filas = (RegistroDiferimiento.query
+             .filter(RegistroDiferimiento.id_donante == usuario.id_usuario,
+                     (RegistroDiferimiento.fecha_fin.is_(None)) |
+                     (RegistroDiferimiento.fecha_fin > date.today()))
+             .all())
+    return sorted(filas, key=lambda d: (
+        0 if d.fecha_fin is None else 1,
+        date.max if d.fecha_fin is None else d.fecha_fin,
+    ))
+
+
+def elegir_vigente(activos):
+    """
+    El que mantiene el bloqueo: un permanente, si hay alguno;
+    si no, el temporal que termina más tarde.
+    """
+    if not activos:
+        return None
+    permanentes = [d for d in activos if d.fecha_fin is None]
+    if permanentes:
+        return permanentes[0]
+    return max(activos, key=lambda d: d.fecha_fin)
+
+
 def diferimiento_vigente(usuario):
     """
-    El diferimiento activo del donante, o None.
+    El diferimiento que hoy impide agendar, o None.
 
-    Nunca se muestra la causa clínica en el portal: solo que hay una
-    condición registrada y, si corresponde, hasta cuándo.
+    Con varios activos el donante sigue bloqueado. En el portal no se
+    muestra la causa: solo que hay una condición y, si corresponde, hasta cuándo.
     """
-    return (RegistroDiferimiento.query
-            .filter(RegistroDiferimiento.id_donante == usuario.id_usuario,
-                    (RegistroDiferimiento.fecha_fin.is_(None)) |
-                    (RegistroDiferimiento.fecha_fin > date.today()))
-            .order_by(RegistroDiferimiento.fecha_inicio.desc())
-            .first())
+    return elegir_vigente(diferimientos_vigentes(usuario))
 
 
 def _citas_de(usuario, activas):

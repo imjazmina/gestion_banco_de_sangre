@@ -7,7 +7,7 @@ from app.controllers.comun.acceso import operador_actual, pintar, requiere
 from app.controllers.comun.informes import vista_previa
 from app.controllers.licenciado import jornada
 from app.controllers.licenciado.jornada import ErrorJornada
-from app.controllers.portal.agenda import diferimiento_vigente
+from app.controllers.portal.agenda import diferimientos_vigentes, elegir_vigente
 
 licenciado_inicio_bp = Blueprint("licenciado_inicio", __name__, url_prefix="/licenciado")
 
@@ -20,7 +20,7 @@ COLORES = {
 }
 
 
-def _contexto(encontrado=None, diferimiento=None):
+def _contexto(encontrado=None, vigentes=None):
     citas = jornada.citas_del_dia()
     orden = ["Completada", "Confirmada", "Pendiente", "Ausente", "No apto"]
     ahora = datetime.now().strftime("%H:%M")
@@ -35,8 +35,8 @@ def _contexto(encontrado=None, diferimiento=None):
         siguientes=[jornada.fila(c) for c in activas[1:4]],
         previa=vista_previa(),
         encontrado=encontrado,
-        diferimiento=diferimiento,
-        restriccion=jornada.restriccion_de(diferimiento),
+        vigentes=vigentes or [],
+        restriccion=jornada.restriccion_de(elegir_vigente(vigentes or [])),
     )
 
 
@@ -65,4 +65,4 @@ def espontaneo():
         return redirect(url_for("licenciado_ficha.ver",
                                 donor_id=donante.id_usuario, cita=cita.id_cita))
     return pintar("licenciado/inicio.html",
-                  **_contexto(donante, diferimiento_vigente(donante)))
+                  **_contexto(donante, diferimientos_vigentes(donante)))

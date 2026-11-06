@@ -157,10 +157,12 @@ def enviar_recordatorio(cita):
 
 def pendientes_de_habilitacion(ahora=None):
     """
-    Donantes cuyo diferimiento temporal ya venció, o cuyo intervalo desde
-    la última extracción ya se cumplió, y todavía no recibieron el aviso.
+    Donantes cuyo diferimiento temporal ya venció y no les queda otro activo,
+    o cuyo intervalo desde la última extracción ya se cumplió, y todavía
+    no recibieron el aviso.
     El texto no incluye la causa.
     """
+    from app.controllers.portal.agenda import diferimiento_vigente
     from app.controllers.portal.perfil import habilitacion
     from app.models import RegistroDiferimiento, Usuario
 
@@ -179,6 +181,8 @@ def pendientes_de_habilitacion(ahora=None):
         if usuario.id_usuario in ya:
             continue
         if usuario.id_usuario in por_diferimiento:
+            if diferimiento_vigente(usuario):
+                continue
             listos.append(usuario)
             continue
         dato = habilitacion(usuario)

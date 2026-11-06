@@ -23,11 +23,11 @@ def ver(cita_id):
             if request.form.get("accion") == "diferir":
                 jornada.registrar_diferimiento(
                     cita, personal,
-                    request.form.get("id_diferimiento", type=int),
+                    request.form.getlist("id_diferimiento"),
                     RegistroDiferimiento.MEDICION,
                     request.form.get("institucion"),
                 )
-                flash("Diferimiento registrado. La cita quedó como no apta.", "ok")
+                flash("Diferimientos registrados. La cita quedó como no apta.", "ok")
                 return redirect(url_for("licenciado_ficha.ver",
                                         donor_id=cita.id_usuario, cita=cita.id_cita))
             jornada.guardar_mediciones(cita, personal, request.form)

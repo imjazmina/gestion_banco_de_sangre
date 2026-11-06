@@ -78,7 +78,7 @@
               <p class="truncate" style="margin:0;font-weight:600;">{{ encontrado.nombre_completo }}</p>
               <p class="muted" style="margin:0;font-size:12px;">CI {{ encontrado.documento_visible }}</p>
             </div>
-            {% if diferimiento %}
+            {% if vigentes %}
             <a class="btn btn-ghost btn-sm" href="{{ url_for('licenciado_ficha.ver', donor_id=encontrado.id_usuario, de='inicio') }}">Ver ficha</a>
             {% else %}
             <form method="post" action="{{ url_for('licenciado_inicio.espontaneo') }}">
@@ -89,20 +89,16 @@
             {% endif %}
           </div>
 
-          {% if diferimiento %}
-            {% if restriccion == 'externo' %}
-              {% call alerta('info', 'Diferimiento en otra institución') %}
-                {{ diferimiento.institucion_diagnostico }}. No se abre una atención nueva.
-              {% endcall %}
-            {% elif restriccion == 'permanente' %}
-              {% call alerta('danger', diferimiento.causa.nombre) %}
-                Diferimiento permanente desde {{ diferimiento.fecha_inicio.strftime('%d/%m/%Y') }}. No se abre una atención nueva.
-              {% endcall %}
-            {% else %}
-              {% call alerta('warn', diferimiento.causa.nombre) %}
-                Fecha de inicio {{ diferimiento.fecha_inicio.strftime('%d/%m/%Y') }}{% if diferimiento.fecha_fin %} · Fecha de fin {{ diferimiento.fecha_fin.strftime('%d/%m/%Y') }}{% endif %}. No se abre una atención nueva.
-              {% endcall %}
-            {% endif %}
+          {% if vigentes %}
+            {% set tono = 'info' if restriccion == 'externo' else ('danger' if restriccion == 'permanente' else 'warn') %}
+            {% call alerta(tono, 'Diferimiento vigente' if vigentes|length == 1 else 'Diferimientos vigentes') %}
+              No se abre una atención nueva mientras quede al menos uno activo.
+              <ul style="margin:8px 0 0;padding-left:16px;">
+                {% for d in vigentes %}
+                <li>{{ d.causa.nombre }} · {{ d.causa.tipo }} · inicio {{ d.fecha_inicio.strftime('%d/%m/%Y') }}{% if d.fecha_fin %} · fin {{ d.fecha_fin.strftime('%d/%m/%Y') }}{% else %} · sin fecha de fin{% endif %}</li>
+                {% endfor %}
+              </ul>
+            {% endcall %}
           {% else %}
             {% call alerta('ok', 'Sin diferimiento vigente') %}
               Al abrir la ficha se le asigna la primera franja de hoy con cupo.

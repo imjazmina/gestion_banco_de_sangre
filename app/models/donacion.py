@@ -200,8 +200,9 @@ class RegistroDiferimiento(db.Model):
     """
     Diferimiento aplicado a un donante concreto.
 
-    fecha_fin la completa el trigger fn_registro_fecha_fin a partir de los
-    días de rehabilitación del catálogo; queda nula si es permanente.
+    Varios registros pueden compartir la misma cita o el mismo resultado.
+    Cada uno guarda su causa, su tipo y sus fechas. fecha_fin la completa
+    el trigger fn_registro_fecha_fin; queda nula si es permanente.
     """
     __tablename__ = "registro_diferimiento"
 

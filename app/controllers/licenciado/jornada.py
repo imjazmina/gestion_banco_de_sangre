@@ -13,7 +13,9 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app import calendario
 from app.controllers.comun.estados import CITA_CERRADA, id_al_cerrar
-from app.controllers.portal.agenda import diferimiento_vigente
+from app.controllers.portal.agenda import (
+    diferimiento_vigente, diferimientos_vigentes, elegir_vigente,
+)
 from app.models import (
     Auditoria, Cita, Cuestionario, Diferimiento, Extraccion, HorarioDisponible,
     Medicion, MuestraCompatibilidad, Notificacion, Pregunta, RegistroDiferimiento,
@@ -280,33 +282,69 @@ def catalogo_diferimientos():
     return Diferimiento.query.order_by(Diferimiento.nombre).all()
 
 
-def registrar_diferimiento(cita, personal, id_diferimiento, origen, institucion):
+def registrar_diferimiento(cita, personal, ids_diferimiento, origen, institucion):
+    """
+    Un registro por causa, en la misma atención.
+
+    `fecha_fin` la escribe el trigger: inicio más días si es temporal,
+    nula si es permanente. La cita pasa a No apto una sola vez.
+    """
     _exigir_ajeno(cita, personal)
-    causa = db.session.get(Diferimiento, id_diferimiento)
-    if causa is None:
-        raise ErrorJornada("Esa causa no está en el catálogo.")
     if origen not in (RegistroDiferimiento.CUESTIONARIO_PERSONAL,
                       RegistroDiferimiento.MEDICION):
         raise ErrorJornada("Ese origen no corresponde a esta pantalla.")
-    institucion = (institucion or "").strip() or INSTITUCION_LOCAL
     if cita.estado != Cita.CONFIRMADA:
         raise ErrorJornada("Solo una cita confirmada puede quedar no apta.")
 
-    registro = RegistroDiferimiento(
-        id_donante=cita.id_usuario,
-        id_diferimiento=causa.id_diferimiento,
-        id_cita=cita.id_cita,
-        id_personal=personal.id_usuario,
-        origen=origen,
-        institucion_diagnostico=institucion,
-        fecha_inicio=date.today(),
-    )
-    db.session.add(registro)
+    vistos = []
+    for crudo in ids_diferimiento or []:
+        try:
+            clave = int(crudo)
+        except (TypeError, ValueError):
+            raise ErrorJornada("Esa causa no está en el catálogo.")
+        if clave not in vistos:
+            vistos.append(clave)
+    if not vistos:
+        raise ErrorJornada("Elegí al menos una causa del catálogo.")
+
+    causas = []
+    for clave in vistos:
+        causa = db.session.get(Diferimiento, clave)
+        if causa is None:
+            raise ErrorJornada("Esa causa no está en el catálogo.")
+        causas.append(causa)
+
+    institucion = (institucion or "").strip() or INSTITUCION_LOCAL
+    hoy = date.today()
+    registros = []
+    for causa in causas:
+        registro = RegistroDiferimiento(
+            id_donante=cita.id_usuario,
+            id_diferimiento=causa.id_diferimiento,
+            id_cita=cita.id_cita,
+            id_personal=personal.id_usuario,
+            origen=origen,
+            institucion_diagnostico=institucion,
+            fecha_inicio=hoy,
+        )
+        db.session.add(registro)
+        registros.append(registro)
     db.session.flush()
+    for causa, registro in zip(causas, registros):
+        db.session.refresh(registro)
+        if causa.tipo == Diferimiento.TEMPORAL and registro.fecha_fin is None:
+            db.session.rollback()
+            raise ErrorJornada(
+                "El diferimiento temporal no quedó con fecha de finalización.")
+        if causa.tipo == Diferimiento.PERMANENTE and registro.fecha_fin is not None:
+            db.session.rollback()
+            raise ErrorJornada(
+                "El diferimiento permanente no admite fecha de finalización.")
     cita.id_personal = id_al_cerrar(Cita.NO_APTO, personal, CITA_CERRADA, ErrorJornada)
     cita.estado = Cita.NO_APTO
-    Auditoria.registrar(personal.id_usuario, "REGISTRO_DIFERIMIENTO",
-                        registro.id_registro, Auditoria.ALTA)
+    for registro in registros:
+        Auditoria.registrar(personal.id_usuario, "REGISTRO_DIFERIMIENTO",
+                            registro.id_registro, Auditoria.ALTA)
     Auditoria.registrar(personal.id_usuario, "CITA", cita.id_cita,
                         Auditoria.CAMBIO_ESTADO)
     _commit()
@@ -553,22 +591,29 @@ def restriccion_de(registro):
 
 def historial(citas, diferimientos):
     """
-    Una fila por cita cerrada, con la causa del diferimiento si esa cita
-    terminó en No apto. La institución es siempre la local: las citas se
-    atienden acá. Los diferimientos externos no tienen cita y van aparte.
+    Una fila por cita cerrada. Si esa atención tiene varios diferimientos,
+    cada uno conserva motivo, tipo, inicio y fin. Los externos no tienen
+    cita y van aparte.
     """
-    causa_por_cita = {d.id_cita: d for d in diferimientos if d.id_cita}
+    por_cita = {}
+    for registro in diferimientos:
+        if registro.id_cita:
+            por_cita.setdefault(registro.id_cita, []).append(registro)
     filas = []
     for cita in citas:
         if cita.estado in Cita.ACTIVAS:
             continue
-        registro = causa_por_cita.get(cita.id_cita)
         filas.append({
             "fecha": cita.fecha_cita,
             "tipo": etiqueta_tipo(cita.tipo_cita),
             "estado": cita.estado,
             "institucion": INSTITUCION_LOCAL,
-            "causa": registro.causa.nombre if registro else None,
+            "causas": [{
+                "nombre": registro.causa.nombre,
+                "tipo": registro.causa.tipo,
+                "inicio": registro.fecha_inicio,
+                "fin": registro.fecha_fin,
+            } for registro in por_cita.get(cita.id_cita, [])],
         })
     filas.sort(key=lambda f: f["fecha"] or date.min, reverse=True)
     return filas
@@ -591,7 +636,8 @@ def ficha(id_usuario):
                      .filter_by(id_donante=id_usuario)
                      .order_by(RegistroDiferimiento.fecha_inicio.desc())
                      .all())
-    vigente = diferimiento_vigente(donante)
+    vigentes = diferimientos_vigentes(donante)
+    vigente = elegir_vigente(vigentes)
     completadas = [c for c in citas if c.estado == Cita.COMPLETADA]
     fechas_completadas = [c.fecha_cita for c in completadas if c.fecha_cita]
     unidades = Unidad.query.filter_by(id_donante=id_usuario).all()
@@ -620,6 +666,7 @@ def ficha(id_usuario):
         "total_donaciones": len(completadas),
         "ultima_donacion": max(fechas_completadas) if fechas_completadas else None,
         "vigente": vigente,
+        "vigentes": vigentes,
         "restriccion": restriccion_de(vigente),
         "diferimientos": diferimientos,
         "unidades": unidades,

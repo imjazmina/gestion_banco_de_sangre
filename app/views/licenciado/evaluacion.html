@@ -40,13 +40,16 @@
         </ul>
       </div>
       <div class="field">
-        <label>Causa del catálogo <span class="req">*</span></label>
-        <select class="control" name="id_diferimiento" required>
+        <label>Causas del catálogo <span class="req">*</span></label>
+        <div class="stack" style="max-height:220px;overflow:auto;">
           {% for c in causas %}
-          <option value="{{ c.id_diferimiento }}" {% if sugeridas and c.nombre == sugeridas[0] %}selected{% endif %}>{{ c.nombre }} · {{ c.tipo }}</option>
+          <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;">
+            <input type="checkbox" name="id_diferimiento" value="{{ c.id_diferimiento }}" {% if c.nombre in sugeridas %}checked{% endif %}>
+            <span>{{ c.nombre }} · {{ c.tipo }}{% if c.tipo == 'Temporal' %} · {{ c.dias_rehabilitacion }} días{% else %} · sin fecha de fin{% endif %}</span>
+          </label>
           {% endfor %}
-        </select>
-        {% if sugeridas %}<p class="hint">Según la medición fuera de rango: {{ sugeridas|join(', ') }}. Puede cambiarla.</p>{% endif %}
+        </div>
+        {% if sugeridas %}<p class="hint">Según las mediciones fuera de rango: {{ sugeridas|join(', ') }}. Podés marcar más de una. Cada causa guarda su fecha de fin.</p>{% else %}<p class="hint">Podés marcar más de una causa. Cada una guarda su motivo, su tipo y sus fechas.</p>{% endif %}
       </div>
       <div class="field">
         <label>Institución del diagnóstico</label>
@@ -55,7 +58,7 @@
     </div>
     <div class="row-end mt-4">
       <button type="button" class="btn btn-ghost" data-cerrar="modal-diferir">Cancelar</button>
-      <button type="submit" class="btn btn-danger">Confirmar diferimiento</button>
+      <button type="submit" class="btn btn-danger">Confirmar diferimientos</button>
     </div>
   </form>
   {% endcall %}

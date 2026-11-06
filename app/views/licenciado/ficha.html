@@ -11,21 +11,17 @@
 <div class="page">
   {{ crumb(volver_url, volver_texto, 'Ficha del donante') }}
 
-  {% if vigente %}
+  {% if vigentes %}
   <div class="mb-4">
-    {% if restriccion == 'externo' %}
-      {% call alerta('info', 'Diferimiento en otra institución') %}
-        {{ vigente.institucion_diagnostico }} · desde {{ vigente.fecha_inicio.strftime('%d/%m/%Y') }}. La extracción no puede realizarse; corresponde derivar a la institución de origen.
-      {% endcall %}
-    {% elif restriccion == 'permanente' %}
-      {% call alerta('danger', vigente.causa.nombre) %}
-        Diferimiento permanente · Fecha de inicio {{ vigente.fecha_inicio.strftime('%d/%m/%Y') }}. La extracción no puede realizarse.
-      {% endcall %}
-    {% else %}
-      {% call alerta('warn', vigente.causa.nombre) %}
-        Fecha de inicio {{ vigente.fecha_inicio.strftime('%d/%m/%Y') }}{% if vigente.fecha_fin %} · Fecha de fin {{ vigente.fecha_fin.strftime('%d/%m/%Y') }}{% endif %}
-      {% endcall %}
-    {% endif %}
+    {% set tono = 'info' if restriccion == 'externo' else ('danger' if restriccion == 'permanente' else 'warn') %}
+    {% call alerta(tono, 'Diferimiento vigente' if vigentes|length == 1 else 'Diferimientos vigentes') %}
+      La extracción no puede realizarse mientras quede al menos uno activo.
+      <ul style="margin:8px 0 0;padding-left:16px;">
+        {% for d in vigentes %}
+        <li>{{ d.causa.nombre }} · {{ d.causa.tipo }} · inicio {{ d.fecha_inicio.strftime('%d/%m/%Y') }}{% if d.fecha_fin %} · fin {{ d.fecha_fin.strftime('%d/%m/%Y') }}{% else %} · sin fecha de fin{% endif %} · {{ d.institucion_diagnostico }}</li>
+        {% endfor %}
+      </ul>
+    {% endcall %}
   </div>
   {% endif %}
 
@@ -108,7 +104,15 @@
                 <td>{{ badge_tipo(h.tipo) }}</td>
                 <td>{{ badge_cita(h.estado) }}</td>
                 <td><span style="font-size:12px;">{{ h.institucion }}</span></td>
-                <td>{% if h.causa %}<span style="font-size:12px;">{{ h.causa }}</span>{% else %}<span class="faint" style="font-size:12px;">—</span>{% endif %}</td>
+                <td>
+                  {% if h.causas %}
+                    {% for c in h.causas %}
+                    <p style="font-size:12px;margin:0;">{{ c.nombre }} · {{ c.tipo }} · inicio {{ c.inicio.strftime('%d/%m/%Y') }}{% if c.fin %} · fin {{ c.fin.strftime('%d/%m/%Y') }}{% else %} · sin fecha de fin{% endif %}</p>
+                    {% endfor %}
+                  {% else %}
+                    <span class="faint" style="font-size:12px;">—</span>
+                  {% endif %}
+                </td>
               </tr>
               {% endfor %}
             </tbody>
@@ -160,7 +164,7 @@
         <div class="summary">
           <div class="split">
             <strong class="mono">{{ u.codigo }}</strong>
-            {{ badge(u.estado, {'Registrada':'gray','En laboratorio':'info','En stock':'ok','Asignada':'navy''Descartada':'danger','Vencida':'danger'}.get(u.estado, 'gray')) }}
+            {{ badge(u.estado, {'Registrada':'gray','En laboratorio':'info','En stock':'ok','Asignada':'navy','Descartada':'danger','Vencida':'danger'}.get(u.estado, 'gray')) }}
           </div>
           {% set trans = transiciones|selectattr('id_unidad', 'equalto', u.id_unidad)|list %}
           {% if trans %}
@@ -173,7 +177,7 @@
           {% for r in resultados if r.id_unidad == u.id_unidad %}
           <p style="margin:8px 0 0;font-size:12px;">Resultado simulado: {{ badge(r.resultado, 'danger' if r.resultado == 'Reactivo' else 'ok') }}</p>
           {% for d in diferimientos if d.id_resultado == r.id_resultado %}
-          <p class="faint" style="margin:4px 0 0;font-size:12px;">{{ d.causa.nombre }} · {{ d.institucion_diagnostico }}</p>
+          <p class="faint" style="margin:4px 0 0;font-size:12px;">{{ d.causa.nombre }} · {{ d.causa.tipo }} · inicio {{ d.fecha_inicio.strftime('%d/%m/%Y') }}{% if d.fecha_fin %} · fin {{ d.fecha_fin.strftime('%d/%m/%Y') }}{% else %} · sin fecha de fin{% endif %}</p>
           {% endfor %}
           {% endfor %}
         </div>

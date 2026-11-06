@@ -264,6 +264,10 @@ def _reactivo(unidad, personal, extraccion, tipo):
         registros.append(registro)
     db.session.flush()
     for registro in registros:
+        db.session.refresh(registro)
+        if registro.fecha_fin is not None:
+            raise ErrorSimulacion(
+                "Un diferimiento permanente de laboratorio no admite fecha de fin.")
         Auditoria.registrar(personal.id_usuario, "REGISTRO_DIFERIMIENTO",
                             registro.id_registro, Auditoria.ALTA)
     _copiar_tipificacion(unidad, tipo)
@@ -706,6 +710,10 @@ def simular_compatibilidad(id_muestra):
         )
         db.session.add(registro)
         db.session.flush()
+        db.session.refresh(registro)
+        if registro.fecha_fin is not None:
+            raise ErrorSimulacion(
+                "Un diferimiento permanente de laboratorio no admite fecha de fin.")
         Auditoria.registrar(personal.id_usuario, "REGISTRO_DIFERIMIENTO",
                             registro.id_registro, Auditoria.ALTA)
         db.session.add(Notificacion(

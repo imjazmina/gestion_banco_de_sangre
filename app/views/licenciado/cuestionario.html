@@ -108,14 +108,16 @@
     <p class="muted" style="margin:0 0 16px;">Registre el motivo por el cual el donante no puede continuar con la donación. La cita pasa a «No apto».</p>
     <div class="stack">
       <div class="field">
-        <label>Motivo del no apto <span class="req">*</span></label>
-        <select class="control" name="id_diferimiento" required>
-          <option value="">Seleccionar motivo...</option>
+        <label>Motivos del no apto <span class="req">*</span></label>
+        <div class="stack" style="max-height:220px;overflow:auto;">
           {% for c in causas %}
-          <option value="{{ c.id_diferimiento }}">{{ c.nombre }} · {{ c.tipo }}</option>
+          <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;">
+            <input type="checkbox" name="id_diferimiento" value="{{ c.id_diferimiento }}">
+            <span>{{ c.nombre }} · {{ c.tipo }}{% if c.tipo == 'Temporal' %} · {{ c.dias_rehabilitacion }} días{% else %} · sin fecha de fin{% endif %}</span>
+          </label>
           {% endfor %}
-        </select>
-        <p class="hint">La duración la calcula el sistema según la causa del catálogo. Las permanentes no tienen fecha de fin.</p>
+        </div>
+        <p class="hint">Podés marcar más de una causa. Cada una guarda su motivo, su tipo y sus fechas. La fecha de fin del temporal la calcula el sistema. El donante sigue bloqueado mientras alguna esté vigente.</p>
       </div>
       <div class="field">
         <label>Institución del diagnóstico</label>
@@ -124,7 +126,7 @@
     </div>
     <div class="row-end mt-4">
       <button type="button" class="btn btn-ghost" data-cerrar="modal-no-apto">Cancelar</button>
-      <button type="submit" class="btn btn-danger">Confirmar</button>
+      <button type="submit" class="btn btn-danger">Confirmar diferimientos</button>
     </div>
   </form>
   {% endcall %}
