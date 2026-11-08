@@ -98,14 +98,14 @@ def intentar_ingreso(email, contrasena):
 
 
 def cerrar_panel():
-    cerrar_sesion()
+    cerrar_sesion(AMBITO_PERSONAL)
 
 
 _ALIAS_ROL = {"lic": Rol.ENFERMERIA, "jef": Rol.JEFATURA}
 
 
 def requiere(rol, ingresar_endpoint):
-    """Deja pasar solo el rol del módulo. Sin sesión, el login es único."""
+    """Deja pasar solo el rol del módulo. Sin sesión de personal, manda al login."""
     codigo = _ALIAS_ROL.get(rol, rol)
 
     def decorador(vista):

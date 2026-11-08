@@ -53,7 +53,7 @@ def ingresar():
     costado las razones para donar y los requisitos, porque quien llega por
     ahí todavía no decidió, no viene a entrar a su cuenta.
     """
-    if usuario_actual():
+    if request.method != "POST" and usuario_actual():
         return redirect(url_for("main.index"))
 
     promocional = request.args.get("donar") == "1"
@@ -81,7 +81,7 @@ def ingresar():
 
 @auth_bp.get("/salir")
 def salir():
-    cerrar_sesion()
+    cerrar_sesion(AMBITO_PORTAL)
     return redirect(url_for("main.index"))
 
 

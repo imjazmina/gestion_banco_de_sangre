@@ -1,26 +1,27 @@
-"""
+﻿"""
 Sesión en la memoria del proceso.
 
-El navegador guarda dos identificadores opacos en cookies HttpOnly. En
-memoria solo están sus hashes. El access dura 15 minutos y viaja a todas
-las rutas. El refresh dura una semana y el navegador lo envía solo a
-`/sesion/renovar`.
+`sesiones` guarda cada ingreso con su id. Un login agrega una entrada y
+no borra las demás. El navegador tiene dos cookies HttpOnly, una por
+ámbito (`portal` y `personal`): cada una lleva los tokens de las sesiones
+de ese ámbito. La pestaña guarda solo el id en sessionStorage y lo manda
+en `X-Sesion`. Ese id no autentica: el token de la cookie tiene que
+existir y corresponder a esa entrada.
 
-Renovar rota el par. Si el mismo refresh llega otra vez dentro de unos
-segundos —dos pedidos a la vez—, se responde con el par ya emitido. Pasada
-esa ventana, presentarlo revoca la familia. Cerrar sesión revoca solo el
-par de este dispositivo.
-
-Un token que no está en memoria no autentica y la respuesta borra las dos
-cookies. Reiniciar el proceso vacía la memoria.
+El access dura 15 minutos. El refresh dura una semana. Renovar rota
+únicamente el par de la pestaña que lo pide. Cerrar sesión revoca solo
+esa entrada. Reiniciar el proceso vacía el diccionario.
 """
 import hashlib
+import json
 import secrets
 import threading
 from datetime import datetime, timedelta, timezone
 from functools import wraps
+from urllib.parse import parse_qsl, urlencode, urlparse, urlunparse
 
-from flask import flash, g, has_request_context, redirect, request, session, url_for
+from flask import (flash, g, has_request_context, make_response, redirect,
+                   request, session, url_for)
 
 from app.models import Usuario
 
@@ -31,8 +32,20 @@ ACCESS_MINUTOS = 15
 REFRESH_DIAS = 7
 GRACIA_SEGUNDOS = 5
 RUTA_RENOVAR = "/sesion/renovar"
-COOKIE_ACCESS = "access_token"
-COOKIE_REFRESH = "refresh_token"
+
+# Cada ingreso agrega una clave. Un login no pisa las otras.
+sesiones = {}
+
+COOKIE_AMBITO = {
+    AMBITO_PORTAL: "portal_sesion",
+    AMBITO_PERSONAL: "personal_sesion",
+}
+_LEGACY = (
+    ("access_token", "/"),
+    ("refresh_token", RUTA_RENOVAR),
+    ("access_personal", "/"),
+    ("refresh_personal", RUTA_RENOVAR),
+)
 
 
 def _ahora():
@@ -57,7 +70,7 @@ class _Almacen:
 
     def __init__(self):
         self._candado = threading.RLock()
-        self._sesiones = {}
+        self._sesiones = sesiones
         self._por_access = {}
         self._por_refresh = {}  
         self._refresh_revocado = {}
@@ -186,11 +199,11 @@ class _Almacen:
             self._refresh_revocado[huella] = (familia, expira)
         self._revocar_familia(familia, ahora)
 
-    def _emitir(self, id_usuario, ambito, familia, ahora):
+    def _emitir(self, id_usuario, ambito, familia, ahora, id_sesion=None):
         access = secrets.token_urlsafe(32)
         refresh = secrets.token_urlsafe(32)
         fila = {
-            "id": secrets.token_hex(16),
+            "id": id_sesion or secrets.token_hex(16),
             "familia": familia,
             "id_usuario": id_usuario,
             "ambito": ambito,
@@ -208,9 +221,11 @@ class _Almacen:
         familia = fila["familia"]
         id_usuario = fila["id_usuario"]
         ambito = fila["ambito"]
+        id_sesion = fila["id"]
         expira = fila["expira_refresh"]
         self._quitar(fila)
-        access, refresh, datos = self._emitir(id_usuario, ambito, familia, ahora)
+        access, refresh, datos = self._emitir(
+            id_usuario, ambito, familia, ahora, id_sesion)
         self._gracia[huella] = {
             "familia": familia,
             "id": datos["id"],
@@ -232,74 +247,237 @@ def _olvidar_cookie_vieja():
     session.pop("ambito", None)
 
 
-def _vigente():
-    if not has_request_context():
+def _parse_mapa(raw):
+    if not raw:
+        return {}
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return {}
+    if not isinstance(data, dict):
+        return {}
+    limpio = {}
+    for sid, par in data.items():
+        if (isinstance(sid, str) and isinstance(par, list) and len(par) == 2
+                and all(isinstance(parte, str) for parte in par)):
+            limpio[sid] = (par[0], par[1])
+    return limpio
+
+
+def _mapas():
+    if getattr(g, "mapas_sesion", None) is None:
+        g.mapas_sesion = {
+            ambito: _parse_mapa(request.cookies.get(nombre))
+            for ambito, nombre in COOKIE_AMBITO.items()
+        }
+        g.mapas_tocados = set()
+    return g.mapas_sesion
+
+
+def _tocar(ambito):
+    _mapas()
+    g.mapas_tocados.add(ambito)
+
+
+def _sid_resuelto():
+    """El id de esta pestaña, o None si el pedido todavía no lo dijo."""
+    if getattr(g, "sid_nueva", None):
+        return g.sid_nueva
+    if request.headers.get("X-Sesion-Resuelta") != "1":
         return None
-    if getattr(g, "_sesion_lista", False):
-        return g.sesion_datos
-    datos, desconocido = _almacen.validar_access(request.cookies.get(COOKIE_ACCESS))
-    g._sesion_lista = True
-    g.sesion_datos = datos
-    g.sesion_borrar = desconocido
-    return datos
+    return (request.headers.get("X-Sesion") or "").strip()
+
+
+def _hay_cookies():
+    return any(_mapas().values())
+
+
+def _es_documento():
+    destino = request.headers.get("Sec-Fetch-Dest", "")
+    if destino:
+        return destino == "document"
+    if request.method not in ("GET", "HEAD"):
+        return False
+    return "text/html" in request.headers.get("Accept", "")
+
+
+def _bootstrap():
+    """El script corre oculto. La página real aparece cuando su CSS ya cargó."""
+    src = url_for("static", filename="js/comun/sesion.js")
+    return f"""<!DOCTYPE html>
+<html style="visibility:hidden"><head><meta charset="utf-8">
+<script src="{src}"></script>
+<script>
+(function () {{
+  var sid = sessionStorage.getItem("sid") || "";
+  var headers = {{"X-Sesion": sid, "X-Sesion-Resuelta": "1", "Accept": "text/html"}};
+  fetch("/sesion/renovar", {{method: "POST", headers: headers, credentials: "same-origin"}})
+    .catch(function () {{}})
+    .then(function () {{
+      return fetch(location.href, {{headers: headers, credentials: "same-origin", redirect: "follow"}});
+    }})
+    .then(function (r) {{
+      if (r.redirected) {{ location.replace(r.url); return null; }}
+      return r.text();
+    }})
+    .then(function (html) {{
+      if (!html || !window.pintarDocumento) {{
+        document.documentElement.style.visibility = "visible";
+        return;
+      }}
+      window.pintarDocumento(html);
+    }});
+}})();
+</script></head><body></body></html>"""
+
+
+def _destino_limpio(url):
+    partes = urlparse(url)
+    if partes.netloc and partes.netloc != request.host:
+        return url
+    query = [(k, v) for k, v in parse_qsl(partes.query, keep_blank_values=True)
+             if k != "sesion"]
+    return urlunparse(partes._replace(query=urlencode(query)))
+
+
+def _html_pestaña(js, destino):
+    html = (
+        "<!DOCTYPE html><html><head><meta charset=\"utf-8\"></head><body><script>"
+        f"{js}location.replace({json.dumps(destino)});"
+        "</script></body></html>"
+    )
+    respuesta = make_response(html)
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta
+
+
+def _elegir(ambito):
+    """La entrada de este ámbito cuyo token coincide con el id de la pestaña."""
+    if getattr(g, "sesion_cerrada", False):
+        return None
+    sid = _sid_resuelto()
+    if not sid:
+        return None
+    mapa = _mapas()[ambito]
+    par = mapa.get(sid)
+    if not par:
+        return None
+    datos, desconocido = _almacen.validar_access(par[0])
+    ajeno = datos is not None and (datos["id"] != sid or datos["ambito"] != ambito)
+    if desconocido or ajeno:
+        mapa.pop(sid, None)
+        _tocar(ambito)
+        return None
+    if datos is None:
+        return None
+    return sid, datos
+
+
+def preparar_sid():
+    """La navegación con cookies y sin id de pestaña no adivina el usuario."""
+    if request.path.startswith("/static/") or request.path == RUTA_RENOVAR:
+        return None
+    if request.method not in ("GET", "HEAD"):
+        return None
+    if request.headers.get("X-Sesion-Resuelta") == "1":
+        return None
+    if not _es_documento() or not _hay_cookies():
+        return None
+    respuesta = make_response(_bootstrap())
+    respuesta.headers["Cache-Control"] = "no-store"
+    return respuesta
+
+
+def entregar_sid(response):
+    """Pasa el id a sessionStorage. No lo pone en la dirección."""
+    if not has_request_context():
+        return response
+    if response.status_code not in (301, 302, 303, 307, 308):
+        return response
+    destino = _destino_limpio(response.headers.get("Location") or "/")
+    if getattr(g, "sesion_cerrada", False):
+        return _html_pestaña("sessionStorage.removeItem('sid');", destino)
+    sid = getattr(g, "sid_nueva", None)
+    if not sid:
+        return response
+    js = f"sessionStorage.setItem('sid', {json.dumps(sid)});"
+    return _html_pestaña(js, destino)
 
 
 def iniciar_sesion(usuario, ambito):
-    ahora = _ahora()
-    if has_request_context():
-        _almacen.revocar_access(request.cookies.get(COOKIE_ACCESS), ahora)
-    access, refresh, datos = _almacen.crear(usuario.id_usuario, ambito, ahora)
+    """Agrega una sesión al diccionario y a la cookie de ese ámbito."""
+    access, refresh, datos = _almacen.crear(usuario.id_usuario, ambito)
+    sid = datos["id"]
     _olvidar_cookie_vieja()
     if has_request_context():
-        g._sesion_lista = True
-        g.sesion_datos = datos
-        g.sesion_cookies = (access, refresh)
-        g.sesion_cerrar = False
-        g.sesion_borrar = False
+        _mapas()[ambito][sid] = (access, refresh)
+        _tocar(ambito)
+        g.sid_nueva = sid
+        g.sesion_cerrada = False
 
 
-def cerrar_sesion():
+def cerrar_sesion(ambito):
+    """Quita solo la sesión de esta pestaña. El resto del diccionario queda."""
     if has_request_context():
-        _almacen.revocar_access(request.cookies.get(COOKIE_ACCESS))
-        g._sesion_lista = True
-        g.sesion_datos = None
-        g.sesion_cookies = None
-        g.sesion_borrar = False
-        g.sesion_cerrar = True
+        sid = _sid_resuelto()
+        mapa = _mapas()[ambito]
+        par = mapa.get(sid) if sid else None
+        if par:
+            datos, _desconocido = _almacen.validar_access(par[0])
+            if datos is not None and datos["id"] == sid:
+                _almacen.revocar_id(sid)
+            else:
+                _almacen.revocar_access(par[0])
+            mapa.pop(sid, None)
+            _tocar(ambito)
+        g.sid_nueva = None
+        g.sesion_cerrada = True
     _olvidar_cookie_vieja()
 
 
 def renovar():
-    """Rota el par si el refresh sigue vigente. Si no, borra las cookies."""
-    token = request.cookies.get(COOKIE_REFRESH)
-    datos, par, cerrar, desconocido = _almacen.renovar(token)
-    g._sesion_lista = True
-    if par and not cerrar and not desconocido:
-        g.sesion_datos = datos
-        g.sesion_cookies = par
-        g.sesion_cerrar = False
-        g.sesion_borrar = False
-        return "", 204
-    g.sesion_datos = None
-    g.sesion_cookies = None
-    g.sesion_borrar = False
-    g.sesion_cerrar = token is not None
+    """Rota el par de la pestaña que lo pide. Las otras entradas siguen."""
+    sid = (request.headers.get("X-Sesion") or "").strip()
+    if not sid or not has_request_context():
+        return "", 401
+    for ambito in (AMBITO_PORTAL, AMBITO_PERSONAL):
+        mapa = _mapas()[ambito]
+        par = mapa.get(sid)
+        if not par:
+            continue
+        datos, nuevo, cerrar, desconocido = _almacen.renovar(par[1])
+        if (nuevo and not cerrar and not desconocido
+                and datos is not None and datos["id"] == sid):
+            mapa[sid] = nuevo
+            _tocar(ambito)
+            return "", 204
+        mapa.pop(sid, None)
+        _tocar(ambito)
+        return "", 401
     return "", 401
 
 
 def aplicar_cookies_de_sesion(response):
-    """Escribe o borra las cookies después de la vista."""
+    """Escribe la cookie del ámbito que este pedido modificó."""
     if not has_request_context():
         return response
-    if getattr(g, "sesion_cerrar", False) or getattr(g, "sesion_borrar", False):
-        _borrar_cookie(response, COOKIE_ACCESS, "/")
-        _borrar_cookie(response, COOKIE_REFRESH, RUTA_RENOVAR)
-        return response
-    par = getattr(g, "sesion_cookies", None)
-    if par:
-        _poner_cookie(response, COOKIE_ACCESS, par[0], ACCESS_MINUTOS * 60, "/")
-        _poner_cookie(
-            response, COOKIE_REFRESH, par[1], REFRESH_DIAS * 24 * 3600, RUTA_RENOVAR)
+    max_age = REFRESH_DIAS * 24 * 3600
+    for ambito in getattr(g, "mapas_tocados", ()):
+        nombre = COOKIE_AMBITO[ambito]
+        mapa = _mapas()[ambito]
+        if mapa:
+            cuerpo = {sid: [par[0], par[1]] for sid, par in mapa.items()}
+            _poner_cookie(response, nombre, json.dumps(cuerpo), max_age, "/")
+        else:
+            _borrar_cookie(response, nombre, "/")
+    for nombre, path in _LEGACY:
+        if nombre in request.cookies:
+            _borrar_cookie(response, nombre, path)
+    for nombre in request.cookies:
+        if nombre.startswith("ses_"):
+            _borrar_cookie(response, nombre, "/")
+        elif nombre.startswith("ref_"):
+            _borrar_cookie(response, nombre, RUTA_RENOVAR)
     return response
 
 
@@ -326,27 +504,31 @@ def _borrar_cookie(response, nombre, path):
 
 
 def usuario_en_ambito(ambito):
-    """El Usuario de ese ámbito, o None si la sesión es de otro o no sirve."""
-    datos = _vigente()
-    if not datos or datos["ambito"] != ambito:
+    """El Usuario de la sesión de esta pestaña en ese ámbito, o None."""
+    elegida = _elegir(ambito)
+    if elegida is None:
         return None
+    sid, datos = elegida
     usuario = (Usuario.query
                .filter_by(id_usuario=datos["id_usuario"],
                           estado=True, cuenta_suprimida=False)
                .first())
     if usuario is None:
         _almacen.revocar_id(datos["id"])
-        g.sesion_datos = None
-        g.sesion_cookies = None
-        g.sesion_borrar = False
-        g.sesion_cerrar = True
+        _mapas()[ambito].pop(sid, None)
+        _tocar(ambito)
         return None
     return usuario
 
 
 def usuario_actual():
-    """El donante con sesión de portal, o None."""
+    """El donante con sesión de portal en esta pestaña, o None."""
     return usuario_en_ambito(AMBITO_PORTAL)
+
+
+def _redirigir_sin_sesion():
+    flash("Iniciá sesión para continuar.", "info")
+    return redirect(url_for("auth.ingresar"))
 
 
 def requiere_login(vista):
@@ -354,8 +536,7 @@ def requiere_login(vista):
     @wraps(vista)
     def envoltura(*args, **kwargs):
         if usuario_actual() is None:
-            flash("Iniciá sesión para continuar.", "info")
-            return redirect(url_for("auth.ingresar"))
+            return _redirigir_sin_sesion()
         return vista(*args, **kwargs)
     return envoltura
 
@@ -367,11 +548,11 @@ def requiere_rol(*codigos):
         def envoltura(*args, **kwargs):
             usuario = usuario_actual()
             if usuario is None:
-                flash("Iniciá sesión para continuar.", "info")
-                return redirect(url_for("auth.ingresar"))
+                return _redirigir_sin_sesion()
             if not any(usuario.tiene_rol(c) for c in codigos):
                 flash("No tenés permiso para acceder a esa sección.", "error")
                 return redirect(url_for("main.index"))
             return vista(*args, **kwargs)
         return envoltura
     return decorador
+

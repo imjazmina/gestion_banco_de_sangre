@@ -7,7 +7,7 @@
 --  Cómo correrlo (pgAdmin): Query Tool sobre gestion_donantes → pegar → Ejecutar.
 --
 --  Decisiones de la maqueta:
---  * Diagnóstico y reposición de la maqueta se guardan como Donacion altruista.
+--  * Diagnóstico de la maqueta se guarda como Donacion altruista.
 --  * Totales históricos de donantes se completan con citas sintéticas.
 --  * Causa «Otro» de diferimientos no se carga.
 --  * Pacientes con CI repetido: 80000001 Pedro, 80000002 Rosa, 80000003 Fulgencio.
@@ -1481,19 +1481,6 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM cita c
-    JOIN usuario u ON u.id_usuario = c.id_usuario
-    JOIN extraccion e ON e.id_cita = c.id_cita
-    JOIN unidad un ON un.id_extraccion = e.id_extraccion
-    JOIN resultado_laboratorio r ON r.id_unidad = un.id_unidad
-    WHERE u.documento LIKE '91%'
-      AND c.tipo_cita = 'Reposicion'
-      AND r.resultado = 'No reactivo'
-  ) THEN
-    RAISE EXCEPTION 'Falta donación de reposición exitosa';
-  END IF;
-
-  IF NOT EXISTS (
     SELECT 1 FROM extraccion e
     JOIN cita c ON c.id_cita = e.id_cita
     JOIN usuario u ON u.id_usuario = c.id_usuario
@@ -1618,9 +1605,6 @@ SELECT
   (SELECT count(*) FROM cita c JOIN extraccion e ON e.id_cita = c.id_cita
     WHERE e.fecha::date BETWEEN DATE '2026-09-01' AND DATE '2026-09-10'
       AND c.tipo_cita = 'Donacion altruista') AS altruistas_periodo,
-  (SELECT count(*) FROM cita c JOIN extraccion e ON e.id_cita = c.id_cita
-    WHERE e.fecha::date BETWEEN DATE '2026-09-01' AND DATE '2026-09-10'
-      AND c.tipo_cita = 'Reposicion') AS reposicion_periodo,
   (SELECT count(*) FROM cita c JOIN extraccion e ON e.id_cita = c.id_cita
     WHERE e.fecha::date BETWEEN DATE '2026-09-01' AND DATE '2026-09-10'
       AND c.tipo_cita = 'Donacion solidaria') AS solidarias_periodo,

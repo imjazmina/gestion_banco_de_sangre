@@ -3,7 +3,9 @@ from flask import (Blueprint, render_template, request, redirect,
                    url_for, flash)
 
 from app.controllers.portal import perfil as ctrl
-from app.controllers.sesion import requiere_login, usuario_actual, cerrar_sesion
+from app.controllers.sesion import (
+    AMBITO_PORTAL, cerrar_sesion, requiere_login, usuario_actual,
+)
 
 perfil_bp = Blueprint("perfil", __name__, url_prefix="/perfil")
 
@@ -113,6 +115,6 @@ def suprimir():
         ctrl.suprimir_cuenta(usuario_actual())
     except ctrl.ErrorSupresion:
         return redirect(url_for("perfil.confirmar_supresion", bloqueada=1))
-    cerrar_sesion()
+    cerrar_sesion(AMBITO_PORTAL)
     flash("Tu cuenta fue suprimida. Gracias por haber formado parte del portal.", "ok")
     return redirect(url_for("main.index"))

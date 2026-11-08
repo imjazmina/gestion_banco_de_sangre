@@ -205,7 +205,8 @@ def ver(cita_id):
                 agendar_resultado(unidad.id_unidad)
         except ErrorJornada as exc:
             flash(str(exc), "error")
-        return redirect(url_for("licenciado_extraccion.ver", cita_id=cita_id))
+        else:
+            return redirect(url_for("licenciado_extraccion.ver", cita_id=cita_id))
     extraccion = jornada.extraccion_de(cita)
     unidades = jornada.unidades_de(cita)
     filas, campos = _resumen(extraccion, unidades)

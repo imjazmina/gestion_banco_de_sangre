@@ -25,9 +25,13 @@ def create_app(config_class=Config, inicializar=True):
     registrar_blueprints(app)
     _registrar_errores(app)
 
-    from app.controllers.sesion import aplicar_cookies_de_sesion, usuario_actual
+    from app.controllers.sesion import (
+        aplicar_cookies_de_sesion, entregar_sid, preparar_sid, usuario_actual,
+    )
 
+    app.before_request(preparar_sid)
     app.after_request(aplicar_cookies_de_sesion)
+    app.after_request(entregar_sid)
 
     @app.context_processor
     def inyectar_usuario():
