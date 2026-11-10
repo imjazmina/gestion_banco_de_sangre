@@ -103,19 +103,36 @@
   </div>
 
   {% call modal('modal-no-apto', 'Donante no apto para donar', danger=true) %}
-  <form method="post">
+  <form method="post" id="form-no-apto">
     <input type="hidden" name="accion" value="diferir">
-    <p class="muted" style="margin:0 0 16px;">Registre el motivo por el cual el donante no puede continuar con la donación. La cita pasa a «No apto».</p>
+    <p class="muted" style="margin:0 0 16px;">Marque los motivos por los que el donante no puede continuar. Solo se registran diferimientos temporales; la fecha de fin la calcula el sistema. La cita pasa a «No apto».</p>
     <div class="stack">
       <div class="field">
-        <label>Motivo del no apto <span class="req">*</span></label>
-        <select class="control" name="id_diferimiento" required>
-          <option value="">Seleccionar motivo...</option>
-          {% for c in causas %}
-          <option value="{{ c.id_diferimiento }}">{{ c.nombre }} · {{ c.tipo }}</option>
+        <label>Motivos detectados en el cuestionario</label>
+        <div class="stack" style="max-height:260px;overflow:auto;">
+          {% for m in motivos %}
+          <div class="summary" style="padding:10px 12px;" data-motivo data-parte="{{ m.parte }}" data-pregunta="{{ m.id_pregunta }}" data-respuesta="{{ m.respuesta }}" data-unica="{{ 1 if m.causas|length == 1 else 0 }}" {% if not m.activo %}hidden{% endif %}>
+            <p style="margin:0 0 6px;font-size:13px;"><span class="muted">Parte {{ m.parte }} · {{ m.numero }}.</span> {{ m.enunciado }} <strong>{{ 'Sí' if m.respuesta == 'Si' else 'No' }}</strong></p>
+            {% for c in m.causas %}
+            <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;">
+              <input type="checkbox" name="id_diferimiento" value="{{ c.id_diferimiento }}" {% if m.activo and m.causas|length == 1 %}checked{% endif %} {% if not m.activo %}disabled{% endif %}>
+              <span>{{ c.nombre }} · {{ c.dias_rehabilitacion }} día{{ '' if c.dias_rehabilitacion == 1 else 's' }} · hasta {{ hasta(c.dias_rehabilitacion) }}</span>
+            </label>
+            {% endfor %}
+          </div>
           {% endfor %}
-        </select>
-        <p class="hint">La duración la calcula el sistema según la causa del catálogo. Las permanentes no tienen fecha de fin.</p>
+          <p class="muted" id="motivos-vacio" style="margin:0;font-size:13px;" {% if motivos|selectattr('activo')|list %}hidden{% endif %}>Ninguna respuesta genera un diferimiento temporal en este paso.</p>
+        </div>
+      </div>
+      <div class="field">
+        <label for="otro-motivo">Agregar otro motivo</label>
+        <input class="control" id="otro-motivo" list="causas-cuestionario" autocomplete="off" placeholder="Escriba para buscar un diferimiento temporal">
+        <datalist id="causas-cuestionario">
+          {% for c in causas %}
+          <option value="{{ c.nombre }}" data-id="{{ c.id_diferimiento }}" data-texto="{{ c.nombre }} · {{ c.dias_rehabilitacion }} día{{ '' if c.dias_rehabilitacion == 1 else 's' }} · hasta {{ hasta(c.dias_rehabilitacion) }}"></option>
+          {% endfor %}
+        </datalist>
+        <div class="stack" id="otros-motivos" style="gap:6px;margin-top:8px;"></div>
       </div>
       <div class="field">
         <label>Institución del diagnóstico</label>
@@ -124,7 +141,7 @@
     </div>
     <div class="row-end mt-4">
       <button type="button" class="btn btn-ghost" data-cerrar="modal-no-apto">Cancelar</button>
-      <button type="submit" class="btn btn-danger">Confirmar</button>
+      <button type="submit" class="btn btn-danger" id="confirmar-no-apto" disabled>Confirmar diferimientos</button>
     </div>
   </form>
   {% endcall %}
@@ -162,6 +179,77 @@
     if (aviso) aviso.hidden = !falta;
     if (falta) e.preventDefault();
   });
+})();
+
+(function () {
+  const form = document.getElementById('form-no-apto');
+  const parteB = document.getElementById('parte-b');
+  const confirmar = document.getElementById('confirmar-no-apto');
+  const vacio = document.getElementById('motivos-vacio');
+  const buscar = document.getElementById('otro-motivo');
+  const opciones = document.getElementById('causas-cuestionario');
+  const otros = document.getElementById('otros-motivos');
+
+  function elegidos() {
+    return Array.from(form.querySelectorAll('input[name="id_diferimiento"]'))
+      .filter(function (i) { return !i.disabled && (i.type === 'hidden' || i.checked); })
+      .map(function (i) { return i.value; });
+  }
+
+  function actualizar() {
+    const visibles = form.querySelectorAll('[data-motivo]:not([hidden])').length;
+    vacio.hidden = visibles > 0;
+    confirmar.disabled = elegidos().length === 0;
+  }
+
+  // Parte B todavía no está guardada: el motivo sigue a la respuesta marcada.
+  function sincronizarParteB() {
+    form.querySelectorAll('[data-motivo][data-parte="B"]').forEach(function (bloque) {
+      const marcada = parteB && parteB.querySelector(
+        'input[name="p' + bloque.dataset.pregunta + '"]:checked');
+      const activo = !!marcada && marcada.value === bloque.dataset.respuesta;
+      const cambia = bloque.hidden === activo;
+      bloque.hidden = !activo;
+      bloque.querySelectorAll('input').forEach(function (i) {
+        i.disabled = !activo;
+        if (cambia) i.checked = activo && bloque.dataset.unica === '1';
+      });
+    });
+    actualizar();
+  }
+
+  function agregar() {
+    const opcion = Array.from(opciones.options).find(function (o) { return o.value === buscar.value; });
+    if (!opcion) return;
+    buscar.value = '';
+    const id = opcion.dataset.id;
+    const detectado = form.querySelector('[data-motivo]:not([hidden]) input[value="' + id + '"]');
+    if (detectado) { detectado.checked = true; actualizar(); return; }
+    if (elegidos().indexOf(id) !== -1) return;
+    const fila = document.createElement('div');
+    fila.className = 'split';
+    fila.style.cssText = 'font-size:13px;align-items:center;gap:8px;';
+    const texto = document.createElement('span');
+    texto.textContent = opcion.dataset.texto;
+    const campo = document.createElement('input');
+    campo.type = 'hidden'; campo.name = 'id_diferimiento'; campo.value = id;
+    const quitar = document.createElement('button');
+    quitar.type = 'button'; quitar.className = 'btn btn-ghost btn-sm'; quitar.textContent = 'Quitar';
+    quitar.addEventListener('click', function () { fila.remove(); actualizar(); });
+    fila.append(texto, campo, quitar);
+    otros.appendChild(fila);
+    actualizar();
+  }
+
+  buscar.addEventListener('change', agregar);
+  buscar.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); agregar(); }
+  });
+  form.addEventListener('change', function (e) {
+    if (e.target.name === 'id_diferimiento') actualizar();
+  });
+  if (parteB) parteB.addEventListener('change', sincronizarParteB);
+  sincronizarParteB();
 })();
 </script>
 {% endblock %}

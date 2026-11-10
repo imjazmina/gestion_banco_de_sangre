@@ -5,7 +5,7 @@ from flask import Blueprint, flash, redirect, request, url_for
 
 from app.controllers.comun.acceso import operador_actual, pintar, requiere
 from app.controllers.comun.simulacion import agendar_resultado
-from app.controllers.licenciado import jornada
+from app.controllers.licenciado import criterios, jornada
 from app.controllers.licenciado.jornada import ErrorJornada
 
 licenciado_extraccion_bp = Blueprint(
@@ -17,10 +17,7 @@ REACCIONES = ("Normal", "Lipotimia", "Otras")
 ANTICOAGULANTES = ("ACD-A", "CPD-A", "SAG MANITOL")
 BOLSAS = ("Simple", "Doble", "Triple", "Cuádruple")
 MOMENTOS = ("Durante", "Posterior")
-TIPOS = (
-    "Hematoma", "Febril", "Lipotimia", "Alérgica", "Náuseas",
-    "Dolor local", "Hipotensión", "Hormigueo", "Vasovagal", "Otro",
-)
+TIPOS = tuple(criterios.EXTRACCION)
 RESULTADOS = ("Sin sangre", "Parcial", "Completa")
 CLAVES = (
     "Brazo", "Punción", "Reacción", "Anticoagulante", "Bolsa", "Marca",
@@ -112,23 +109,30 @@ def _observacion(formulario, accion):
 
     completo = resultado == "Completa"
     con_sangre = resultado != "Sin sangre"
-    brazo = _opcion(formulario, "brazo", BRAZOS, con_sangre, "el brazo")
-    puncion = _opcion(formulario, "puncion", PUNCIONES, con_sangre, "la punción")
-    reaccion = _opcion(formulario, "reaccion", REACCIONES, False, "la reacción")
+    # En una incidencia solo se exigen Procedimiento y Horarios.
+    resto = con_sangre and accion != "incidencia"
+    brazo = _opcion(formulario, "brazo", BRAZOS, True, "el brazo")
+    puncion = _opcion(formulario, "puncion", PUNCIONES, True, "la punción")
+    reaccion = _opcion(
+        formulario, "reaccion", REACCIONES, accion == "incidencia", "la reacción")
     anticoagulante = _opcion(
-        formulario, "anticoagulante", ANTICOAGULANTES, con_sangre,
-        "el anticoagulante")
-    bolsa = _opcion(formulario, "bolsa_tipo", BOLSAS, con_sangre, "el tipo de bolsa")
-    marca = _texto(formulario, "marca", con_sangre, "la marca")
+        formulario, "anticoagulante", ANTICOAGULANTES, resto, "el anticoagulante")
+    bolsa = _opcion(formulario, "bolsa_tipo", BOLSAS, resto, "el tipo de bolsa")
+    marca = _texto(formulario, "marca", resto, "la marca")
     inicio = _hora(formulario, "hora_inicio", "la hora de inicio")
     fin = _hora(formulario, "hora_fin", "la hora de finalización")
     if fin < inicio:
         raise ErrorJornada("La hora de finalización es anterior al inicio.")
-    cantidad = _cantidad(formulario, resultado)
-    n_unidades = _unidades(formulario, completo)
-    tabuladora = _texto(
-        formulario, "codigo_tabuladora", con_sangre, "el código de tabuladora")
-    lote = _texto(formulario, "lote", con_sangre, "el lote")
+    if accion == "incidencia":
+        bruto = (formulario.get("cantidad") or "").strip()
+        cantidad = _cantidad(formulario, resultado) if bruto else None
+        pedidas = (formulario.get("unidades") or "").strip()
+        n_unidades = _unidades(formulario, completo and bool(pedidas))
+    else:
+        cantidad = _cantidad(formulario, resultado)
+        n_unidades = _unidades(formulario, completo)
+    tabuladora = _texto(formulario, "codigo_tabuladora", resto, "el código de tabuladora")
+    lote = _texto(formulario, "lote", resto, "el lote")
 
     pares = (
         ("Brazo", brazo),
@@ -197,15 +201,18 @@ def ver(cita_id):
     personal = operador_actual()["usuario"]
     if request.method == "POST":
         try:
-            observacion, n_unidades = _observacion(
-                request.form, request.form.get("accion") or "")
+            accion = request.form.get("accion") or ""
+            observacion, n_unidades = _observacion(request.form, accion)
+            incidente = request.form.get("tipo") if accion == "incidencia" else None
             unidades = jornada.registrar_extraccion(
-                cita, personal, observacion, n_unidades=n_unidades)
+                cita, personal, observacion, n_unidades=n_unidades,
+                incidente=incidente)
             for unidad in unidades:
                 agendar_resultado(unidad.id_unidad)
         except ErrorJornada as exc:
             flash(str(exc), "error")
-        return redirect(url_for("licenciado_extraccion.ver", cita_id=cita_id))
+        else:
+            return redirect(url_for("licenciado_extraccion.ver", cita_id=cita_id))
     extraccion = jornada.extraccion_de(cita)
     unidades = jornada.unidades_de(cita)
     filas, campos = _resumen(extraccion, unidades)
@@ -223,6 +230,7 @@ def ver(cita_id):
         anticoagulantes=ANTICOAGULANTES,
         bolsas=BOLSAS,
         momentos=MOMENTOS,
-        tipos=TIPOS,
+        incidentes=[] if extraccion else jornada.causas_de_incidente(),
         resultados=RESULTADOS,
+        datos=request.form,
     )

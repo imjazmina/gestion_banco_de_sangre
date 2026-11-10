@@ -1,6 +1,8 @@
 {% extends "comun/layout.html" %}
-{% from "comun/_ui.html" import crumb, alerta, modal, btn %}
+{% from "comun/_ui.html" import crumb, alerta, modal, btn, badge %}
 {% from "comun/_iconos.html" import ico %}
+
+{% macro dias(causa) %}{% if causa %}{{ causa.nombre }} · {{ causa.dias_rehabilitacion }} día{{ '' if causa.dias_rehabilitacion == 1 else 's' }}{% endif %}{% endmacro %}
 
 {% block titulo %}Examen físico{% endblock %}
 
@@ -12,55 +14,10 @@
       <h1>Examen físico</h1>
       <p>{{ cita.donante.nombre_completo }} · CI {{ cita.donante.documento_visible }}</p>
     </div>
+    {% if cita.estado != 'Confirmada' and mediciones %}{{ badge('Evaluación física no superada', 'danger') }}{% endif %}
   </div>
 
-  {% if mediciones %}
-  {# No apto: no se muestran los valores. Solo el diferimiento. #}
-  {% call alerta('warn', 'Uno o más signos fuera de rango') %}No se puede realizar la extracción. Se debe registrar el motivo de diferimiento.{% endcall %}
-
-  <div class="row-end mt-5">
-    {% if cita.estado in ('Pendiente', 'Confirmada') %}
-      <button type="button" class="btn btn-danger" data-abrir="modal-diferir">{{ ico('alert', 14) }} Diferir</button>
-    {% else %}
-      {{ btn('Volver a la ficha', 'secondary', 'md', url_for('licenciado_ficha.ver', donor_id=cita.id_usuario, cita=cita.id_cita)) }}
-    {% endif %}
-  </div>
-
-  {% call modal('modal-diferir', 'Diferimiento — Examen físico', danger=true) %}
-  <form method="post">
-    <input type="hidden" name="accion" value="diferir">
-    <p class="muted" style="margin:0 0 16px;">El donante no continúa a extracción. Registre el diferimiento de examen físico para <strong style="color:var(--ink);">{{ cita.donante.nombre_completo }}</strong>.</p>
-    <div class="stack">
-      <div class="summary" style="border-color:var(--danger-line);background:var(--danger-bg);">
-        <p style="margin:0;font-weight:500;color:var(--danger-ink);">Motivo</p>
-        <ul style="margin:8px 0 0;padding-left:16px;">
-          {% for m in mediciones if not m.apto %}
-          <li>{{ m.tipo.nombre }}: {{ m.valor|float }} {{ m.tipo.unidad }}</li>
-          {% endfor %}
-        </ul>
-      </div>
-      <div class="field">
-        <label>Causa del catálogo <span class="req">*</span></label>
-        <select class="control" name="id_diferimiento" required>
-          {% for c in causas %}
-          <option value="{{ c.id_diferimiento }}" {% if sugeridas and c.nombre == sugeridas[0] %}selected{% endif %}>{{ c.nombre }} · {{ c.tipo }}</option>
-          {% endfor %}
-        </select>
-        {% if sugeridas %}<p class="hint">Según la medición fuera de rango: {{ sugeridas|join(', ') }}. Puede cambiarla.</p>{% endif %}
-      </div>
-      <div class="field">
-        <label>Institución del diagnóstico</label>
-        <input class="control" name="institucion" value="{{ institucion }}">
-      </div>
-    </div>
-    <div class="row-end mt-4">
-      <button type="button" class="btn btn-ghost" data-cerrar="modal-diferir">Cancelar</button>
-      <button type="submit" class="btn btn-danger">Confirmar diferimiento</button>
-    </div>
-  </form>
-  {% endcall %}
-
-  {% else %}
+  {% if cita.estado == 'Confirmada' %}
   <form method="post" id="signos">
     <div class="card card-pad">
       <div class="mb-4">
@@ -69,7 +26,11 @@
       </div>
       <div class="vital-grid">
         {% for t in tipos %}
-        <div class="vital" data-vital data-min="{{ t.valor_minimo|float }}" data-max="{{ t.valor_maximo|float }}">
+        {% set par = causas_rango.get(t.codigo, (none, none)) %}
+        {% set actual = valores.get(t.codigo) %}
+        <div class="vital" data-vital data-min="{{ t.valor_minimo|float }}" data-max="{{ t.valor_maximo|float }}"
+             data-nombre="{{ t.nombre }}" data-unidad="{{ t.unidad }}"
+             data-causa-bajo="{{ dias(catalogo.get(par[0])) }}" data-causa-alto="{{ dias(catalogo.get(par[1])) }}">
           <div class="split" style="align-items:flex-start;">
             <div style="min-width:0;">
               <label for="v-{{ t.codigo }}" style="font-weight:600;">{{ t.nombre }}</label>
@@ -77,36 +38,131 @@
             </div>
             <span class="faint" data-estado style="font-size:12px;height:20px;display:inline-flex;align-items:center;">—</span>
           </div>
-          <input class="control" id="v-{{ t.codigo }}" name="{{ t.codigo }}" type="number" step="any" inputmode="decimal" placeholder="Ej: {{ t.valor_minimo|float }}" required>
+          <input class="control" id="v-{{ t.codigo }}" name="{{ t.codigo }}" type="number" step="any" inputmode="decimal"
+                 placeholder="Ej: {{ t.valor_minimo|float }}" value="{{ actual if actual is not none else '' }}" required>
         </div>
         {% endfor %}
       </div>
     </div>
     <div class="row-end mt-5">
-      <button type="submit" class="btn btn-teal">Registrar signos</button>
+      <button type="button" class="btn btn-teal" id="btn-registrar">Registrar signos</button>
     </div>
   </form>
+
+  {% call modal('modal-fuera', 'Valores fuera de rango', danger=true) %}
+    <form method="post" id="form-diferir">
+      {% for t in tipos %}
+      <input type="hidden" name="{{ t.codigo }}" data-copia="{{ t.codigo }}" value="">
+      {% endfor %}
+      <input type="hidden" name="accion" value="diferir">
+      <p class="muted" style="margin:0 0 12px;">Estos valores no cumplen el rango. Si son correctos, se guardan las mediciones, se registra el diferimiento de cada parámetro y la cita pasa a «No apto».</p>
+      <ul id="fuera-lista" style="margin:0;padding-left:16px;"></ul>
+      <div class="row-end mt-4">
+        <button type="button" class="btn btn-ghost" data-cerrar="modal-fuera">Cerrar</button>
+        <button type="submit" class="btn btn-danger">Confirmar diferimiento</button>
+      </div>
+    </form>
+  {% endcall %}
+
+  {% else %}
+  {% call alerta('danger', 'Valores fuera de rango') %}No se realiza la extracción. Cada parámetro que no cumplió genera su diferimiento automáticamente.{% endcall %}
+
+  <div class="summary mt-4" style="padding:16px;">
+    <ul style="margin:0;padding-left:16px;">
+      {% for f in fuera %}
+      <li><strong>{{ f.medicion.tipo.nombre }}</strong>: {{ f.medicion.valor|float }} {{ f.medicion.tipo.unidad }}{% if f.umbral %} · {{ f.umbral }}{% endif %}{% if f.causa %} · {{ dias(f.causa) }}{% endif %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="row-end mt-5" style="gap:8px;">
+    {{ btn('Volver a la ficha', 'secondary', 'md', url_for('licenciado_ficha.ver', donor_id=cita.id_usuario, cita=cita.id_cita)) }}
+  </div>
   {% endif %}
 </div>
 {% endblock %}
 
 {% block scripts %}
-{% if not mediciones %}
+{% if cita.estado == 'Confirmada' %}
 <script>
-  // Vista previa del rango mientras se escribe. No decide: el valor que
-  // vale es el que calcula la base al guardar.
   document.querySelectorAll('[data-vital]').forEach(function (caja) {
     var input = caja.querySelector('input');
     var estado = caja.querySelector('[data-estado]');
     var min = parseFloat(caja.dataset.min), max = parseFloat(caja.dataset.max);
-    input.addEventListener('input', function () {
-      var n = parseFloat(input.value.replace(',', '.'));
+    function pintar() {
+      var n = parseFloat(String(input.value).replace(',', '.'));
       caja.classList.remove('bad');
       if (isNaN(n)) { estado.className = 'faint'; estado.textContent = '—'; return; }
       if (n >= min && n <= max) { estado.className = 'apto'; estado.textContent = 'En rango'; }
       else { estado.className = 'noapto'; estado.textContent = 'Fuera de rango'; caja.classList.add('bad'); }
-    });
+    }
+    input.addEventListener('input', pintar);
+    pintar();
   });
+
+  (function () {
+    var form = document.getElementById('signos');
+    var modal = document.getElementById('modal-fuera');
+    var lista = document.getElementById('fuera-lista');
+    var btn = document.getElementById('btn-registrar');
+    var diferir = document.getElementById('form-diferir');
+
+    function fueraDeRango() {
+      var items = [];
+      form.querySelectorAll('[data-vital]').forEach(function (caja) {
+        var input = caja.querySelector('input');
+        var n = parseFloat(String(input.value).replace(',', '.'));
+        var min = parseFloat(caja.dataset.min), max = parseFloat(caja.dataset.max);
+        if (isNaN(n) || (n >= min && n <= max)) return;
+        var bajo = n < min;
+        var item = document.createElement('li');
+        var nombre = document.createElement('strong');
+        nombre.textContent = caja.dataset.nombre;
+        item.appendChild(nombre);
+        item.appendChild(document.createTextNode(': ' + n + ' ' + caja.dataset.unidad + ' · '
+          + (bajo ? 'Por debajo del mínimo (' + min : 'Por encima del máximo (' + max)
+          + ' ' + caja.dataset.unidad + ')'));
+        var causa = bajo ? caja.dataset.causaBajo : caja.dataset.causaAlto;
+        if (causa) {
+          var detalle = document.createElement('span');
+          detalle.className = 'muted';
+          detalle.textContent = causa;
+          item.appendChild(document.createElement('br'));
+          item.appendChild(detalle);
+        }
+        items.push(item);
+      });
+      return items;
+    }
+
+    function copiarValores() {
+      form.querySelectorAll('[data-vital] input').forEach(function (input) {
+        var copia = diferir.querySelector('[data-copia="' + input.name + '"]');
+        if (copia) copia.value = input.value;
+      });
+    }
+
+    btn.addEventListener('click', function () {
+      if (!form.reportValidity()) return;
+      var items = fueraDeRango();
+      if (!items.length) {
+        // requestSubmit dispara el evento submit; sesion.js envía con X-Sesion.
+        // form.submit() nativo salta ese interceptor y pierde la sesión.
+        form.requestSubmit();
+        return;
+      }
+      lista.innerHTML = '';
+      items.forEach(function (item) { lista.appendChild(item); });
+      copiarValores();
+      modal.classList.remove('hidden');
+    });
+
+    form.addEventListener('keydown', function (e) {
+      if (e.key !== 'Enter' || e.target.tagName !== 'INPUT') return;
+      e.preventDefault();
+      btn.click();
+    });
+  })();
 </script>
 {% endif %}
 {% endblock %}

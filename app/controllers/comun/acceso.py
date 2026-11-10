@@ -1,8 +1,8 @@
 """Sesión del personal de salud.
 
-Comparte la cookie con el portal, con ámbito `personal`. El correo de
-ingreso es `perfil_personal.correo_institucional` y la contraseña es el
-hash de ese perfil. No hay usuarios de demostración en este archivo.
+Usa la misma sesión en memoria que el portal, con ámbito `personal`. El
+correo de ingreso es `perfil_personal.correo_institucional` y la contraseña
+es el hash de ese perfil. No hay usuarios de demostración en este archivo.
 """
 from functools import wraps
 
@@ -98,14 +98,14 @@ def intentar_ingreso(email, contrasena):
 
 
 def cerrar_panel():
-    cerrar_sesion()
+    cerrar_sesion(AMBITO_PERSONAL)
 
 
 _ALIAS_ROL = {"lic": Rol.ENFERMERIA, "jef": Rol.JEFATURA}
 
 
 def requiere(rol, ingresar_endpoint):
-    """Deja pasar solo el rol del módulo. Sin sesión, el login es único."""
+    """Deja pasar solo el rol del módulo. Sin sesión de personal, manda al login."""
     codigo = _ALIAS_ROL.get(rol, rol)
 
     def decorador(vista):

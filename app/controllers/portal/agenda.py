@@ -11,7 +11,8 @@ De ahí salen dos cosas que este módulo hace y conviene entender:
     semana; a partir del octavo día se repetiría y dos lunes distintos
     apuntarían a la misma franja.
   * Las reglas (una cita activa por donante, cupo de la franja, diferimiento
-    vigente) las hace cumplir este código, no la base. El alta toma un
+    vigente e intervalo mínimo desde la última donación) las hace cumplir
+    este código, no la base. El alta toma un
     bloqueo sobre la fila de la franja para contar y grabar sin que dos
     reservas simultáneas pasen el cupo.
 """
@@ -21,21 +22,17 @@ from sqlalchemy import func, text
 
 from app import calendario
 from app.models import (db, Auditoria, Cita, HorarioDisponible, MuestraCompatibilidad,
-                        Notificacion, RegistroDiferimiento, Solicitud, Usuario)
+                        Notificacion, RegistroDiferimiento, Solicitud)
 
-# Documento del usuario de servicio «Personal de turno». `cita.id_personal`
-# es NOT NULL y al reservar todavía no se sabe quién va a atender, así que
-# queda este y el panel lo reemplaza por la persona real en el mostrador.
+# Usuario de servicio del mostrador en la maqueta. No firma vencimientos:
+# esos los graba Sistema (documento 00000002).
 DOCUMENTO_PERSONAL_DE_TURNO = "00000000"
 
-# Los tipos que el donante puede elegir. 'Extraccion de compatibilidad' queda
+# Los tipos que el donante puede elegir. La extracción de muestra queda
 # afuera a propósito: la indica el personal, no se pide desde el portal.
 TIPOS = [
     ("Donacion altruista", "Altruista",
      "Donás sin destinatario específico, para la reserva general del banco.",
-     False),
-    ("Reposicion", "Reposición",
-     "Donás para reponer unidades que usó un familiar o conocido.",
      False),
     ("Donacion solidaria", "Solidaria",
      "Donás para una persona concreta de la lista de solicitudes.",
@@ -59,19 +56,45 @@ def etiqueta_tipo(clave):
 
 
 # ------------------------------------------------------------------ estado
+def diferimientos_vigentes(usuario):
+    """
+    Todos los diferimientos que hoy siguen bloqueando al donante.
+
+    Activo: permanente (`fecha_fin` nula) o temporal con fin posterior a hoy.
+    Cada fila conserva su causa, tipo y fechas.
+    """
+    filas = (RegistroDiferimiento.query
+             .filter(RegistroDiferimiento.id_donante == usuario.id_usuario,
+                     (RegistroDiferimiento.fecha_fin.is_(None)) |
+                     (RegistroDiferimiento.fecha_fin > date.today()))
+             .all())
+    return sorted(filas, key=lambda d: (
+        0 if d.fecha_fin is None else 1,
+        date.max if d.fecha_fin is None else d.fecha_fin,
+    ))
+
+
+def elegir_vigente(activos):
+    """
+    El que mantiene el bloqueo: un permanente, si hay alguno;
+    si no, el temporal que termina más tarde.
+    """
+    if not activos:
+        return None
+    permanentes = [d for d in activos if d.fecha_fin is None]
+    if permanentes:
+        return permanentes[0]
+    return max(activos, key=lambda d: d.fecha_fin)
+
+
 def diferimiento_vigente(usuario):
     """
-    El diferimiento activo del donante, o None.
+    El diferimiento que hoy impide agendar, o None.
 
-    Nunca se muestra la causa clínica en el portal: solo que hay una
-    condición registrada y, si corresponde, hasta cuándo.
+    Con varios activos el donante sigue bloqueado. En el portal no se
+    muestra la causa: solo que hay una condición y, si corresponde, hasta cuándo.
     """
-    return (RegistroDiferimiento.query
-            .filter(RegistroDiferimiento.id_donante == usuario.id_usuario,
-                    (RegistroDiferimiento.fecha_fin.is_(None)) |
-                    (RegistroDiferimiento.fecha_fin > date.today()))
-            .order_by(RegistroDiferimiento.fecha_inicio.desc())
-            .first())
+    return elegir_vigente(diferimientos_vigentes(usuario))
 
 
 def _citas_de(usuario, activas):
@@ -198,6 +221,20 @@ def franja_elegida(fecha, id_horario, ahora=None):
                  if f["id_horario"] == id_horario and f["libres"] > 0), None)
 
 
+def intervalo_pendiente(usuario):
+    """
+    El intervalo mínimo todavía no se cumplió, o None.
+
+    Los meses son los del perfil: 3 para masculino y 4 para femenino.
+    Un diferimiento activo no entra acá: lo resuelve diferimiento_vigente.
+    """
+    from app.controllers.portal.perfil import habilitacion
+    dato = habilitacion(usuario)
+    if dato["motivo"] == "intervalo" and not dato["apto"]:
+        return dato
+    return None
+
+
 def solicitud_abierta(usuario):
     """RN23: Creada o Publicada impide agendar una donación."""
     return (Solicitud.query
@@ -222,23 +259,6 @@ def tiene_muestra(solicitud):
     return (MuestraCompatibilidad.query
             .filter_by(id_solicitud=solicitud.id_solicitud)
             .first() is not None)
-
-
-def personal_de_turno():
-    """
-    El usuario de servicio que queda como responsable al reservar.
-
-    Lo carga database/catalogos.sql. Si no está, se avisa en lugar de
-    inventar un responsable: `cita.id_personal` no admite nulos y poner a
-    cualquiera sería atribuirle a una persona un trabajo que no hizo.
-    """
-    usuario = Usuario.query.filter_by(
-        documento=DOCUMENTO_PERSONAL_DE_TURNO).first()
-    if usuario is None:
-        raise ErrorAgenda(
-            "Falta el usuario «Personal de turno» en la base. "
-            "Ejecutá: python database/cargar_catalogos.py")
-    return usuario
 
 
 # --------------------------------------------------------------- escritura
@@ -272,6 +292,8 @@ def crear(usuario, fecha, id_horario, tipo, id_solicitud=None,
             raise ErrorAgenda(
                 "Indicá si autorizás publicar la solicitud.")
         solicitud.consentimiento_publicacion = bool(consentimiento_publicacion)
+        Auditoria.registrar(usuario.id_usuario, "SOLICITUD",
+                            solicitud.id_solicitud, Auditoria.MODIFICACION)
         # La cita no apunta a la solicitud propia: lo impide RN03.
         # El vínculo queda en muestra_compatibilidad.
         id_solicitud = None
@@ -279,15 +301,15 @@ def crear(usuario, fecha, id_horario, tipo, id_solicitud=None,
         raise ErrorAgenda("No podés agendar mientras tengas una solicitud abierta.")
     elif tipo not in TIPOS_VALIDOS:
         raise ErrorAgenda("Ese tipo de cita no está disponible.")
-
-    responsable = personal_de_turno()
+    elif intervalo_pendiente(usuario):
+        raise ErrorAgenda(
+            "Todavía no se cumplió el intervalo mínimo desde tu última donación.")
 
     try:
         franja = _bloquear_franja(id_horario, fecha)
         cita = Cita(tipo_cita=tipo,
                     id_usuario=usuario.id_usuario,
                     id_solicitud=id_solicitud,
-                    id_personal=responsable.id_usuario,
                     id_horario=id_horario,
                     fecha_hora_creacion=datetime.now(),
                     estado=Cita.PENDIENTE)

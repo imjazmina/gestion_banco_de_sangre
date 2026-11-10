@@ -7,7 +7,7 @@
 --  Cómo correrlo (pgAdmin): Query Tool sobre gestion_donantes → pegar → Ejecutar.
 --
 --  Decisiones de la maqueta:
---  * Diagnóstico se guarda como Reposicion.
+--  * Diagnóstico de la maqueta se guarda como Donacion altruista.
 --  * Totales históricos de donantes se completan con citas sintéticas.
 --  * Causa «Otro» de diferimientos no se carga.
 --  * Pacientes con CI repetido: 80000001 Pedro, 80000002 Rosa, 80000003 Fulgencio.
@@ -67,18 +67,54 @@ INSERT INTO tipo_medicion (codigo, nombre, unidad, valor_minimo, valor_maximo) V
 ON CONFLICT (codigo) DO NOTHING;
 
 -- ---------- Catálogo de diferimientos ----------
+-- Días de cuestionario: MSPBS; si no fija plazo, OPS 2025 (Elegibilidad para
+-- la donación de sangre); si tampoco, OMS 2012 (Blood Donor Selection).
+-- Medición: sin plazo oficial (se difiere hasta cumplir el umbral); los días
+-- son parámetro del hospital. Incidentes de extracción: sin plazo oficial,
+-- 7 días por decisión del hospital.
 INSERT INTO diferimiento (nombre, tipo, dias_rehabilitacion) VALUES
-  ('Cuadro febril o gripal',            'Temporal',    14),
-  ('Tratamiento con antibióticos',      'Temporal',    15),
-  ('Enfermedad infecciosa reciente',    'Temporal',    30),
+  ('Cuadro febril o gripal',            'Temporal',     7),
+  ('Tratamiento con antibióticos',      'Temporal',     7),
+  ('Enfermedad infecciosa reciente',    'Temporal',     7),
   ('Viaje a zona endémica',             'Temporal',    90),
-  ('Tatuaje, piercing o acupuntura',    'Temporal',   120),
+  ('Tatuaje, piercing o acupuntura',    'Temporal',   365),
   ('Cirugía o procedimiento invasivo',  'Temporal',   180),
-  ('Transfusión recibida',              'Temporal',   365),
+  ('Transfusión recibida',              'Temporal',   180),
   ('Embarazo o lactancia',              'Temporal',   180),
-  ('Hemoglobina baja',                  'Temporal',    30),
+  ('Tratamiento odontológico simple',   'Temporal',     1),
+  ('Extracción dental, endodoncia o implante', 'Temporal', 7),
+  ('Vacuna contra la hepatitis B',      'Temporal',    14),
+  ('Vacuna de virus vivos atenuados',   'Temporal',    28),
+  ('Vacuna contra el dengue',           'Temporal',    30),
+  ('Vacuna desconocida o en investigación', 'Temporal', 365),
+  ('Profilaxis antirrábica posexposición', 'Temporal', 365),
+  ('Detención de más de 72 horas',      'Temporal',   180),
+  ('Contacto sexual con pareja de riesgo', 'Temporal', 180),
+  ('Sexo a cambio de dinero o drogas',  'Temporal',   180),
+  ('Nueva pareja o varias parejas con relaciones anales', 'Temporal', 180),
+  ('Accidente cortopunzante o exposición a sangre', 'Temporal', 180),
+  ('Ictericia de causa desconocida',    'Temporal',   180),
+  ('Dengue',                            'Temporal',    30),
+  ('Tuberculosis tratada',              'Temporal',   730),
+  ('Isotretinoína',                     'Temporal',    28),
+  ('Finasterida o dutasterida',         'Temporal',   180),
+  ('Acitretina',                        'Temporal',  1095),
+  ('Corticoides orales o inyectables',  'Temporal',     7),
+  ('Consumo de alcohol en las últimas 12 horas', 'Temporal', 1),
+  ('Lesión en el brazo de punción',     'Temporal',    14),
+  ('Hemoglobina fuera de rango',        'Temporal',    30),
   ('Presión arterial fuera de rango',   'Temporal',     7),
-  ('Peso inferior al mínimo',           'Temporal',    30),
+  ('Peso fuera de rango',               'Temporal',    30),
+  ('Temperatura fuera de rango',        'Temporal',     0),
+  ('Hematoma en el sitio de punción',   'Temporal',     7),
+  ('Punción arterial',                  'Temporal',     7),
+  ('Dolor local en el sitio de punción', 'Temporal',    7),
+  ('Hormigueo o irritación nerviosa',   'Temporal',     7),
+  ('Lipotimia',                         'Temporal',     7),
+  ('Reacción vasovagal',                'Temporal',     7),
+  ('Hipotensión asociada a la extracción', 'Temporal',  7),
+  ('Náuseas o vómitos asociados a la extracción', 'Temporal', 7),
+  ('Reacción alérgica asociada a la extracción', 'Temporal', 7),
   ('VIH 1/2',                           'Permanente',  NULL),
   ('HBsAg (Hepatitis B)',               'Permanente',  NULL),
   ('Anti-HCV (Hepatitis C)',            'Permanente',  NULL),
@@ -167,12 +203,22 @@ SELECT u.id_usuario, r.id_rol
        SELECT 1 FROM usuario_rol ur
         WHERE ur.id_usuario = u.id_usuario AND ur.id_rol = r.id_rol);
 
+-- Actor de procesos automáticos (vencimientos). Sin rol, correo ni clave:
+-- no entra al portal ni al panel. Cubre AUDITORIA.id_usuario y
+-- TRANSICION_ESTADO.id_personal, ambos NOT NULL.
+INSERT INTO usuario (documento, nombre, apellido, fecha_nacimiento, genero,
+                     contrasena, consentimiento_privacidad, estado,
+                     cuenta_suprimida, fecha_alta)
+SELECT '00000002', 'Sistema', NULL, DATE '2000-01-01', 'Femenino',
+       NULL, true, true, false, timestamp '2020-01-01 08:00'
+WHERE NOT EXISTS (SELECT 1 FROM usuario WHERE documento = '00000002');
+
 -- ---------- Enfermería y jefatura ----------
 INSERT INTO usuario (documento, nombre, apellido, fecha_nacimiento, genero,
                      contrasena, consentimiento_privacidad, estado,
                      cuenta_suprimida, fecha_alta)
 SELECT '10000001', 'María', 'Recalde', DATE '1988-04-12', 'Femenino',
-       NULL,
+       '$2b$12$tywo9SOoAO7h2RdyK549pOQG91A7HbPik7i28IllrBfFOhNf2S25u',
        true, true, false, timestamp '2020-03-01 08:00'
 WHERE NOT EXISTS (SELECT 1 FROM usuario WHERE documento = '10000001');
 
@@ -180,7 +226,7 @@ INSERT INTO usuario (documento, nombre, apellido, fecha_nacimiento, genero,
                      contrasena, consentimiento_privacidad, estado,
                      cuenta_suprimida, fecha_alta)
 SELECT '10000002', 'Jorge', 'Fernández', DATE '1976-11-03', 'Masculino',
-       NULL,
+       '$2b$12$tywo9SOoAO7h2RdyK549pOQG91A7HbPik7i28IllrBfFOhNf2S25u',
        true, true, false, timestamp '2018-06-01 08:00'
 WHERE NOT EXISTS (SELECT 1 FROM usuario WHERE documento = '10000002');
 
@@ -216,6 +262,25 @@ INSERT INTO usuario_rol (id_usuario, id_rol)
 SELECT u.id_usuario, r.id_rol
   FROM usuario u, rol r
  WHERE u.documento = '10000002' AND r.codigo = 'JEFATURA'
+   AND NOT EXISTS (
+       SELECT 1 FROM usuario_rol ur
+        WHERE ur.id_usuario = u.id_usuario AND ur.id_rol = r.id_rol);
+
+-- Correo y clave personales: abren el portal. El institucional queda en el perfil.
+INSERT INTO correo (id_usuario, direccion, es_principal)
+SELECT u.id_usuario, v.correo, true
+  FROM (VALUES
+          ('10000001', 'maria.recalde@gmail.com'),
+          ('10000002', 'jorge.fernandez@gmail.com')
+       ) AS v(documento, correo)
+  JOIN usuario u ON u.documento = v.documento
+ WHERE NOT EXISTS (SELECT 1 FROM correo c WHERE c.direccion = v.correo);
+
+INSERT INTO usuario_rol (id_usuario, id_rol)
+SELECT u.id_usuario, r.id_rol
+  FROM usuario u, rol r
+ WHERE u.documento IN ('10000001', '10000002')
+   AND r.codigo = 'DONANTE'
    AND NOT EXISTS (
        SELECT 1 FROM usuario_rol ur
         WHERE ur.id_usuario = u.id_usuario AND ur.id_rol = r.id_rol);
@@ -351,16 +416,20 @@ DECLARE
   v_res timestamp;
 BEGIN
   SELECT id_usuario INTO v_user FROM usuario WHERE documento = p_doc;
-  SELECT id_usuario INTO v_pers FROM usuario WHERE documento = COALESCE(p_personal, '00000000');
   v_hor := maqueta_id_horario(p_fecha, p_hora);
+  v_pers := NULL;
+  IF p_estado IN ('Ausente', 'Completada', 'No apto') THEN
+    SELECT id_usuario INTO v_pers FROM usuario WHERE documento = p_personal;
+  END IF;
   -- 00:01 del mismo día es la marca de quien llega sin reserva.
   IF p_espontanea THEN
     v_res := p_fecha::timestamp + time '00:01';
   ELSE
     v_res := maqueta_reserva(p_fecha);
   END IF;
-  IF v_user IS NULL OR v_pers IS NULL OR v_hor IS NULL THEN
-    RAISE EXCEPTION 'cita: faltan usuario/personal/horario % % %', p_doc, p_fecha, p_hora;
+  IF v_user IS NULL OR v_hor IS NULL
+     OR (p_estado IN ('Ausente', 'Completada', 'No apto') AND v_pers IS NULL) THEN
+    RAISE EXCEPTION 'cita: faltan usuario/horario/personal % % %', p_doc, p_fecha, p_hora;
   END IF;
   IF p_sol_doc IS NOT NULL THEN
     SELECT s.id_solicitud INTO v_sol
@@ -424,7 +493,14 @@ DECLARE
   v_resultado integer;
 BEGIN
   SELECT id_usuario INTO v_don FROM usuario WHERE documento = p_doc;
-  SELECT id_diferimiento INTO v_dif FROM diferimiento WHERE nombre = p_causa;
+  IF p_causa IS NULL THEN
+    v_dif := NULL;
+  ELSE
+    SELECT id_diferimiento INTO v_dif FROM diferimiento WHERE nombre = p_causa;
+    IF v_dif IS NULL THEN
+      RAISE EXCEPTION 'causa desconocida: %', p_causa;
+    END IF;
+  END IF;
   IF p_personal IS NULL THEN
     v_pers := NULL;
   ELSE
@@ -445,12 +521,22 @@ BEGIN
       RAISE EXCEPTION 'diferimiento de laboratorio sin resultado reactivo: %', p_doc;
     END IF;
   END IF;
-  SELECT r.id_registro INTO v_id
-    FROM registro_diferimiento r
-   WHERE r.id_donante = v_don
-     AND r.id_diferimiento = v_dif
-     AND r.fecha_inicio = p_inicio
-   LIMIT 1;
+  IF p_causa IS NULL THEN
+    SELECT r.id_registro INTO v_id
+      FROM registro_diferimiento r
+     WHERE r.id_donante = v_don
+       AND r.id_diferimiento IS NULL
+       AND r.institucion_diagnostico = p_institucion
+       AND r.fecha_inicio = p_inicio
+     LIMIT 1;
+  ELSE
+    SELECT r.id_registro INTO v_id
+      FROM registro_diferimiento r
+     WHERE r.id_donante = v_don
+       AND r.id_diferimiento = v_dif
+       AND r.fecha_inicio = p_inicio
+     LIMIT 1;
+  END IF;
   IF v_id IS NOT NULL THEN
     RETURN v_id;
   END IF;
@@ -793,7 +879,7 @@ SELECT maqueta_donacion('6123456', 'Donacion altruista', DATE '2025-10-05', TIME
 SELECT maqueta_donacion('1876543', 'Donacion altruista', DATE '2026-06-15', TIME '11:30', 'UN-2026-0623', 'AB+', 'No reactivo', 'Utilizada', NULL, NULL, NULL);
 SELECT maqueta_donacion('1876543', 'Donacion altruista', DATE '2025-12-28', TIME '11:30', 'UN-2025-2567', 'AB+', 'No reactivo', 'Utilizada', NULL, NULL, NULL);
 SELECT maqueta_donacion('5678901', 'Donacion solidaria', DATE '2025-07-22', TIME '12:00', 'UN-2025-1345', 'O+', 'No reactivo', 'Utilizada', NULL, NULL, '1234567');
-SELECT maqueta_donacion('5678901', 'Reposicion', DATE '2024-11-05', TIME '11:30', 'UN-2024-1987', 'O+', 'No reactivo', 'Utilizada', NULL, NULL, NULL);
+SELECT maqueta_donacion('5678901', 'Donacion altruista', DATE '2024-11-05', TIME '11:30', 'UN-2024-1987', 'O+', 'No reactivo', 'Utilizada', NULL, NULL, NULL);
 SELECT maqueta_donacion('7111111', 'Donacion altruista', DATE '2026-04-02', TIME '08:00', 'UN-2026-0402', 'A+', 'No reactivo', 'Utilizada', NULL, NULL, NULL);
 SELECT maqueta_donacion('7111111', 'Donacion altruista', DATE '2025-08-19', TIME '08:00', 'UN-2025-1510', 'A+', 'No reactivo', 'Utilizada', NULL, NULL, NULL);
 SELECT maqueta_donacion('7222222', 'Donacion altruista', DATE '2025-12-18', TIME '10:30', 'UN-2025-2410', 'O+', 'No reactivo', 'Utilizada', NULL, NULL, NULL);
@@ -859,10 +945,10 @@ SELECT maqueta_donacion('7444444', 'Donacion altruista', DATE '2023-06-26', TIME
 -- Citas del 2026-09-10 (donación y compatibilidad)
 
 SELECT maqueta_cita('3456789', 'Donacion altruista', DATE '2026-09-10', TIME '07:30', 'Pendiente', NULL, '00000000');
-SELECT maqueta_cita('4123456', 'Reposicion', DATE '2026-09-10', TIME '08:00', 'Pendiente', NULL, '00000000');
+SELECT maqueta_cita('4123456', 'Donacion altruista', DATE '2026-09-10', TIME '08:00', 'Pendiente', NULL, '00000000');
 SELECT maqueta_cita('3789012', 'Donacion altruista', DATE '2026-09-10', TIME '09:30', 'Ausente', NULL, '10000001');
-SELECT maqueta_cita('4567890', 'Reposicion', DATE '2026-09-10', TIME '10:00', 'Pendiente', NULL, '00000000');
-SELECT maqueta_cita('6123456', 'Reposicion', DATE '2026-09-10', TIME '11:00', 'Pendiente', NULL, '00000000');
+SELECT maqueta_cita('4567890', 'Donacion altruista', DATE '2026-09-10', TIME '10:00', 'Pendiente', NULL, '00000000');
+SELECT maqueta_cita('6123456', 'Donacion altruista', DATE '2026-09-10', TIME '11:00', 'Pendiente', NULL, '00000000');
 SELECT maqueta_cita('1876543', 'Donacion altruista', DATE '2026-09-10', TIME '11:30', 'Pendiente', NULL, '00000000');
 SELECT maqueta_cita('5678901', 'Donacion solidaria', DATE '2026-09-10', TIME '12:00', 'Ausente', '1234567', '10000001');
 -- Compatibilidad: donantes del padrón (no el paciente). RN03 impide citarse por solicitud propia.
@@ -870,25 +956,56 @@ SELECT maqueta_cita('90000009', 'Extraccion de muestra para compatibilidad', DAT
 SELECT maqueta_cita('90000010', 'Extraccion de muestra para compatibilidad', DATE '2026-09-10', TIME '08:00', 'Completada', '80000001', '10000001');
 SELECT maqueta_cita('90000011', 'Extraccion de muestra para compatibilidad', DATE '2026-09-10', TIME '08:30', 'Pendiente', '80000002', '00000000');
 SELECT maqueta_cita('90000012', 'Extraccion de muestra para compatibilidad', DATE '2026-09-10', TIME '09:00', 'Pendiente', '80000003', '00000000');
-SELECT maqueta_donacion('90000010', 'Extraccion de muestra para compatibilidad', DATE '2026-09-10', TIME '08:00', 'UN-2026-EC02', 'A+', 'No reactivo', 'Asignada', NULL, NULL, '80000001');
+-- La cita ya existe: esa extracción admite una muestra, no una unidad.
+INSERT INTO extraccion (id_cita, id_personal, codigo_unico, fecha, observacion)
+SELECT c.id_cita, p.id_usuario, 'EX-2026-EC02',
+       TIMESTAMP '2026-09-10 08:00',
+       'Extracción de muestra para compatibilidad.'
+  FROM cita c
+  JOIN usuario u ON u.id_usuario = c.id_usuario
+  JOIN horario_disponible h ON h.id_horario = c.id_horario
+  JOIN usuario p ON p.documento = '10000001'
+ WHERE u.documento = '90000010'
+   AND c.tipo_cita = 'Extraccion de muestra para compatibilidad'
+   AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-09-10')
+   AND h.hora_inicio = TIME '08:00'
+   AND NOT EXISTS (SELECT 1 FROM extraccion e WHERE e.id_cita = c.id_cita);
+
+INSERT INTO muestra_compatibilidad (id_extraccion, id_solicitud, fecha)
+SELECT e.id_extraccion, c.id_solicitud, e.fecha
+  FROM extraccion e
+  JOIN cita c ON c.id_cita = e.id_cita
+ WHERE e.codigo_unico = 'EX-2026-EC02'
+   AND c.id_solicitud IS NOT NULL
+   AND NOT EXISTS (
+       SELECT 1 FROM muestra_compatibilidad m WHERE m.id_extraccion = e.id_extraccion);
+
+INSERT INTO resultado_compatibilidad (id_muestra, id_tipo_sangre, id_diferimiento, fecha)
+SELECT m.id_muestra, maqueta_id_tipo('O+'), d.id_diferimiento, m.fecha
+  FROM muestra_compatibilidad m
+  JOIN extraccion e ON e.id_extraccion = m.id_extraccion
+  JOIN diferimiento d ON d.nombre = 'PAI negativo'
+ WHERE e.codigo_unico = 'EX-2026-EC02'
+   AND NOT EXISTS (
+       SELECT 1 FROM resultado_compatibilidad r WHERE r.id_muestra = m.id_muestra);
 
 -- Citas no aptas y diferimientos
 
 SELECT maqueta_cita('3456789', 'Donacion altruista', DATE '2024-06-12', TIME '07:30', 'No apto', NULL, '10000001');
-SELECT maqueta_diferimiento('3456789', 'Hemoglobina baja', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '3456789' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2024-06-12') AND h.hora_inicio = TIME '07:30' LIMIT 1), 'MEDICION', 'Hospital Regional de Luque', DATE '2024-06-12', NULL);
+SELECT maqueta_diferimiento('3456789', 'Hemoglobina fuera de rango', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '3456789' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2024-06-12') AND h.hora_inicio = TIME '07:30' LIMIT 1), 'MEDICION', 'Hospital Regional de Luque', DATE '2024-06-12', NULL);
 SELECT maqueta_medicion((SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='3456789' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2024-06-12') LIMIT 1), 'HB', 11.2, TIMESTAMP '2024-06-12 07:40');
 SELECT maqueta_cita('4123456', 'Donacion altruista', DATE '2025-11-30', TIME '08:00', 'No apto', NULL, '10000001');
-SELECT maqueta_diferimiento('4123456', 'Hemoglobina baja', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '4123456' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2025-11-30') AND h.hora_inicio = TIME '08:00' LIMIT 1), 'MEDICION', 'Hospital Regional de Luque', DATE '2025-11-30', NULL);
+SELECT maqueta_diferimiento('4123456', 'Hemoglobina fuera de rango', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '4123456' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2025-11-30') AND h.hora_inicio = TIME '08:00' LIMIT 1), 'MEDICION', 'Hospital Regional de Luque', DATE '2025-11-30', NULL);
 SELECT maqueta_medicion((SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='4123456' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2025-11-30') LIMIT 1), 'HB', 11.8, TIMESTAMP '2025-11-30 08:10');
-SELECT maqueta_diferimiento('5234567', 'Presión arterial fuera de rango', NULL, 'CUESTIONARIO_PERSONAL', 'Hospital Bautista', DATE '2026-09-10', NULL);
+SELECT maqueta_diferimiento('5234567', NULL, NULL, 'Cuestionario', 'Hospital Bautista', DATE '2026-11-09', NULL);
 SELECT maqueta_diferimiento('2345678', 'HBsAg (Hepatitis B)', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '2345678' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2025-07-10') AND h.hora_inicio = TIME '10:30' LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2025-07-10', NULL);
 SELECT maqueta_cita('7222222', 'Donacion altruista', DATE '2026-06-20', TIME '10:30', 'No apto', NULL, '10000001');
-SELECT maqueta_diferimiento('7222222', 'Tatuaje, piercing o acupuntura', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '7222222' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-06-20') AND h.hora_inicio = TIME '10:30' LIMIT 1), 'CUESTIONARIO_PERSONAL', 'Hospital Regional de Luque', DATE '2026-06-20', NULL);
+SELECT maqueta_diferimiento('7222222', 'Tatuaje, piercing o acupuntura', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '7222222' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-06-20') AND h.hora_inicio = TIME '10:30' LIMIT 1), 'Cuestionario', 'Hospital Regional de Luque', DATE '2026-06-20', NULL);
 SELECT maqueta_cita('7333333', 'Donacion altruista', DATE '2025-09-02', TIME '08:00', 'No apto', NULL, '10000001');
-SELECT maqueta_diferimiento('7333333', 'Hemoglobina baja', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '7333333' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2025-09-02') AND h.hora_inicio = TIME '08:00' LIMIT 1), 'MEDICION', 'Hospital Regional de Luque', DATE '2025-09-02', NULL);
+SELECT maqueta_diferimiento('7333333', 'Hemoglobina fuera de rango', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '7333333' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2025-09-02') AND h.hora_inicio = TIME '08:00' LIMIT 1), 'MEDICION', 'Hospital Regional de Luque', DATE '2025-09-02', NULL);
 SELECT maqueta_medicion((SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='7333333' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2025-09-02') LIMIT 1), 'HB', 11.0, TIMESTAMP '2025-09-02 08:15');
 SELECT maqueta_diferimiento('7444444', 'Anti-HCV (Hepatitis C)', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '7444444' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2025-04-14') AND h.hora_inicio = TIME '09:00' LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2025-04-14', NULL);
-SELECT maqueta_diferimiento('7555555', 'Enfermedad infecciosa reciente', NULL, 'CUESTIONARIO_PERSONAL', 'Hospital Nacional de Itauguá', DATE '2026-07-01', NULL);
+SELECT maqueta_diferimiento('7555555', NULL, NULL, 'Cuestionario', 'Hospital Nacional de Itauguá', DATE '2026-11-09', NULL);
 SELECT maqueta_diferimiento('5485567', 'VIH 1/2', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '5485567' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-08-20') AND h.hora_inicio = TIME '11:00' LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2026-08-20', NULL);
 
 -- Citaciones de consejería (solo permanentes con resultado)
@@ -896,7 +1013,7 @@ SELECT maqueta_diferimiento('5485567', 'VIH 1/2', (SELECT c.id_cita FROM cita c 
 
 INSERT INTO citacion_consejeria (id_donante, id_personal, id_horario, id_resultado, fecha_hora, estado, observaciones)
 SELECT don.id_usuario,
-       (SELECT id_usuario FROM usuario WHERE documento = '10000002'),
+       NULL,
        maqueta_id_horario(DATE '2026-09-10', v.hora),
        r.id_resultado,
        DATE '2026-09-10' + v.hora,
@@ -995,10 +1112,6 @@ DECLARE
   v_reaccion varchar;
   v_causa varchar;
   v_causa2 varchar;
-  v_origen varchar;
-  v_origen2 varchar;
-  v_pers varchar;
-  v_pers2 varchar;
   v_tipo_cita varchar;
   v_tipo_inc varchar;
   v_momento varchar;
@@ -1032,8 +1145,17 @@ DECLARE
     'CMV'
   ];
   v_tipos text[] := ARRAY[
-    'Hematoma', 'Febril', 'Lipotimia', 'Alérgica', 'Náuseas',
-    'Dolor local', 'Hipotensión', 'Hormigueo', 'Vasovagal', 'Otro'
+    'Hematoma', 'Punción arterial', 'Lipotimia', 'Alérgica', 'Náuseas',
+    'Dolor local', 'Hipotensión', 'Hormigueo', 'Vasovagal'
+  ];
+  -- Misma posición que v_tipos: la causa que registra cada incidente.
+  v_causas_inc text[] := ARRAY[
+    'Hematoma en el sitio de punción', 'Punción arterial', 'Lipotimia',
+    'Reacción alérgica asociada a la extracción',
+    'Náuseas o vómitos asociados a la extracción',
+    'Dolor local en el sitio de punción',
+    'Hipotensión asociada a la extracción',
+    'Hormigueo o irritación nerviosa', 'Reacción vasovagal'
   ];
   v_grupos text[] := ARRAY[
     'O+','O+','O+','A+','A+','B+','AB+','O-','A-','B-','AB-'
@@ -1069,7 +1191,7 @@ BEGIN
         NULL, v_doc || '@maqueta.local', v_grupo, v_fecha::timestamp + v_hora);
 
       IF v_esc IN (1, 7, 10) THEN
-        v_tipo_cita := CASE WHEN v_esc = 10 THEN 'Reposicion' ELSE 'Donacion altruista' END;
+        v_tipo_cita := 'Donacion altruista';
         v_con_res := NOT (v_esc = 1 AND v_fecha >= CURRENT_DATE - 10 AND v_i % 4 = 0);
         PERFORM maqueta_donacion(
           v_doc, v_tipo_cita, v_fecha, v_hora, 'UN-A-' || v_doc, v_grupo,
@@ -1102,10 +1224,9 @@ BEGIN
           'Hospital Regional de Luque', v_fecha, NULL, NULL);
         INSERT INTO citacion_consejeria (
             id_donante, id_personal, id_horario, id_resultado, estado)
-        SELECT don.id_usuario, jef.id_usuario,
+        SELECT don.id_usuario, NULL,
                maqueta_id_horario(v_fecha, v_hora), r.id_resultado, 'Pendiente'
           FROM usuario don
-          JOIN usuario jef ON jef.documento = '10000002'
           JOIN unidad un ON un.codigo = 'UN-A-' || v_doc
           JOIN resultado_laboratorio r ON r.id_unidad = un.id_unidad
          WHERE don.documento = v_doc
@@ -1126,7 +1247,7 @@ BEGIN
           IF v_i % 3 = 0 THEN
             v_med_codigo := 'HB';
             v_med_valor := 11.0;
-            v_causa := 'Hemoglobina baja';
+            v_causa := 'Hemoglobina fuera de rango';
           ELSIF v_i % 3 = 1 THEN
             v_med_codigo := 'PAS';
             v_med_valor := 170;
@@ -1134,7 +1255,7 @@ BEGIN
           ELSE
             v_med_codigo := 'PESO';
             v_med_valor := 45;
-            v_causa := 'Peso inferior al mínimo';
+            v_causa := 'Peso fuera de rango';
           END IF;
           PERFORM maqueta_medicion(v_cita, v_med_codigo, v_med_valor, v_fecha::timestamp + v_hora);
           PERFORM maqueta_diferimiento(
@@ -1144,11 +1265,9 @@ BEGIN
           v_cita := maqueta_cita(
             v_doc, 'Donacion altruista', v_fecha, v_hora, 'No apto',
             NULL, '10000001', v_esc = 8);
-          v_origen := CASE WHEN v_i % 2 = 0 THEN 'CUESTIONARIO_SISTEMA' ELSE 'CUESTIONARIO_PERSONAL' END;
-          v_pers := CASE WHEN v_origen = 'CUESTIONARIO_SISTEMA' THEN NULL ELSE '10000001' END;
           PERFORM maqueta_diferimiento(
-            v_doc, v_causa, v_cita, v_origen,
-            'Hospital Regional de Luque', v_fecha, NULL, v_pers);
+            v_doc, v_causa, v_cita, 'Cuestionario',
+            'Hospital Regional de Luque', v_fecha, NULL, '10000001');
           IF v_i % 3 = 0 THEN
             v_idx2 := 1 + (v_idx % array_length(v_causas, 1));
             IF v_causas[v_idx2] = 'Embarazo o lactancia' AND v_gen <> 'Femenino' THEN
@@ -1158,18 +1277,15 @@ BEGIN
               v_idx2 := CASE WHEN v_idx = 1 THEN 2 ELSE 1 END;
             END IF;
             v_causa2 := v_causas[v_idx2];
-            v_origen2 := CASE
-              WHEN v_origen = 'CUESTIONARIO_SISTEMA' THEN 'CUESTIONARIO_PERSONAL'
-              ELSE 'CUESTIONARIO_SISTEMA' END;
-            v_pers2 := CASE WHEN v_origen2 = 'CUESTIONARIO_SISTEMA' THEN NULL ELSE '10000001' END;
             PERFORM maqueta_diferimiento(
-              v_doc, v_causa2, v_cita, v_origen2,
-              'Hospital Regional de Luque', v_fecha, NULL, v_pers2);
+              v_doc, v_causa2, v_cita, 'Cuestionario',
+              'Hospital Regional de Luque', v_fecha, NULL, '10000001');
           END IF;
         END IF;
 
       ELSIF v_esc = 6 THEN
-        v_tipo_inc := v_tipos[1 + (v_i % array_length(v_tipos, 1))];
+        v_idx := 1 + (v_i % array_length(v_tipos, 1));
+        v_tipo_inc := v_tipos[v_idx];
         v_momento := CASE WHEN v_i % 2 = 0 THEN 'Durante' ELSE 'Posterior' END;
         v_obs := format(
           'Momento: %s · Tipo: %s · Resultado: Sin sangre · Incidencia: Extracción interrumpida.',
@@ -1184,6 +1300,9 @@ BEGIN
             FROM usuario p
            WHERE p.documento = '10000001';
         END IF;
+        PERFORM maqueta_diferimiento(
+          v_doc, v_causas_inc[v_idx], v_cita, 'EXTRACCION',
+          'Hospital Regional de Luque', v_fecha, NULL, '10000001');
 
       ELSE
         -- Escenario 9: solicitud de volúmenes, cita agendada y muestra.
@@ -1204,8 +1323,8 @@ BEGIN
         ELSE
           SELECT id_extraccion INTO v_ext FROM extraccion WHERE id_cita = v_cita;
         END IF;
-        INSERT INTO muestra_compatibilidad (id_extraccion, id_solicitud, codigo, fecha)
-        SELECT v_ext, v_sol, 'MC-A-' || v_doc, v_fecha::timestamp + v_hora
+        INSERT INTO muestra_compatibilidad (id_extraccion, id_solicitud, fecha)
+        SELECT v_ext, v_sol, v_fecha::timestamp + v_hora
          WHERE NOT EXISTS (
              SELECT 1 FROM muestra_compatibilidad m WHERE m.id_extraccion = v_ext);
         v_pai := CASE WHEN v_i % 4 = 0 THEN 'PAI positivo' ELSE 'PAI negativo' END;
@@ -1214,7 +1333,7 @@ BEGIN
         SELECT m.id_muestra, maqueta_id_tipo(v_grupo), d.id_diferimiento, m.fecha
           FROM muestra_compatibilidad m
           JOIN diferimiento d ON d.nombre = v_pai
-         WHERE m.codigo = 'MC-A-' || v_doc
+         WHERE m.id_extraccion = v_ext
            AND NOT EXISTS (
                SELECT 1 FROM resultado_compatibilidad r
                 WHERE r.id_muestra = m.id_muestra);
@@ -1226,7 +1345,7 @@ BEGIN
                  'Hospital Regional de Luque', v_fecha, rc.id_resultado_compatibilidad
             FROM usuario don
             JOIN diferimiento d ON d.nombre = 'PAI positivo'
-            JOIN muestra_compatibilidad m ON m.codigo = 'MC-A-' || v_doc
+            JOIN muestra_compatibilidad m ON m.id_extraccion = v_ext
             JOIN resultado_compatibilidad rc ON rc.id_muestra = m.id_muestra
            WHERE don.documento = v_doc
              AND NOT EXISTS (
@@ -1234,12 +1353,11 @@ BEGIN
                   WHERE r.id_resultado_compatibilidad = rc.id_resultado_compatibilidad);
           INSERT INTO citacion_consejeria (
               id_donante, id_personal, id_horario, id_resultado_compatibilidad, estado)
-          SELECT don.id_usuario, jef.id_usuario,
+          SELECT don.id_usuario, NULL,
                  maqueta_id_horario(v_fecha, v_hora),
                  rc.id_resultado_compatibilidad, 'Pendiente'
             FROM usuario don
-            JOIN usuario jef ON jef.documento = '10000002'
-            JOIN muestra_compatibilidad m ON m.codigo = 'MC-A-' || v_doc
+            JOIN muestra_compatibilidad m ON m.id_extraccion = v_ext
             JOIN resultado_compatibilidad rc ON rc.id_muestra = m.id_muestra
            WHERE don.documento = v_doc
              AND NOT EXISTS (
@@ -1344,17 +1462,10 @@ BEGIN
     JOIN usuario u ON u.id_usuario = rd.id_donante
     JOIN cita c ON c.id_cita = rd.id_cita
     WHERE u.documento LIKE '91%'
-      AND rd.origen = 'CUESTIONARIO_SISTEMA'
-      AND c.fecha_hora_creacion::time <> time '00:01'
-  ) OR NOT EXISTS (
-    SELECT 1 FROM registro_diferimiento rd
-    JOIN usuario u ON u.id_usuario = rd.id_donante
-    JOIN cita c ON c.id_cita = rd.id_cita
-    WHERE u.documento LIKE '91%'
-      AND rd.origen = 'CUESTIONARIO_PERSONAL'
+      AND rd.origen = 'Cuestionario'
       AND c.fecha_hora_creacion::time <> time '00:01'
   ) THEN
-    RAISE EXCEPTION 'Falta diferimiento de cuestionario A o B';
+    RAISE EXCEPTION 'Falta diferimiento de cuestionario';
   END IF;
 
   IF NOT EXISTS (
@@ -1417,19 +1528,6 @@ BEGIN
       AND c.fecha_hora_creacion::time <> time '00:01'
   ) THEN
     RAISE EXCEPTION 'Falta muestra de compatibilidad con solicitud';
-  END IF;
-
-  IF NOT EXISTS (
-    SELECT 1 FROM cita c
-    JOIN usuario u ON u.id_usuario = c.id_usuario
-    JOIN extraccion e ON e.id_cita = c.id_cita
-    JOIN unidad un ON un.id_extraccion = e.id_extraccion
-    JOIN resultado_laboratorio r ON r.id_unidad = un.id_unidad
-    WHERE u.documento LIKE '91%'
-      AND c.tipo_cita = 'Reposicion'
-      AND r.resultado = 'No reactivo'
-  ) THEN
-    RAISE EXCEPTION 'Falta donación de reposición exitosa';
   END IF;
 
   IF NOT EXISTS (
@@ -1557,9 +1655,6 @@ SELECT
   (SELECT count(*) FROM cita c JOIN extraccion e ON e.id_cita = c.id_cita
     WHERE e.fecha::date BETWEEN DATE '2026-09-01' AND DATE '2026-09-10'
       AND c.tipo_cita = 'Donacion altruista') AS altruistas_periodo,
-  (SELECT count(*) FROM cita c JOIN extraccion e ON e.id_cita = c.id_cita
-    WHERE e.fecha::date BETWEEN DATE '2026-09-01' AND DATE '2026-09-10'
-      AND c.tipo_cita = 'Reposicion') AS reposicion_periodo,
   (SELECT count(*) FROM cita c JOIN extraccion e ON e.id_cita = c.id_cita
     WHERE e.fecha::date BETWEEN DATE '2026-09-01' AND DATE '2026-09-10'
       AND c.tipo_cita = 'Donacion solidaria') AS solidarias_periodo,

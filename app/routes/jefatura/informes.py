@@ -1,9 +1,8 @@
 """Informes simulados de jefatura."""
-from flask import Blueprint, Response, flash, redirect, request, url_for
+from flask import Blueprint, Response, request
 
-from app.controllers.comun.acceso import operador_actual, pintar, requiere
+from app.controllers.comun.acceso import pintar, requiere
 from app.controllers.comun import informes
-from app.controllers.comun.simulacion import marcar_vencidas
 
 jefatura_informes_bp = Blueprint("jefatura_informes", __name__, url_prefix="/jefatura")
 
@@ -43,13 +42,5 @@ def exportar():
     return Response(
         informes.csv_maqueta(datos, tab),
         mimetype="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={nombre}"},
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
     )
-
-
-@jefatura_informes_bp.post("/informes/vencer")
-@requiere("jef", "personal_auth.ingresar")
-def vencer():
-    n = marcar_vencidas(operador_actual()["usuario"])
-    flash(f"Unidades pasadas a vencidas: {n}. No se calculó una vida útil.", "ok")
-    return redirect(url_for("jefatura_informes.ver"))

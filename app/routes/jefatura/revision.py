@@ -1,4 +1,4 @@
-"""Cierra una citación el día de atención y muestra su historial."""
+"""Cierra una citación el día de atención."""
 from datetime import date
 
 from flask import Blueprint, flash, redirect, request, url_for
@@ -21,7 +21,8 @@ def ver(cita_id):
     personal = operador_actual()["usuario"]
     if request.method == "POST":
         try:
-            consejeria.marcar(citacion, request.form.get("estado"), personal)
+            consejeria.marcar(citacion, request.form.get("estado"), personal,
+                              request.form.get("observaciones"))
             flash("Citación actualizada.", "ok")
         except ErrorConsejeria as exc:
             flash(str(exc), "error")
@@ -30,11 +31,6 @@ def ver(cita_id):
     donante = db.session.get(Usuario, citacion.id_donante)
     dia = citacion.fecha_hora.date() if citacion.fecha_hora else None
     hoy = date.today()
-    estados, acciones = consejeria.evolucion(citacion)
-    responsables = {
-        accion.id_usuario: db.session.get(Usuario, accion.id_usuario)
-        for accion in acciones
-    }
     return pintar(
         "jefatura/revision.html",
         citacion=citacion,
@@ -43,7 +39,7 @@ def ver(cita_id):
         puede_cerrar=(
             citacion.estado in ("Pendiente", "Confirmada")
             and dia is not None and dia <= hoy),
-        estados=estados,
-        acciones=acciones,
-        responsables=responsables,
+        dia=dia,
+        hoy=hoy,
+        cerro=db.session.get(Usuario, citacion.id_personal) if citacion.id_personal else None,
     )

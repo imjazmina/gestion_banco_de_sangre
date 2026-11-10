@@ -9,14 +9,37 @@ class ErrorDerivacion(Exception):
     """La derivación no se puede guardar."""
 
 
-def puede_derivar(registro):
+def es_externo(registro):
     if registro is None:
         return False
     return registro.institucion_diagnostico.strip().lower() != INSTITUCION_LOCAL.lower()
 
 
+def esta_vigente(registro, hoy=None):
+    """Permanente, o temporal cuyo fin todavía no llegó."""
+    if registro is None:
+        return False
+    hoy = hoy or date.today()
+    return registro.fecha_fin is None or registro.fecha_fin > hoy
+
+
+def puede_derivar(registro):
+    return es_externo(registro) and esta_vigente(registro)
+
+
+def externo_vigente(id_donante):
+    """Hay un diferimiento de otro establecimiento que hoy sigue activo."""
+    from app.controllers.portal.agenda import diferimientos_vigentes
+    from app.models import Usuario
+
+    usuario = db.session.get(Usuario, id_donante)
+    if usuario is None:
+        return False
+    return any(es_externo(registro) for registro in diferimientos_vigentes(usuario))
+
+
 def pendientes(registros):
-    """Registros de otro establecimiento que todavía no tienen derivación."""
+    """Diferimientos vigentes de otro establecimiento, sin derivación."""
     salida = []
     for registro in registros:
         if not puede_derivar(registro):
@@ -28,16 +51,20 @@ def pendientes(registros):
     return salida
 
 
-def registrar(registro, personal, establecimiento, motivo):
-    if not puede_derivar(registro):
+def registrar(registro, personal, motivo):
+    if not es_externo(registro):
         raise ErrorDerivacion(
             "La derivación solo se registra si el diagnóstico no es de este banco.")
+    if not esta_vigente(registro):
+        raise ErrorDerivacion(
+            "Ese diferimiento de otro establecimiento ya no está vigente.")
     if Derivacion.query.filter_by(
             id_registro_diferimiento=registro.id_registro).first():
         raise ErrorDerivacion("Ese diferimiento ya tiene una derivación.")
-    establecimiento = (establecimiento or "").strip()
+    establecimiento = (registro.institucion_diagnostico or "").strip()
     if not establecimiento:
-        raise ErrorDerivacion("Indicá el establecimiento de destino.")
+        raise ErrorDerivacion(
+            "El diferimiento no tiene institución de diagnóstico.")
     fila = Derivacion(
         id_registro_diferimiento=registro.id_registro,
         id_personal=personal.id_usuario,

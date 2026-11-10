@@ -25,7 +25,13 @@ def create_app(config_class=Config, inicializar=True):
     registrar_blueprints(app)
     _registrar_errores(app)
 
-    from app.controllers.sesion import usuario_actual
+    from app.controllers.sesion import (
+        aplicar_cookies_de_sesion, entregar_sid, preparar_sid, usuario_actual,
+    )
+
+    app.before_request(preparar_sid)
+    app.after_request(aplicar_cookies_de_sesion)
+    app.after_request(entregar_sid)
 
     @app.context_processor
     def inyectar_usuario():
@@ -44,8 +50,13 @@ def create_app(config_class=Config, inicializar=True):
             _inicializar_base_de_datos(app)
             # El recargador de depuración arranca el proceso dos veces.
             if not app.debug or os.environ.get("WERKZEUG_RUN_MAIN") == "true":
-                from app.controllers.comun.simulacion import reponer_laboratorio
+                from app.controllers.comun.ausencias import enganchar, marcar
+                from app.controllers.comun.simulacion import (
+                    aplicar_vencimientos, reponer_laboratorio)
                 reponer_laboratorio()
+                aplicar_vencimientos()
+                marcar()
+                enganchar(app)
                 _arrancar_programador(app)
 
     return app

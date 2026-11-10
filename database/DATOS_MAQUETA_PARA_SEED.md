@@ -13,7 +13,7 @@ No es un script SQL. El script deberá respetar sin cambios
 - Institución local: **Hospital Regional de Luque (HRL)**.
 - Personal de enfermería: **María Recalde**, documento `10000001`.
 - Personal de jefatura: **Jorge Fernández**, documento `10000002`.
-- Personal de servicio para citas todavía no asignadas: documento `00000000`.
+- Las citas y citaciones abiertas no tienen personal: `id_personal` queda NULL hasta el cierre.
 - Los documentos deben guardarse sin puntos para facilitar las búsquedas.
 - El script debe ser idempotente: identificar usuarios por `documento` y usar
   comprobaciones `NOT EXISTS` o `ON CONFLICT` donde exista una restricción
@@ -24,7 +24,6 @@ No es un script SQL. El script deberá respetar sin cambios
 ## 2. Correspondencia entre la maqueta y el esquema
 
 - `Altruista` se guarda como `Donacion altruista`.
-- `Reposición` se guarda como `Reposicion`.
 - `Solicitud` se guarda como `Donacion solidaria` y requiere
   `cita.id_solicitud`.
 - `Extracción de compatibilidad` se guarda con ese mismo valor.
@@ -75,7 +74,7 @@ No es un script SQL. El script deberá respetar sin cambios
 - Género: Femenino.
 - Teléfono: `0991234567`.
 - Correo: `mfacosta@outlook.com`.
-- Cita del día: 08:00, reposición, pendiente.
+- Cita del día: 08:00, altruista, pendiente.
 - Historial visible:
   - 2025-11-30, no apta por hemoglobina baja.
   - 2025-05-14, altruista, completada, unidad `UN-2025-0823`.
@@ -144,7 +143,7 @@ No es un script SQL. El script deberá respetar sin cambios
 - Género: Femenino.
 - Teléfono: `0985789012`.
 - Correo: `lgparedes@gmail.com`.
-- Cita del día: 10:00, reposición, pendiente.
+- Cita del día: 10:00, altruista, pendiente.
 - Primera donación: no tiene historial ni diferimientos.
 
 ### 3.7 Diego Cabrera Núñez
@@ -205,7 +204,7 @@ No es un script SQL. El script deberá respetar sin cambios
 - Sin diferimientos.
 - Historial:
   - 2025-07-22, solidaria, completada, unidad `UN-2025-1345`.
-  - 2024-11-05, reposición, completada, unidad `UN-2024-1987`.
+  - 2024-11-05, altruista, completada, unidad `UN-2024-1987`.
 - La maqueta indica 3 donaciones; crear 1 histórica adicional si se debe
   reproducir el total calculado.
 
@@ -373,8 +372,7 @@ Objetivo del período 2026-09-01 a 2026-09-10:
 
 - Donaciones/extracciones completadas: **87**.
 - Por tipo:
-  - Altruista: 54.
-  - Reposición: 22.
+  - Altruista: 76.
   - Solidaria/solicitud: 8.
   - Diagnóstico: 3.
 - Por género:
@@ -405,7 +403,7 @@ La fecha que debe gobernar el informe es `extraccion.fecha`. La cita no guarda
 directamente la fecha de atención y su día se calcula a partir de una franja
 semanal.
 
-El tipo `Diagnóstico` no existe en el esquema. Cambiar por reposicion.
+El tipo `Diagnóstico` no existe en el esquema. Esas citas se guardan como `Donacion altruista`.
 
 ### 7.2 Diferimientos
 

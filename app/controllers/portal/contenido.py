@@ -19,7 +19,7 @@ FAQS = [
     {'pregunta': "¿Cuánto dura el proceso?",
      'respuesta': "La extracción dura entre 10 y 15 minutos. Contando registro, cuestionario y recuperación, el proceso completo toma alrededor de 45 minutos."},
     {'pregunta': "¿Qué debo llevar el día de la cita?",
-     'respuesta': "Únicamente tu documento de identidad vigente. Si vas a donar por reposición, tené a mano el nombre del paciente."},
+     'respuesta': "Únicamente tu documento de identidad vigente."},
     {'pregunta': "¿Duele donar sangre?",
      'respuesta': "Se siente un pinchazo breve al inicio, similar a un análisis de sangre común. Durante la extracción no debería haber dolor."},
     {'pregunta': "¿Puedo donar si tomo medicamentos?",

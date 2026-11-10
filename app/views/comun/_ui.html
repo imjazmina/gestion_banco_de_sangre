@@ -23,7 +23,7 @@
 {% endmacro %}
 
 {% macro badge_tipo(tipo) %}
-  {% set mapa = {'Altruista':'teal','Reposición':'navy','Solidaria':'info','Compatibilidad':'warn'} %}
+  {% set mapa = {'Altruista':'teal','Solidaria':'info','Compatibilidad':'warn'} %}
   {{ badge(tipo, mapa.get(tipo, 'gray')) }}
 {% endmacro %}
 

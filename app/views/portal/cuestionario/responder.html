@@ -69,11 +69,10 @@
         <label class="check-row" style="margin:18px 0 8px;">
           <input type="checkbox" name="acepta_declaracion" value="Si" required
                  {% if formulario and formulario.get('acepta_declaracion') == 'Si' %}checked{% endif %}>
-          <span>He leído y acepto la declaración y consentimiento del donante</span>
+          <p>He leído y acepto la  
+            <a class="muted-link" href="{{ url_for('legal.declaracion_donante') }}" target="_blank" rel="noopener">declaración y consentimiento del donante</a>
+          </p>
         </label>
-        <p style="margin:0 0 4px 26px;">
-          <a class="muted-link" href="{{ url_for('legal.declaracion_donante') }}" target="_blank" rel="noopener">Leer declaración y consentimiento del donante</a>
-        </p>
         {% endif %}
 
         <div class="q-acciones">
@@ -94,7 +93,7 @@
       {% endfor %}
 
       <p class="hint" style="text-align:center; margin-top:12px;">
-        Las respuestas se envían recién al final. Si cerrás esta página antes, se pierden.
+        Las respuestas quedan en este navegador hasta que las enviás. Si actualizás la página, siguen acá.
       </p>
     </form>
 
@@ -111,16 +110,44 @@
   const total = Number(form.dataset.total) || pasos.length;
   let actual = Number(form.dataset.paso) || 1;
   let salir = false;
+  const clave = "cuestionario:" + (form.getAttribute("action") || location.pathname);
+
+  function guardarLocal() {
+    const datos = { paso: actual };
+    form.querySelectorAll('input[type="radio"]:checked').forEach(function (radio) {
+      datos[radio.name] = radio.value;
+    });
+    form.querySelectorAll("input.q-detalle").forEach(function (campo) {
+      datos[campo.name] = campo.value;
+    });
+    const acepta = form.querySelector('input[name="acepta_declaracion"]');
+    if (acepta) datos.acepta_declaracion = acepta.checked ? "Si" : "";
+    try { localStorage.setItem(clave, JSON.stringify(datos)); } catch (e) {}
+  }
+
+  function restaurarLocal() {
+    let datos = null;
+    try { datos = JSON.parse(localStorage.getItem(clave) || "null"); } catch (e) { return; }
+    if (!datos) return;
+    Object.keys(datos).forEach(function (nombre) {
+      if (nombre === "paso") return;
+      const valor = datos[nombre];
+      const radio = form.querySelector(
+        'input[type="radio"][name="' + nombre + '"][value="' + valor + '"]');
+      if (radio) {
+        radio.checked = true;
+        return;
+      }
+      const campo = form.elements[nombre];
+      if (!campo || campo.type === "radio") return;
+      if (campo.type === "checkbox") campo.checked = valor === campo.value;
+      else campo.value = valor;
+    });
+    if (datos.paso) actual = Number(datos.paso) || actual;
+  }
 
   function respondidas() {
     return form.querySelectorAll('input[type="radio"]:checked').length;
-  }
-
-  function hayRespuestas() {
-    if (respondidas() > 0) return true;
-    return Array.from(form.querySelectorAll('input.q-detalle')).some(function (campo) {
-      return campo.value.trim() !== '';
-    });
   }
 
   function sincronizarComplemento(item) {
@@ -186,6 +213,7 @@
       if (aviso) aviso.hidden = true;
     });
     mostrar(destino);
+    guardarLocal();
     const titulo = document.querySelector('.q-progress');
     if (titulo) titulo.scrollIntoView({block: 'start'});
   });
@@ -194,6 +222,11 @@
     const item = e.target.closest('.q-item');
     if (item) sincronizarComplemento(item);
     mostrar(actual);
+    guardarLocal();
+  });
+
+  form.addEventListener('input', function (e) {
+    if (e.target.classList.contains('q-detalle')) guardarLocal();
   });
 
   form.addEventListener('submit', function (e) {
@@ -224,29 +257,10 @@
       return;
     }
     salir = true;
+    try { localStorage.removeItem(clave); } catch (e) {}
   });
 
-  window.addEventListener('beforeunload', function (e) {
-    if (salir || !hayRespuestas()) return;
-    const aviso = 'Si salís ahora vas a perder las respuestas del cuestionario.';
-    e.preventDefault();
-    e.returnValue = aviso;
-    return aviso;
-  });
-
-  document.addEventListener('click', function (e) {
-    const enlace = e.target.closest('a[href]');
-    if (!enlace || salir || !hayRespuestas()) return;
-    if (enlace.target === '_blank') return;
-    const href = enlace.getAttribute('href') || '';
-    if (href.charAt(0) === '#' || href.indexOf('mailto:') === 0 || href.indexOf('tel:') === 0) return;
-    if (!window.confirm('Si salís ahora vas a perder las respuestas del cuestionario.')) {
-      e.preventDefault();
-      return;
-    }
-    salir = true;
-  });
-
+  restaurarLocal();
   form.querySelectorAll('.q-item').forEach(sincronizarComplemento);
   mostrar(actual);
 })();

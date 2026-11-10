@@ -463,7 +463,7 @@ table.data tbody tr:nth-child(even){background:#FBFCFD;}
 .slot-btn.selected{background:var(--navy); border-color:var(--navy); color:#fff;}
 .slot-btn.disabled{opacity:.4; cursor:not-allowed; text-decoration:line-through;}
 
-.type-grid{display:grid; grid-template-columns:repeat(3,1fr); gap:14px;}
+.type-grid{display:grid; grid-template-columns:repeat(2,1fr); gap:14px;}
 @media(max-width:700px){.type-grid{grid-template-columns:1fr;}}
 .type-card{display:block; width:100%; border:1.5px solid var(--line); border-radius:var(--r-card); padding:18px; background:var(--surface); text-align:left; transition:border-color .18s ease, transform .18s ease; position:relative;}
 .type-card:hover{border-color:var(--navy); transform:translateY(-2px);}

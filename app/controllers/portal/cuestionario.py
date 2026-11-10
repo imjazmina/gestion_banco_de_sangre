@@ -255,9 +255,8 @@ def enviar(cita, usuario, formulario):
         filas.append(fila)
         cita.estado = Cita.CONFIRMADA
         db.session.flush()
-        for fila in filas:
-            Auditoria.registrar(usuario.id_usuario, "CUESTIONARIO",
-                                fila.id_cuestionario, Auditoria.ALTA)
+        Auditoria.registrar(usuario.id_usuario, "CUESTIONARIO",
+                            filas[0].id_cuestionario, Auditoria.ALTA)
         if estado_anterior != Cita.CONFIRMADA:
             Auditoria.registrar(usuario.id_usuario, "CITA", cita.id_cita,
                                 Auditoria.CAMBIO_ESTADO)

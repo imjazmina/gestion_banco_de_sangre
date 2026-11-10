@@ -1,60 +1,87 @@
 {% extends "comun/layout.html" %}
-{% from "comun/_ui.html" import crumb, alerta, badge_cita %}
+{% from "comun/_ui.html" import crumb, alerta, badge_cita, badge_dif %}
+{% from "comun/_iconos.html" import ico %}
 
 {% block titulo %}Citación{% endblock %}
 
 {% block contenido %}
-<div class="page">
-  {{ crumb(url_for('jefatura_diferimientos.lista'), 'Citaciones', 'Revisión') }}
+<div class="page" style="max-width:40rem;">
+  {{ crumb(url_for('jefatura_diferimientos.lista'), 'Citaciones', donante.nombre_completo) }}
+
   <div class="section-head">
-    <h1>{{ donante.nombre_completo }}</h1>
-    <p>Documento {{ donante.documento_visible }} · {{ badge_cita(citacion.estado) }}</p>
+    <div>
+      <h1>{{ donante.nombre_completo }}</h1>
+      <p>Documento {{ donante.documento_visible }}{% if citacion.fecha_hora %}
+        · {{ citacion.fecha_hora.strftime('%d/%m/%Y %H:%M') }}{% endif %}</p>
+    </div>
+    {{ badge_cita(citacion.estado) }}
   </div>
-  {% call alerta('info') %}La citación que ve el donante es genérica. El resultado no se le envía por la plataforma.{% endcall %}
 
   {% if registros %}
-  <div class="card card-pad mt-4">
+  <div class="stack mt-4" style="gap:8px;">
     {% for registro in registros %}
-    <p>Diferimiento: {{ registro.causa.nombre }} · {{ registro.institucion_diagnostico }}</p>
+    <div class="summary">
+      <div class="row mb-3">
+        <strong style="font-size:14px;">{{ registro.causa.nombre }}</strong>
+        {{ badge_dif(registro.causa.tipo) }}
+      </div>
+      <p class="muted" style="margin:0;font-size:13px;">
+        {{ registro.institucion_diagnostico }}
+        · desde {{ registro.fecha_inicio.strftime('%d/%m/%Y') }}
+        {% if registro.fecha_fin %}hasta {{ registro.fecha_fin.strftime('%d/%m/%Y') }}
+        {% else %}· sin fecha de fin{% endif %}
+      </p>
+    </div>
     {% endfor %}
   </div>
-  {% endif %}
-
-  <p class="muted mt-4">
-    {% if citacion.fecha_hora %}Atención {{ citacion.fecha_hora.strftime('%d/%m/%Y %H:%M') }}.{% endif %}
-  </p>
-  {% if puede_cerrar %}
-  <form method="post" class="row mt-4">
-    <button class="btn btn-primary" name="estado" value="Realizada" type="submit">Marcar realizada</button>
-    <button class="btn btn-ghost" name="estado" value="Ausente" type="submit">Marcar ausente</button>
-  </form>
+  <p class="hint mt-3">El donante ve una citación genérica: el resultado no se le envía por la plataforma.</p>
   {% endif %}
 
   <div class="card card-pad mt-4">
-    <h2 class="kicker">Estados</h2>
-    <p class="muted">Cada cambio queda en el historial. No se pisa ni se borra. El esquema no guarda motivo ni la franja anterior.</p>
-    {% if estados %}
-    <ul>
-      {% for fila in estados %}
-      <li>{{ fila.fecha_hora.strftime('%d/%m/%Y %H:%M') }} · {{ fila.estado_anterior or 'Alta' }} → {{ fila.estado_nuevo }}</li>
-      {% endfor %}
-    </ul>
-    {% else %}
-    <p class="muted">Esta citación no tiene filas de historial.</p>
-    {% endif %}
-  </div>
+    <h3 style="margin:0 0 12px;font-size:14px;font-weight:600;">Atención</h3>
 
-  <div class="card card-pad mt-4">
-    <h2 class="kicker">Auditoría</h2>
-    <p class="muted">Usuario, acción y momento. Una reprogramación figura como modificación y no cambia el estado.</p>
-    {% if acciones %}
-    <ul>
-      {% for fila in acciones %}
-      <li>{{ fila.fecha.strftime('%d/%m/%Y %H:%M') }} · {{ fila.accion }} · {{ responsables[fila.id_usuario].nombre_completo if responsables[fila.id_usuario] else fila.id_usuario }}</li>
-      {% endfor %}
-    </ul>
+    {% if puede_cerrar %}
+    <form method="post" class="stack">
+      <div class="field">
+        <label for="observaciones">Observaciones <span class="hint">(opcional)</span></label>
+        <textarea class="control" id="observaciones" name="observaciones" rows="3"
+                  maxlength="500"
+                  placeholder="Lo conversado o cualquier dato de la atención…">{{ citacion.observaciones or '' }}</textarea>
+      </div>
+      <div class="row">
+        <button class="btn btn-teal" name="estado" value="Realizada" type="submit">
+          {{ ico('check', 16) }} Atención realizada
+        </button>
+      </div>
+    </form>
+
+    {% elif citacion.estado in ('Realizada', 'Ausente') %}
+      {% call alerta('ok' if citacion.estado == 'Realizada' else 'warn') %}
+        Citación cerrada como <b>{{ citacion.estado|lower }}</b>{% if cerro %}
+        por {{ cerro.nombre_completo }}{% endif %}.
+      {% endcall %}
+      {% if citacion.observaciones %}
+      <div class="summary mt-4">
+        <p class="data-label">Observaciones</p>
+        <p class="data-value">{{ citacion.observaciones }}</p>
+      </div>
+      {% endif %}
+
+    {% elif citacion.estado == 'Cancelada' %}
+      {% call alerta('info') %}
+        El donante canceló esta citación. Puede volver a agendarla; no hay atención que registrar.
+      {% endcall %}
+
+    {% elif dia and dia > hoy %}
+      {% call alerta('info') %}
+        La atención es el {{ dia.strftime('%d/%m/%Y') }}. Desde ese día se habilitan
+        <b>Atención realizada</b> y <b>Donante ausente</b>.
+      {% endcall %}
+
     {% else %}
-    <p class="muted">Todavía no hay auditoría de esta citación.</p>
+      {% call alerta('warn') %}
+        La citación todavía no tiene fecha de atención asignada.
+      {% endcall %}
     {% endif %}
   </div>
 </div>

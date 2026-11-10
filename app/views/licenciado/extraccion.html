@@ -17,12 +17,12 @@
     Se generaron <strong>{{ unidades|length }}</strong> unidades. Pasan a laboratorio para tipificación y serología.
     {% endif %}
     {% if campos.get('Incidencia') %}
-    Quedó documentada la incidencia: <strong>{{ campos.get('Tipo') }}</strong>.
+    Quedó documentada la incidencia: <strong>{{ campos.get('Tipo') }}</strong>, con su diferimiento temporal.
     {% endif %}
   {% endcall %}
   {% elif campos.get('Incidencia') %}
   {% call alerta('danger', 'Extracción sin unidad') %}
-    Se registró la extracción y la incidencia. Resultado: <strong>{{ campos.get('Resultado') }}</strong>. No se generó código de unidad ni se incorporó al stock.
+    Se registró la extracción, la incidencia <strong>{{ campos.get('Tipo') }}</strong> y su diferimiento temporal. Resultado: <strong>{{ campos.get('Resultado') }}</strong>. No se generó código de unidad ni se incorporó al stock.
   {% endcall %}
   {% else %}
   {% call alerta('warn', 'Extracción registrada') %}
@@ -81,7 +81,7 @@
             <label>Brazo</label>
             <div class="radios">
               {% for b in brazos %}
-              <label><input type="radio" name="brazo" value="{{ b }}"> {{ b }}</label>
+              <label><input type="radio" name="brazo" value="{{ b }}" {% if datos.get('brazo') == b %}checked{% endif %}> {{ b }}</label>
               {% endfor %}
             </div>
           </div>
@@ -89,7 +89,7 @@
             <label>Punción</label>
             <div class="radios">
               {% for p in punciones %}
-              <label><input type="radio" name="puncion" value="{{ p }}"> {{ p }}</label>
+              <label><input type="radio" name="puncion" value="{{ p }}" {% if datos.get('puncion') == p %}checked{% endif %}> {{ p }}</label>
               {% endfor %}
             </div>
           </div>
@@ -97,9 +97,23 @@
             <label>Reacción post-extracción</label>
             <div class="radios">
               {% for r in reacciones %}
-              <label><input type="radio" name="reaccion" value="{{ r }}"> {{ r }}</label>
+              <label><input type="radio" name="reaccion" value="{{ r }}" {% if datos.get('reaccion') == r %}checked{% endif %}> {{ r }}</label>
               {% endfor %}
             </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card card-pad">
+        <h3 style="margin:0 0 12px;font-size:14px;font-weight:600;">Horarios</h3>
+        <div class="form-grid two">
+          <div class="field">
+            <label>Hora de inicio</label>
+            <input class="control" type="time" name="hora_inicio" value="{{ datos.get('hora_inicio', '') }}">
+          </div>
+          <div class="field">
+            <label>Hora de finalización</label>
+            <input class="control" type="time" name="hora_fin" value="{{ datos.get('hora_fin', '') }}">
           </div>
         </div>
       </div>
@@ -111,7 +125,7 @@
             <label>Anticoagulante</label>
             <div class="radios">
               {% for a in anticoagulantes %}
-              <label><input type="radio" name="anticoagulante" value="{{ a }}"> {{ a }}</label>
+              <label><input type="radio" name="anticoagulante" value="{{ a }}" {% if datos.get('anticoagulante') == a %}checked{% endif %}> {{ a }}</label>
               {% endfor %}
             </div>
           </div>
@@ -119,41 +133,27 @@
             <label>Tipo de bolsa</label>
             <div class="radios">
               {% for t in bolsas %}
-              <label><input type="radio" name="bolsa_tipo" value="{{ t }}"> {{ t }}</label>
+              <label><input type="radio" name="bolsa_tipo" value="{{ t }}" {% if datos.get('bolsa_tipo') == t %}checked{% endif %}> {{ t }}</label>
               {% endfor %}
             </div>
           </div>
           <div class="field">
             <label>Marca</label>
-            <input class="control" name="marca" maxlength="80" placeholder="Marca de la bolsa">
+            <input class="control" name="marca" maxlength="80" placeholder="Marca de la bolsa" value="{{ datos.get('marca', '') }}">
           </div>
         </div>
       </div>
-
-      <div class="card card-pad">
-        <h3 style="margin:0 0 12px;font-size:14px;font-weight:600;">Horarios</h3>
-        <div class="form-grid two">
-          <div class="field">
-            <label>Hora de inicio</label>
-            <input class="control" type="time" name="hora_inicio">
-          </div>
-          <div class="field">
-            <label>Hora de finalización</label>
-            <input class="control" type="time" name="hora_fin">
-          </div>
-        </div>
-      </div>
-
+      
       <div class="card card-pad">
         <h3 style="margin:0 0 12px;font-size:14px;font-weight:600;">Unidad de sangre</h3>
         <div class="form-grid two">
           <div class="field">
             <label>Cantidad extraída (ml)</label>
-            <input class="control" type="number" name="cantidad" min="0" step="1" placeholder="ml obtenidos">
+            <input class="control" type="number" name="cantidad" min="0" step="1" placeholder="ml obtenidos" value="{{ datos.get('cantidad', '') }}">
           </div>
           <div class="field">
             <label>Unidades completadas</label>
-            <input class="control" type="number" name="unidades" min="1" step="1" placeholder="Solo si se completó al menos una">
+            <input class="control" type="number" name="unidades" min="1" step="1" placeholder="Solo si se completó al menos una" value="{{ datos.get('unidades', '') }}">
           </div>
         </div>
       </div>
@@ -163,11 +163,11 @@
         <div class="form-grid two">
           <div class="field">
             <label>Código de tabuladora</label>
-            <input class="control" name="codigo_tabuladora" maxlength="80" placeholder="Código de tabuladora">
+            <input class="control" name="codigo_tabuladora" maxlength="80" placeholder="Código de tabuladora" value="{{ datos.get('codigo_tabuladora', '') }}">
           </div>
           <div class="field">
             <label>Lote</label>
-            <input class="control" name="lote" maxlength="80" placeholder="Lote de la bolsa">
+            <input class="control" name="lote" maxlength="80" placeholder="Lote de la bolsa" value="{{ datos.get('lote', '') }}">
           </div>
         </div>
       </div>
@@ -186,7 +186,7 @@
           <select class="control" name="momento" id="inc-momento">
             <option value="">Seleccionar</option>
             {% for m in momentos %}
-            <option value="{{ m }}">{{ m }}</option>
+            <option value="{{ m }}" {% if datos.get('momento') == m %}selected{% endif %}>{{ m }}</option>
             {% endfor %}
           </select>
         </div>
@@ -194,20 +194,21 @@
           <label>Tipo <span class="req">*</span></label>
           <select class="control" name="tipo" id="inc-tipo">
             <option value="">Seleccionar</option>
-            {% for t in tipos %}
-            <option value="{{ t }}">{{ t }}</option>
+            {% for t, causa in incidentes %}
+            <option value="{{ t }}" data-causa="{{ causa.nombre }}" data-dias="{{ causa.dias_rehabilitacion }}" {% if datos.get('tipo') == t %}selected{% endif %}>{{ t }}</option>
             {% endfor %}
           </select>
+          <p class="hint" id="inc-causa" hidden></p>
         </div>
         <div class="field">
           <label>Descripción <span class="req">*</span></label>
-          <textarea class="control" name="incidencia" id="inc-desc" rows="3" maxlength="500" placeholder="Describa la incidencia..."></textarea>
+          <textarea class="control" name="incidencia" id="inc-desc" rows="3" maxlength="500" placeholder="Describa la incidencia...">{{ datos.get('incidencia', '') }}</textarea>
         </div>
         <div class="field">
           <label>Resultado <span class="req">*</span></label>
           <div class="radios">
             {% for r in resultados %}
-            <label><input type="radio" name="resultado" value="{{ r }}"> {{ r }}</label>
+            <label><input type="radio" name="resultado" value="{{ r }}" {% if datos.get('resultado') == r %}checked{% endif %}> {{ r }}</label>
             {% endfor %}
           </div>
         </div>
@@ -219,20 +220,89 @@
     {% endcall %}
   </form>
   <script>
+    const form = document.getElementById("form-extraccion");
     const momento = document.getElementById("inc-momento");
     const tipo = document.getElementById("inc-tipo");
     const desc = document.getElementById("inc-desc");
     const confirmar = document.getElementById("confirmar-incidencia");
+    const causa = document.getElementById("inc-causa");
+    const inicio = form.elements.hora_inicio;
+    const fin = form.elements.hora_fin;
+
+    function mensajeHora(campo, vacio) {
+      if (campo.validity.badInput) return "La hora no es válida.";
+      if (!campo.value) return vacio;
+      return "";
+    }
+    function procedimientoYHorarios(avisar) {
+      const controles = [
+        [form.querySelector("input[name='brazo']"), form.querySelector("input[name='brazo']:checked") ? "" : "Falta el brazo."],
+        [form.querySelector("input[name='puncion']"), form.querySelector("input[name='puncion']:checked") ? "" : "Falta la punción."],
+        [form.querySelector("input[name='reaccion']"), form.querySelector("input[name='reaccion']:checked") ? "" : "Falta la reacción."],
+        [inicio, mensajeHora(inicio, "Falta la hora de inicio.")],
+        [fin, mensajeHora(fin, "Falta la hora de finalización.")],
+      ];
+      if (!controles[4][1] && inicio.value && fin.value < inicio.value) {
+        controles[4][1] = "La hora de finalización es anterior al inicio.";
+      }
+      let primero = null;
+      controles.forEach(([campo, mensaje]) => {
+        campo.setCustomValidity(avisar ? mensaje : "");
+        if (mensaje && !primero) primero = campo;
+      });
+      if (primero && avisar) primero.reportValidity();
+      return !primero;
+    }
+    function limpiarAviso() {
+      ["brazo", "puncion", "reaccion"].forEach((nombre) => {
+        form.querySelector("input[name='" + nombre + "']").setCustomValidity("");
+      });
+      inicio.setCustomValidity("");
+      fin.setCustomValidity("");
+    }
     function lista() {
-      const resultado = document.querySelector("input[name='resultado']:checked");
-      confirmar.disabled = !(momento.value && tipo.value && desc.value.trim() && resultado);
+      const resultado = form.querySelector("input[name='resultado']:checked");
+      const incidente = momento.value && tipo.value && desc.value.trim() && resultado;
+      confirmar.disabled = !(incidente && procedimientoYHorarios(false));
+    }
+    function mostrarCausa() {
+      const opcion = tipo.selectedOptions[0];
+      causa.hidden = !(opcion && opcion.dataset.causa);
+      if (!causa.hidden) {
+        causa.textContent = "Registra el diferimiento temporal «" + opcion.dataset.causa
+          + "» por " + opcion.dataset.dias + " días.";
+      }
     }
     momento.addEventListener("change", lista);
     tipo.addEventListener("change", lista);
+    tipo.addEventListener("change", mostrarCausa);
     desc.addEventListener("input", lista);
-    document.querySelectorAll("input[name='resultado']").forEach((radio) => {
+    form.querySelectorAll("input[name='resultado'], input[name='brazo'], input[name='puncion'], input[name='reaccion']").forEach((radio) => {
       radio.addEventListener("change", lista);
     });
+    inicio.addEventListener("input", lista);
+    inicio.addEventListener("change", lista);
+    fin.addEventListener("input", lista);
+    fin.addEventListener("change", lista);
+    form.querySelector("button[value='finalizar']").addEventListener("click", limpiarAviso);
+    document.querySelector("[data-abrir='modal-incidencia']").addEventListener("click", (evento) => {
+      if (!procedimientoYHorarios(true)) {
+        evento.preventDefault();
+        evento.stopPropagation();
+      }
+    });
+    window.addEventListener("submit", (evento) => {
+      if (evento.target !== form || !evento.submitter || evento.submitter.value !== "incidencia") return;
+      if (!procedimientoYHorarios(true)) {
+        evento.preventDefault();
+        evento.stopPropagation();
+      }
+    }, true);
+    lista();
+    mostrarCausa();
+    {% if datos.get('accion') == 'incidencia' %}
+    document.getElementById("modal-incidencia").classList.remove("hidden");
+    {% endif %}
   </script>
   {% endif %}
   {% endif %}

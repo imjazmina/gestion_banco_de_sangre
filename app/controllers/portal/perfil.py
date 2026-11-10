@@ -80,13 +80,15 @@ def agregar_correo(usuario, direccion):
         raise ErrorPerfil(["Ese correo ya está registrado."])
 
     try:
-        db.session.add(Correo(
+        fila = Correo(
             id_usuario=usuario.id_usuario,
             direccion=direccion,
             es_principal=not usuario.correos,
-        ))
-        Auditoria.registrar(usuario.id_usuario, "USUARIO",
-                            usuario.id_usuario, Auditoria.MODIFICACION)
+        )
+        db.session.add(fila)
+        db.session.flush()
+        Auditoria.registrar(usuario.id_usuario, "CORREO",
+                            fila.id_correo, Auditoria.ALTA)
         db.session.commit()
     except IntegrityError:
         db.session.rollback()
@@ -113,8 +115,8 @@ def editar_correo(usuario, id_correo, direccion):
 
     try:
         fila.direccion = direccion
-        Auditoria.registrar(usuario.id_usuario, "USUARIO",
-                            usuario.id_usuario, Auditoria.MODIFICACION)
+        Auditoria.registrar(usuario.id_usuario, "CORREO",
+                            fila.id_correo, Auditoria.MODIFICACION)
         db.session.commit()
     except IntegrityError:
         db.session.rollback()
@@ -143,8 +145,8 @@ def hacer_principal(usuario, id_correo):
                 otro.es_principal = False
         db.session.flush()
         fila.es_principal = True
-        Auditoria.registrar(usuario.id_usuario, "USUARIO",
-                            usuario.id_usuario, Auditoria.MODIFICACION)
+        Auditoria.registrar(usuario.id_usuario, "CORREO",
+                            fila.id_correo, Auditoria.MODIFICACION)
         db.session.commit()
     except IntegrityError:
         db.session.rollback()
@@ -183,9 +185,9 @@ def eliminar_correo(usuario, id_correo):
         raise ErrorPerfil(["Elegí otro correo como principal antes de eliminar este."])
 
     try:
+        Auditoria.registrar(usuario.id_usuario, "CORREO",
+                            fila.id_correo, Auditoria.BAJA)
         db.session.delete(fila)
-        Auditoria.registrar(usuario.id_usuario, "USUARIO",
-                            usuario.id_usuario, Auditoria.MODIFICACION)
         db.session.commit()
     except Exception:
         db.session.rollback()

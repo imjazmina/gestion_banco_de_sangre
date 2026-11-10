@@ -157,10 +157,12 @@ def enviar_recordatorio(cita):
 
 def pendientes_de_habilitacion(ahora=None):
     """
-    Donantes cuyo diferimiento temporal ya venció, o cuyo intervalo desde
-    la última extracción ya se cumplió, y todavía no recibieron el aviso.
+    Donantes cuyo diferimiento temporal ya venció y no les queda otro activo,
+    o cuyo intervalo desde la última extracción ya se cumplió, y todavía
+    no recibieron el aviso.
     El texto no incluye la causa.
     """
+    from app.controllers.portal.agenda import diferimiento_vigente
     from app.controllers.portal.perfil import habilitacion
     from app.models import RegistroDiferimiento, Usuario
 
@@ -179,6 +181,8 @@ def pendientes_de_habilitacion(ahora=None):
         if usuario.id_usuario in ya:
             continue
         if usuario.id_usuario in por_diferimiento:
+            if diferimiento_vigente(usuario):
+                continue
             listos.append(usuario)
             continue
         dato = habilitacion(usuario)
@@ -220,19 +224,22 @@ def correr(url_base, ahora=None):
         enviar_habilitacion(usuario)
         lineas.append(f"  habilitación usuario {usuario.id_usuario}")
 
-    from app.controllers.comun.simulacion import marcar_vencidas, vencer_publicadas
-    from app.controllers.portal.agenda import DOCUMENTO_PERSONAL_DE_TURNO
-    from app.models import Usuario
+    from app.controllers.comun.simulacion import aplicar_vencimientos
 
-    personal = Usuario.query.filter_by(documento=DOCUMENTO_PERSONAL_DE_TURNO).first()
-    if personal is None:
-        lineas.append("  solicitudes: falta el usuario Personal de turno.")
-    else:
-        try:
-            n = vencer_publicadas(personal, (ahora or datetime.now()).date())
-            lineas.append(f"  solicitudes vencidas: {n}")
-            lineas.append(f"  unidades vencidas: {marcar_vencidas(personal)}")
-        except Exception as exc:
-            db.session.rollback()
-            lineas.append(f"  solicitudes: FALLÓ — {exc}")
+    try:
+        n_sol, n_uni = aplicar_vencimientos((ahora or datetime.now()).date())
+        lineas.append(f"  solicitudes vencidas: {n_sol}")
+        lineas.append(f"  unidades vencidas: {n_uni}")
+    except Exception as exc:
+        db.session.rollback()
+        lineas.append(f"  vencimientos: FALLÓ — {exc}")
+
+    from app.controllers.comun.ausencias import marcar
+
+    try:
+        n_aus = marcar(ahora)
+        lineas.append(f"  citas y consejerías ausentes: {n_aus}")
+    except Exception as exc:
+        db.session.rollback()
+        lineas.append(f"  ausencias: FALLÓ — {exc}")
     return lineas

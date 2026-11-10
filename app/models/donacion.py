@@ -66,12 +66,9 @@ class Cita(db.Model):
         db.Integer, db.ForeignKey("usuario.id_usuario"), nullable=False)
     id_solicitud = db.Column(
         db.Integer, db.ForeignKey("solicitud.id_solicitud"))
-    # NOT NULL en el esquema: toda cita nombra a quien atiende. Al reservar
-    # por el portal todavía no se sabe quién va a ser, así que queda el
-    # usuario de servicio «Personal de turno» y el panel lo reemplaza por la
-    # persona real en el mostrador.
+    # NULL hasta Ausente, No apto o Completada. Ahí se graba quien cerró.
     id_personal = db.Column(
-        db.Integer, db.ForeignKey("usuario.id_usuario"), nullable=False)
+        db.Integer, db.ForeignKey("usuario.id_usuario"))
     id_horario = db.Column(
         db.Integer, db.ForeignKey("horario_disponible.id_horario"), nullable=False)
     fecha_hora_creacion = db.Column(
@@ -115,7 +112,6 @@ class Cita(db.Model):
         return instante is not None and instante < datetime.now()
 
     ALTRUISTA = "Donacion altruista"
-    REPOSICION = "Reposicion"
     SOLIDARIA = "Donacion solidaria"
     COMPATIBILIDAD = "Extraccion de muestra para compatibilidad"
     MUESTRA = "Extraccion de muestra para compatibilidad"
@@ -204,8 +200,11 @@ class RegistroDiferimiento(db.Model):
     """
     Diferimiento aplicado a un donante concreto.
 
-    fecha_fin la completa el trigger fn_registro_fecha_fin a partir de los
-    días de rehabilitación del catálogo; queda nula si es permanente.
+    Varios registros pueden compartir la misma cita o el mismo resultado.
+    Cada uno guarda su causa, su tipo y sus fechas. fecha_fin la completa
+    el trigger fn_registro_fecha_fin; queda nula si es permanente.
+    Si el diagnóstico es de otra institución, no hay causa: id_diferimiento
+    queda nulo y se conserva la fecha de inicio.
     """
     __tablename__ = "registro_diferimiento"
 
@@ -213,7 +212,7 @@ class RegistroDiferimiento(db.Model):
     id_donante = db.Column(
         db.Integer, db.ForeignKey("usuario.id_usuario"), nullable=False)
     id_diferimiento = db.Column(
-        db.Integer, db.ForeignKey("diferimiento.id_diferimiento"), nullable=False)
+        db.Integer, db.ForeignKey("diferimiento.id_diferimiento"))
     id_cita = db.Column(db.Integer, db.ForeignKey("cita.id_cita"))
     id_personal = db.Column(db.Integer, db.ForeignKey("usuario.id_usuario"))
     origen = db.Column(db.String(30), nullable=False)
@@ -228,9 +227,9 @@ class RegistroDiferimiento(db.Model):
 
     causa = db.relationship("Diferimiento", lazy="joined")
 
-    CUESTIONARIO_SISTEMA = "CUESTIONARIO_SISTEMA"
-    CUESTIONARIO_PERSONAL = "CUESTIONARIO_PERSONAL"
+    CUESTIONARIO = "Cuestionario"
     MEDICION = "MEDICION"
+    EXTRACCION = "EXTRACCION"
     LABORATORIO = "LABORATORIO"
 
 
@@ -257,7 +256,6 @@ class MuestraCompatibilidad(db.Model):
         nullable=False, unique=True)
     id_solicitud = db.Column(
         db.Integer, db.ForeignKey("solicitud.id_solicitud"), nullable=False)
-    codigo = db.Column(db.String(40), nullable=False, unique=True)
     fecha = db.Column(db.DateTime, nullable=False, default=datetime.now)
 
     solicitud = db.relationship("Solicitud")
@@ -366,8 +364,9 @@ class CitacionConsejeria(db.Model):
     id_citacion = db.Column(db.Integer, primary_key=True)
     id_donante = db.Column(
         db.Integer, db.ForeignKey("usuario.id_usuario"), nullable=False)
+    # NULL hasta Ausente o Realizada. Ahí se graba quien cerró.
     id_personal = db.Column(
-        db.Integer, db.ForeignKey("usuario.id_usuario"), nullable=False)
+        db.Integer, db.ForeignKey("usuario.id_usuario"))
     id_horario = db.Column(
         db.Integer, db.ForeignKey("horario_disponible.id_horario"), nullable=False)
     id_resultado = db.Column(

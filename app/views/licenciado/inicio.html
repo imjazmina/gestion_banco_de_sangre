@@ -78,7 +78,7 @@
               <p class="truncate" style="margin:0;font-weight:600;">{{ encontrado.nombre_completo }}</p>
               <p class="muted" style="margin:0;font-size:12px;">CI {{ encontrado.documento_visible }}</p>
             </div>
-            {% if diferimiento %}
+            {% if vigentes %}
             <a class="btn btn-ghost btn-sm" href="{{ url_for('licenciado_ficha.ver', donor_id=encontrado.id_usuario, de='inicio') }}">Ver ficha</a>
             {% else %}
             <form method="post" action="{{ url_for('licenciado_inicio.espontaneo') }}">
@@ -89,18 +89,22 @@
             {% endif %}
           </div>
 
-          {% if diferimiento %}
-            {% if restriccion == 'externo' %}
-              {% call alerta('info', 'Diferimiento en otra institución') %}
-                {{ diferimiento.institucion_diagnostico }}. No se abre una atención nueva.
-              {% endcall %}
-            {% elif restriccion == 'permanente' %}
-              {% call alerta('danger', diferimiento.causa.nombre) %}
-                Diferimiento permanente desde {{ diferimiento.fecha_inicio.strftime('%d/%m/%Y') }}. No se abre una atención nueva.
+          {% if origenes or vigentes_locales %}
+            {% if origenes and not vigentes_locales %}
+              {% call alerta('info', 'Diferimiento vigente de otra institución' if origenes|length == 1 else 'Diferimientos vigentes de otra institución') %}
+                No se abre una atención nueva mientras quede al menos uno activo.
+                {% for origen in origenes %}<p style="margin:8px 0 0;">Origen: {{ origen }}</p>{% endfor %}
               {% endcall %}
             {% else %}
-              {% call alerta('warn', diferimiento.causa.nombre) %}
-                Fecha de inicio {{ diferimiento.fecha_inicio.strftime('%d/%m/%Y') }}{% if diferimiento.fecha_fin %} · Fecha de fin {{ diferimiento.fecha_fin.strftime('%d/%m/%Y') }}{% endif %}. No se abre una atención nueva.
+              {% set tono = 'danger' if restriccion == 'permanente' else 'warn' %}
+              {% call alerta(tono, 'Diferimiento vigente' if (vigentes_locales|length + origenes|length) == 1 else 'Diferimientos vigentes') %}
+                No se abre una atención nueva mientras quede al menos uno activo.
+                <ul style="margin:8px 0 0;padding-left:16px;">
+                  {% for d in vigentes_locales %}
+                  <li>{{ d.causa.nombre }} · {{ d.causa.tipo }} · inicio {{ d.fecha_inicio.strftime('%d/%m/%Y') }}{% if d.fecha_fin %} · fin {{ d.fecha_fin.strftime('%d/%m/%Y') }}{% else %} · sin fecha de fin{% endif %}</li>
+                  {% endfor %}
+                  {% for origen in origenes %}<li>Origen: {{ origen }}</li>{% endfor %}
+                </ul>
               {% endcall %}
             {% endif %}
           {% else %}
