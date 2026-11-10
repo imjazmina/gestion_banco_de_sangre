@@ -109,23 +109,30 @@ def _observacion(formulario, accion):
 
     completo = resultado == "Completa"
     con_sangre = resultado != "Sin sangre"
-    brazo = _opcion(formulario, "brazo", BRAZOS, con_sangre, "el brazo")
-    puncion = _opcion(formulario, "puncion", PUNCIONES, con_sangre, "la punción")
-    reaccion = _opcion(formulario, "reaccion", REACCIONES, False, "la reacción")
+    # En una incidencia solo se exigen Procedimiento y Horarios.
+    resto = con_sangre and accion != "incidencia"
+    brazo = _opcion(formulario, "brazo", BRAZOS, True, "el brazo")
+    puncion = _opcion(formulario, "puncion", PUNCIONES, True, "la punción")
+    reaccion = _opcion(
+        formulario, "reaccion", REACCIONES, accion == "incidencia", "la reacción")
     anticoagulante = _opcion(
-        formulario, "anticoagulante", ANTICOAGULANTES, con_sangre,
-        "el anticoagulante")
-    bolsa = _opcion(formulario, "bolsa_tipo", BOLSAS, con_sangre, "el tipo de bolsa")
-    marca = _texto(formulario, "marca", con_sangre, "la marca")
+        formulario, "anticoagulante", ANTICOAGULANTES, resto, "el anticoagulante")
+    bolsa = _opcion(formulario, "bolsa_tipo", BOLSAS, resto, "el tipo de bolsa")
+    marca = _texto(formulario, "marca", resto, "la marca")
     inicio = _hora(formulario, "hora_inicio", "la hora de inicio")
     fin = _hora(formulario, "hora_fin", "la hora de finalización")
     if fin < inicio:
         raise ErrorJornada("La hora de finalización es anterior al inicio.")
-    cantidad = _cantidad(formulario, resultado)
-    n_unidades = _unidades(formulario, completo)
-    tabuladora = _texto(
-        formulario, "codigo_tabuladora", con_sangre, "el código de tabuladora")
-    lote = _texto(formulario, "lote", con_sangre, "el lote")
+    if accion == "incidencia":
+        bruto = (formulario.get("cantidad") or "").strip()
+        cantidad = _cantidad(formulario, resultado) if bruto else None
+        pedidas = (formulario.get("unidades") or "").strip()
+        n_unidades = _unidades(formulario, completo and bool(pedidas))
+    else:
+        cantidad = _cantidad(formulario, resultado)
+        n_unidades = _unidades(formulario, completo)
+    tabuladora = _texto(formulario, "codigo_tabuladora", resto, "el código de tabuladora")
+    lote = _texto(formulario, "lote", resto, "el lote")
 
     pares = (
         ("Brazo", brazo),
@@ -225,4 +232,5 @@ def ver(cita_id):
         momentos=MOMENTOS,
         incidentes=[] if extraccion else jornada.causas_de_incidente(),
         resultados=RESULTADOS,
+        datos=request.form,
     )
