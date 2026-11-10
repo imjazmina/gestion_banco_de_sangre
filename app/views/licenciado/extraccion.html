@@ -17,12 +17,12 @@
     Se generaron <strong>{{ unidades|length }}</strong> unidades. Pasan a laboratorio para tipificación y serología.
     {% endif %}
     {% if campos.get('Incidencia') %}
-    Quedó documentada la incidencia: <strong>{{ campos.get('Tipo') }}</strong>.
+    Quedó documentada la incidencia: <strong>{{ campos.get('Tipo') }}</strong>, con su diferimiento temporal.
     {% endif %}
   {% endcall %}
   {% elif campos.get('Incidencia') %}
   {% call alerta('danger', 'Extracción sin unidad') %}
-    Se registró la extracción y la incidencia. Resultado: <strong>{{ campos.get('Resultado') }}</strong>. No se generó código de unidad ni se incorporó al stock.
+    Se registró la extracción, la incidencia <strong>{{ campos.get('Tipo') }}</strong> y su diferimiento temporal. Resultado: <strong>{{ campos.get('Resultado') }}</strong>. No se generó código de unidad ni se incorporó al stock.
   {% endcall %}
   {% else %}
   {% call alerta('warn', 'Extracción registrada') %}
@@ -194,10 +194,11 @@
           <label>Tipo <span class="req">*</span></label>
           <select class="control" name="tipo" id="inc-tipo">
             <option value="">Seleccionar</option>
-            {% for t in tipos %}
-            <option value="{{ t }}">{{ t }}</option>
+            {% for t, causa in incidentes %}
+            <option value="{{ t }}" data-causa="{{ causa.nombre }}" data-dias="{{ causa.dias_rehabilitacion }}">{{ t }}</option>
             {% endfor %}
           </select>
+          <p class="hint" id="inc-causa" hidden></p>
         </div>
         <div class="field">
           <label>Descripción <span class="req">*</span></label>
@@ -223,12 +224,22 @@
     const tipo = document.getElementById("inc-tipo");
     const desc = document.getElementById("inc-desc");
     const confirmar = document.getElementById("confirmar-incidencia");
+    const causa = document.getElementById("inc-causa");
     function lista() {
       const resultado = document.querySelector("input[name='resultado']:checked");
       confirmar.disabled = !(momento.value && tipo.value && desc.value.trim() && resultado);
     }
+    function mostrarCausa() {
+      const opcion = tipo.selectedOptions[0];
+      causa.hidden = !(opcion && opcion.dataset.causa);
+      if (!causa.hidden) {
+        causa.textContent = "Registra el diferimiento temporal «" + opcion.dataset.causa
+          + "» por " + opcion.dataset.dias + " días.";
+      }
+    }
     momento.addEventListener("change", lista);
     tipo.addEventListener("change", lista);
+    tipo.addEventListener("change", mostrarCausa);
     desc.addEventListener("input", lista);
     document.querySelectorAll("input[name='resultado']").forEach((radio) => {
       radio.addEventListener("change", lista);

@@ -21,8 +21,11 @@ def citacion_por_id(id_citacion):
     return db.session.get(CitacionConsejeria, id_citacion)
 
 
-def marcar(citacion, estado, personal):
-    """Desde el día de atención marca ausente o realizada. No confirma ni cancela."""
+def marcar(citacion, estado, personal, observaciones=None):
+    """Desde el día de atención marca ausente o realizada. No confirma ni cancela.
+
+    `observaciones` es opcional: lo que el personal anote queda en la citación.
+    """
     if estado not in (
             CitacionConsejeria.AUSENTE, CitacionConsejeria.REALIZADA):
         raise ErrorConsejeria(
@@ -36,6 +39,8 @@ def marcar(citacion, estado, personal):
     citacion.id_personal = id_al_cerrar(
         estado, personal, CITACION_CERRADA, ErrorConsejeria)
     citacion.estado = estado
+    if observaciones is not None:
+        citacion.observaciones = observaciones.strip() or None
     Auditoria.registrar(personal.id_usuario, "CITACION_CONSEJERIA",
                         citacion.id_citacion, Auditoria.CAMBIO_ESTADO)
     db.session.commit()

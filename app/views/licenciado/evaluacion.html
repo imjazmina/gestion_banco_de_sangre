@@ -1,6 +1,8 @@
 {% extends "comun/layout.html" %}
-{% from "comun/_ui.html" import crumb, alerta, modal, btn %}
+{% from "comun/_ui.html" import crumb, alerta, modal, btn, badge %}
 {% from "comun/_iconos.html" import ico %}
+
+{% macro dias(causa) %}{% if causa %}{{ causa.nombre }} · {{ causa.dias_rehabilitacion }} día{{ '' if causa.dias_rehabilitacion == 1 else 's' }}{% endif %}{% endmacro %}
 
 {% block titulo %}Examen físico{% endblock %}
 
@@ -12,56 +14,44 @@
       <h1>Examen físico</h1>
       <p>{{ cita.donante.nombre_completo }} · CI {{ cita.donante.documento_visible }}</p>
     </div>
+    {% if mediciones %}{{ badge('Evaluación física no superada', 'danger') }}{% endif %}
   </div>
 
   {% if mediciones %}
-  {# No apto: no se muestran los valores. Solo el diferimiento. #}
-  {% call alerta('warn', 'Uno o más signos fuera de rango') %}No se puede realizar la extracción. Se debe registrar el motivo de diferimiento.{% endcall %}
+  {% call alerta('danger', 'Valores fuera de rango') %}No se realiza la extracción. Cada parámetro que no cumplió genera su diferimiento automáticamente.{% endcall %}
 
-  <div class="row-end mt-5">
-    {% if cita.estado in ('Pendiente', 'Confirmada') %}
-      <button type="button" class="btn btn-danger" data-abrir="modal-diferir">{{ ico('alert', 14) }} Diferir</button>
-    {% else %}
-      {{ btn('Volver a la ficha', 'secondary', 'md', url_for('licenciado_ficha.ver', donor_id=cita.id_usuario, cita=cita.id_cita)) }}
+  <div class="summary mt-4" style="padding:16px;">
+    <ul style="margin:0;padding-left:16px;">
+      {% for f in fuera %}
+      <li><strong>{{ f.medicion.tipo.nombre }}</strong>: {{ f.medicion.valor|float }} {{ f.medicion.tipo.unidad }}{% if f.umbral %} · {{ f.umbral }}{% endif %}{% if f.causa %} · {{ dias(f.causa) }}{% endif %}</li>
+      {% endfor %}
+    </ul>
+  </div>
+
+  <div class="row-end mt-5" style="gap:8px;">
+    {{ btn('Volver a la ficha', 'secondary', 'md', url_for('licenciado_ficha.ver', donor_id=cita.id_usuario, cita=cita.id_cita)) }}
+    {% if cita.estado == 'Confirmada' %}
+      <button type="button" class="btn btn-danger" data-abrir="modal-fuera">{{ ico('alert', 14) }} Diferir</button>
     {% endif %}
   </div>
 
-  {% call modal('modal-diferir', 'Diferimiento — Examen físico', danger=true) %}
+  {% if cita.estado == 'Confirmada' %}
+  {% call modal('modal-fuera', 'Valores fuera de rango', danger=true) %}
   <form method="post">
     <input type="hidden" name="accion" value="diferir">
-    <p class="muted" style="margin:0 0 16px;">El donante no continúa a extracción. Registre el diferimiento de examen físico para <strong style="color:var(--ink);">{{ cita.donante.nombre_completo }}</strong>.</p>
-    <div class="stack">
-      <div class="summary" style="border-color:var(--danger-line);background:var(--danger-bg);">
-        <p style="margin:0;font-weight:500;color:var(--danger-ink);">Motivo</p>
-        <ul style="margin:8px 0 0;padding-left:16px;">
-          {% for m in mediciones if not m.apto %}
-          <li>{{ m.tipo.nombre }}: {{ m.valor|float }} {{ m.tipo.unidad }}</li>
-          {% endfor %}
-        </ul>
-      </div>
-      <div class="field">
-        <label>Causas del catálogo <span class="req">*</span></label>
-        <div class="stack" style="max-height:220px;overflow:auto;">
-          {% for c in causas %}
-          <label style="display:flex;gap:8px;align-items:flex-start;font-size:13px;">
-            <input type="checkbox" name="id_diferimiento" value="{{ c.id_diferimiento }}" {% if c.nombre in sugeridas %}checked{% endif %}>
-            <span>{{ c.nombre }} · {{ c.tipo }}{% if c.tipo == 'Temporal' %} · {{ c.dias_rehabilitacion }} días{% else %} · sin fecha de fin{% endif %}</span>
-          </label>
-          {% endfor %}
-        </div>
-        {% if sugeridas %}<p class="hint">Según las mediciones fuera de rango: {{ sugeridas|join(', ') }}. Podés marcar más de una. Cada causa guarda su fecha de fin.</p>{% else %}<p class="hint">Podés marcar más de una causa. Cada una guarda su motivo, su tipo y sus fechas.</p>{% endif %}
-      </div>
-      <div class="field">
-        <label>Institución del diagnóstico</label>
-        <input class="control" name="institucion" value="{{ institucion }}">
-      </div>
-    </div>
+    <p class="muted" style="margin:0 0 12px;"><strong style="color:var(--ink);">{{ cita.donante.nombre_completo }}</strong> no superó la evaluación física. Se registran estos diferimientos y la cita pasa a «No apto».</p>
+    <ul style="margin:0;padding-left:16px;">
+      {% for f in fuera %}
+      <li><strong>{{ f.medicion.tipo.nombre }}</strong>: {{ f.medicion.valor|float }} {{ f.medicion.tipo.unidad }}{% if f.umbral %} · {{ f.umbral }}{% endif %}{% if f.causa %}<br><span class="muted">{{ dias(f.causa) }}</span>{% endif %}</li>
+      {% endfor %}
+    </ul>
     <div class="row-end mt-4">
-      <button type="button" class="btn btn-ghost" data-cerrar="modal-diferir">Cancelar</button>
-      <button type="submit" class="btn btn-danger">Confirmar diferimientos</button>
+      <button type="button" class="btn btn-ghost" data-cerrar="modal-fuera">Cerrar</button>
+      <button type="submit" class="btn btn-danger">Confirmar diferimiento</button>
     </div>
   </form>
   {% endcall %}
+  {% endif %}
 
   {% else %}
   <form method="post" id="signos">
@@ -72,7 +62,10 @@
       </div>
       <div class="vital-grid">
         {% for t in tipos %}
-        <div class="vital" data-vital data-min="{{ t.valor_minimo|float }}" data-max="{{ t.valor_maximo|float }}">
+        {% set par = causas_rango.get(t.codigo, (none, none)) %}
+        <div class="vital" data-vital data-min="{{ t.valor_minimo|float }}" data-max="{{ t.valor_maximo|float }}"
+             data-nombre="{{ t.nombre }}" data-unidad="{{ t.unidad }}"
+             data-causa-bajo="{{ dias(catalogo.get(par[0])) }}" data-causa-alto="{{ dias(catalogo.get(par[1])) }}">
           <div class="split" style="align-items:flex-start;">
             <div style="min-width:0;">
               <label for="v-{{ t.codigo }}" style="font-weight:600;">{{ t.nombre }}</label>
@@ -88,6 +81,15 @@
     <div class="row-end mt-5">
       <button type="submit" class="btn btn-teal">Registrar signos</button>
     </div>
+
+    {% call modal('modal-fuera', 'Valores fuera de rango', danger=true) %}
+      <p class="muted" style="margin:0 0 12px;">Estos valores no cumplen el rango. Si son correctos, se guardan las mediciones, se registra el diferimiento de cada parámetro y la cita pasa a «No apto».</p>
+      <ul id="fuera-lista" style="margin:0;padding-left:16px;"></ul>
+      <div class="row-end mt-4">
+        <button type="button" class="btn btn-ghost" data-cerrar="modal-fuera">Corregir valores</button>
+        <button type="submit" class="btn btn-danger" name="accion" value="diferir">Registrar y diferir</button>
+      </div>
+    {% endcall %}
   </form>
   {% endif %}
 </div>
@@ -110,6 +112,46 @@
       else { estado.className = 'noapto'; estado.textContent = 'Fuera de rango'; caja.classList.add('bad'); }
     });
   });
+
+  (function () {
+    var form = document.getElementById('signos');
+    var modal = document.getElementById('modal-fuera');
+    var lista = document.getElementById('fuera-lista');
+    form.addEventListener('submit', function (e) {
+      if (e.submitter && e.submitter.name === 'accion') return;
+      lista.innerHTML = '';
+      form.querySelectorAll('[data-vital]').forEach(function (caja) {
+        var n = parseFloat(caja.querySelector('input').value.replace(',', '.'));
+        var min = parseFloat(caja.dataset.min), max = parseFloat(caja.dataset.max);
+        if (isNaN(n) || (n >= min && n <= max)) return;
+        var bajo = n < min;
+        var item = document.createElement('li');
+        var nombre = document.createElement('strong');
+        nombre.textContent = caja.dataset.nombre;
+        item.appendChild(nombre);
+        item.appendChild(document.createTextNode(': ' + n + ' ' + caja.dataset.unidad + ' · '
+          + (bajo ? 'Por debajo del mínimo (' + min : 'Por encima del máximo (' + max)
+          + ' ' + caja.dataset.unidad + ')'));
+        var causa = bajo ? caja.dataset.causaBajo : caja.dataset.causaAlto;
+        if (causa) {
+          var detalle = document.createElement('span');
+          detalle.className = 'muted';
+          detalle.textContent = causa;
+          item.appendChild(document.createElement('br'));
+          item.appendChild(detalle);
+        }
+        lista.appendChild(item);
+      });
+      if (lista.children.length) {
+        e.preventDefault();
+        modal.classList.remove('hidden');
+      }
+    });
+  })();
 </script>
+{% else %}
+{% if cita.estado == 'Confirmada' %}
+<script>document.getElementById('modal-fuera').classList.remove('hidden');</script>
+{% endif %}
 {% endif %}
 {% endblock %}

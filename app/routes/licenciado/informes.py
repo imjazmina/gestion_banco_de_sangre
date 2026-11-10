@@ -43,5 +43,5 @@ def exportar():
     return Response(
         informes.csv_maqueta(datos, tab),
         mimetype="text/csv",
-        headers={"Content-Disposition": f"attachment; filename={nombre}"},
+        headers={"Content-Disposition": f'attachment; filename="{nombre}"'},
     )

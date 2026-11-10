@@ -755,7 +755,7 @@ def csv_maqueta(datos, tab):
     escritor.writerow([])
     for fila in panel["filas"]:
         escritor.writerow(fila)
-    return buffer.getvalue()
+    return "\ufeff" + buffer.getvalue()
 
 
 def csv(datos):

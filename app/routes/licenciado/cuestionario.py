@@ -1,11 +1,13 @@
 """Parte B del cuestionario, en sala."""
+from datetime import date, timedelta
+
 from flask import Blueprint, flash, redirect, request, url_for
 
 from app.controllers.comun.acceso import operador_actual, pintar, requiere
+from app.controllers.comun.derivacion import externo_vigente
 from app.controllers.licenciado import jornada
 from app.controllers.licenciado.jornada import ErrorJornada
 from app.controllers.portal import cuestionario as parte_a
-from app.models import RegistroDiferimiento
 
 licenciado_cuestionario_bp = Blueprint(
     "licenciado_cuestionario", __name__, url_prefix="/licenciado")
@@ -24,6 +26,11 @@ def ver(cita_id):
     cita = _cita_o_volver(cita_id)
     if cita is None:
         return redirect(url_for("licenciado_agendamientos.lista"))
+    if externo_vigente(cita.id_usuario):
+        flash("Hay un diferimiento vigente de otro establecimiento. "
+              "La evaluación queda desactivada.", "error")
+        return redirect(url_for("licenciado_ficha.ver", donor_id=cita.id_usuario,
+                                cita=cita.id_cita))
     # Parte A: lo que el donante respondió en el portal. Solo lectura acá.
     filas_a, atencion = parte_a.resumen(cita)
     secciones_a = []
@@ -41,7 +48,9 @@ def ver(cita_id):
         consentimiento=parte_a.consentimiento_aceptado(cita),
         preguntas=jornada.preguntas_parte_b(),
         respuestas=jornada.respuestas_de(cita),
-        causas=jornada.catalogo_diferimientos(),
+        motivos=jornada.motivos_cuestionario(cita),
+        causas=jornada.causas_cuestionario(),
+        hasta=lambda dias: (date.today() + timedelta(days=dias)).strftime("%d/%m/%Y"),
         institucion=jornada.INSTITUCION_LOCAL,
     )
 
@@ -52,13 +61,17 @@ def guardar(cita_id):
     cita = _cita_o_volver(cita_id)
     if cita is None:
         return redirect(url_for("licenciado_agendamientos.lista"))
+    if externo_vigente(cita.id_usuario):
+        flash("Hay un diferimiento vigente de otro establecimiento. "
+              "La evaluación queda desactivada.", "error")
+        return redirect(url_for("licenciado_ficha.ver", donor_id=cita.id_usuario,
+                                cita=cita.id_cita))
     personal = operador_actual()["usuario"]
     try:
         if request.form.get("accion") == "diferir":
             jornada.registrar_diferimiento(
                 cita, personal,
                 request.form.getlist("id_diferimiento"),
-                RegistroDiferimiento.CUESTIONARIO_PERSONAL,
                 request.form.get("institucion"),
             )
             flash("La cita quedó como no apta y se registraron los diferimientos.", "ok")

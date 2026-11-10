@@ -244,7 +244,7 @@
 
       </div>
       <div class="informe-actions">
-        {{ btn('Exportar informe', 'secondary', 'sm', url_for(exportar_url, tab=tab, desde=datos.desde.isoformat(), hasta=datos.hasta.isoformat()), 'download') }}
+        {{ btn('Exportar informe', 'secondary', 'sm', url_for(exportar_url, tab=tab, desde=datos.desde.isoformat(), hasta=datos.hasta.isoformat()), 'download', attrs='id="exportar-informe"') }}
       </div>
     </div>
   </div>
@@ -265,6 +265,39 @@
   }
   form.desde.addEventListener("input", revisar);
   form.hasta.addEventListener("input", revisar);
+})();
+(function () {
+  var enlace = document.getElementById("exportar-informe");
+  if (!enlace) return;
+  enlace.addEventListener("click", function (evento) {
+    evento.preventDefault();
+    var sid = sessionStorage.getItem("sid") || "";
+    fetch(enlace.href, {
+      headers: {"X-Sesion": sid, "X-Sesion-Resuelta": "1"},
+      credentials: "same-origin"
+    }).then(function (respuesta) {
+      if (respuesta.redirected) {
+        window.location.replace(respuesta.url);
+        return null;
+      }
+      var tipo = respuesta.headers.get("Content-Type") || "";
+      if (!respuesta.ok || tipo.indexOf("text/csv") === -1) return null;
+      var nombre = "informe.csv";
+      var disp = respuesta.headers.get("Content-Disposition") || "";
+      var coincide = /filename="?([^";]+)"?/.exec(disp);
+      if (coincide) nombre = coincide[1];
+      return respuesta.blob().then(function (blob) {
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement("a");
+        a.href = url;
+        a.download = nombre;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        URL.revokeObjectURL(url);
+      });
+    });
+  });
 })();
 </script>
 {% endblock %}

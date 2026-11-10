@@ -13,6 +13,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app import calendario
 from app.controllers.comun.estados import CITA_CERRADA, id_al_cerrar
+from app.controllers.licenciado import criterios
 from app.controllers.portal.agenda import (
     diferimiento_vigente, diferimientos_vigentes, elegir_vigente,
 )
@@ -36,15 +37,6 @@ ETIQUETA_AGENDAMIENTO = {
     Cita.SOLIDARIA: "Donación solidaria",
     Cita.MUESTRA: "Extracción de muestra para compatibilidad",
 }
-
-CAUSA_POR_MEDICION = {
-    "TEMPERATURA": "Cuadro febril o gripal",
-    "PESO": "Peso inferior al mínimo",
-    "PAS": "Presión arterial fuera de rango",
-    "PAD": "Presión arterial fuera de rango",
-    "HB": "Hemoglobina baja",
-}
-
 
 class ErrorJornada(Exception):
     """La acción no se puede guardar. El mensaje se muestra al personal."""
@@ -255,6 +247,7 @@ def guardar_mediciones(cita, personal, formulario):
             id_tipo_medicion=tipo.id_tipo_medicion,
             valor=valor,
             apto=False,
+            observaciones=fuera_de_rango(tipo, valor),
             fecha=ahora,
         )
         db.session.add(fila)
@@ -266,55 +259,119 @@ def guardar_mediciones(cita, personal, formulario):
     _commit()
 
 
-def causas_sugeridas(cita):
-    """Nombres de catálogo que corresponden a mediciones no aptas."""
-    nombres = []
+def fuera_de_rango(tipo, valor):
+    """Qué umbral no cumplió el valor, o None si está en rango."""
+    minimo, maximo = float(tipo.valor_minimo), float(tipo.valor_maximo)
+    if valor < minimo:
+        return f"Por debajo del mínimo ({minimo:g} {tipo.unidad})"
+    if valor > maximo:
+        return f"Por encima del máximo ({maximo:g} {tipo.unidad})"
+    return None
+
+
+def _causas_por_nombre(nombres):
+    """Las filas del catálogo, en el orden pedido. Falla si falta alguna."""
+    filas = {c.nombre: c for c in
+             Diferimiento.query.filter(Diferimiento.nombre.in_(nombres)).all()}
+    faltan = [n for n in nombres if n not in filas]
+    if faltan:
+        raise ErrorJornada(f"Falta en el catálogo la causa «{faltan[0]}».")
+    return [filas[n] for n in nombres]
+
+
+def mediciones_fuera_de_rango(cita):
+    """
+    Cada medición no apta con la causa que le corresponde según hacia dónde
+    se salió del rango. `apto` lo calculó la base; acá solo se nombra.
+    """
+    filas = []
     for medicion in mediciones_de(cita):
         if medicion.apto:
             continue
-        nombre = CAUSA_POR_MEDICION.get(medicion.tipo.codigo)
-        if nombre and nombre not in nombres:
-            nombres.append(nombre)
-    return nombres
+        tipo = medicion.tipo
+        nombre = criterios.causa_de_medicion(
+            tipo.codigo, float(medicion.valor),
+            float(tipo.valor_minimo), float(tipo.valor_maximo))
+        filas.append((medicion, nombre))
+    return filas
 
 
-def catalogo_diferimientos():
-    return Diferimiento.query.order_by(Diferimiento.nombre).all()
+def causas_de_medicion_posibles():
+    nombres = list(dict.fromkeys(
+        n for par in criterios.MEDICION.values() for n in par))
+    return _causas_por_nombre(nombres)
 
 
-def registrar_diferimiento(cita, personal, ids_diferimiento, origen, institucion):
+def causas_de_medicion(cita):
+    nombres = list(dict.fromkeys(
+        n for _, n in mediciones_fuera_de_rango(cita) if n))
+    return _causas_por_nombre(nombres) if nombres else []
+
+
+def causas_cuestionario():
+    """Lo que ofrece el autocompletado: causas temporales del cuestionario."""
+    return [c for c in _causas_por_nombre(list(criterios.CUESTIONARIO))
+            if c.tipo == Diferimiento.TEMPORAL]
+
+
+def motivos_cuestionario(cita):
     """
-    Un registro por causa, en la misma atención.
+    Las preguntas que, según la respuesta, generan un diferimiento temporal.
 
-    `fecha_fin` la escribe el trigger: inicio más días si es temporal,
-    nula si es permanente. La cita pasa a No apto una sola vez.
+    Parte A sale de lo que el donante ya envió. Parte B se pinta entera con
+    la respuesta que difiere: la pantalla la muestra u oculta según lo que
+    marque el personal, porque todavía no está guardada.
     """
-    _exigir_ajeno(cita, personal)
-    if origen not in (RegistroDiferimiento.CUESTIONARIO_PERSONAL,
-                      RegistroDiferimiento.MEDICION):
-        raise ErrorJornada("Ese origen no corresponde a esta pantalla.")
-    if cita.estado != Cita.CONFIRMADA:
-        raise ErrorJornada("Solo una cita confirmada puede quedar no apta.")
+    from app.controllers.portal import cuestionario as parte_a
 
+    por_nombre = {c.nombre: c for c in causas_cuestionario()}
+    respondidas = respuestas_de(cita)
+    motivos = []
+
+    def agregar(id_pregunta, enunciado, parte, numero):
+        regla = criterios.POR_PREGUNTA.get(enunciado)
+        if regla is None:
+            return
+        respuesta, nombres = regla
+        causas = [por_nombre[n] for n in nombres if n in por_nombre]
+        if not causas:
+            return
+        fila = respondidas.get(id_pregunta)
+        dada = fila.valor.split(" — ")[0] if fila else None
+        if parte == "A" and dada != respuesta:
+            return
+        motivos.append({
+            "id_pregunta": id_pregunta, "parte": parte, "numero": numero,
+            "enunciado": enunciado, "respuesta": respuesta,
+            "activo": dada == respuesta, "causas": causas,
+        })
+
+    for item in parte_a.preguntas():
+        agregar(item.id_pregunta, item.enunciado, "A", item.orden)
+    for numero, pregunta in enumerate(preguntas_parte_b(), start=1):
+        agregar(pregunta.id_pregunta, pregunta.enunciado, "B", numero)
+    return motivos
+
+
+def _ids(crudos):
     vistos = []
-    for crudo in ids_diferimiento or []:
+    for crudo in crudos or []:
         try:
             clave = int(crudo)
         except (TypeError, ValueError):
             raise ErrorJornada("Esa causa no está en el catálogo.")
         if clave not in vistos:
             vistos.append(clave)
-    if not vistos:
-        raise ErrorJornada("Elegí al menos una causa del catálogo.")
+    return vistos
 
-    causas = []
-    for clave in vistos:
-        causa = db.session.get(Diferimiento, clave)
-        if causa is None:
-            raise ErrorJornada("Esa causa no está en el catálogo.")
-        causas.append(causa)
 
-    institucion = (institucion or "").strip() or INSTITUCION_LOCAL
+def _registrar_causas(cita, personal, causas, origen, institucion):
+    """
+    Un registro por causa, en la misma atención. No hace commit.
+
+    `fecha_fin` la escribe el trigger: inicio más días si es temporal,
+    nula si es permanente.
+    """
     hoy = date.today()
     registros = []
     for causa in causas:
@@ -340,13 +397,55 @@ def registrar_diferimiento(cita, personal, ids_diferimiento, origen, institucion
             db.session.rollback()
             raise ErrorJornada(
                 "El diferimiento permanente no admite fecha de finalización.")
-    cita.id_personal = id_al_cerrar(Cita.NO_APTO, personal, CITA_CERRADA, ErrorJornada)
-    cita.estado = Cita.NO_APTO
     for registro in registros:
         Auditoria.registrar(personal.id_usuario, "REGISTRO_DIFERIMIENTO",
                             registro.id_registro, Auditoria.ALTA)
+    return registros
+
+
+def _cerrar_no_apto(cita, personal):
+    cita.id_personal = id_al_cerrar(Cita.NO_APTO, personal, CITA_CERRADA, ErrorJornada)
+    cita.estado = Cita.NO_APTO
     Auditoria.registrar(personal.id_usuario, "CITA", cita.id_cita,
                         Auditoria.CAMBIO_ESTADO)
+
+
+def registrar_diferimiento(cita, personal, ids_diferimiento, institucion):
+    """
+    Diferimiento desde el cuestionario de sala. Solo admite causas temporales
+    del cuestionario. La cita pasa a No apto una sola vez.
+    """
+    _exigir_ajeno(cita, personal)
+    if cita.estado != Cita.CONFIRMADA:
+        raise ErrorJornada("Solo una cita confirmada puede quedar no apta.")
+    vistos = _ids(ids_diferimiento)
+    if not vistos:
+        raise ErrorJornada("Elegí al menos un motivo.")
+    permitidas = {c.id_diferimiento: c for c in causas_cuestionario()}
+    if any(clave not in permitidas for clave in vistos):
+        raise ErrorJornada(
+            "Ese motivo no es un diferimiento temporal del cuestionario.")
+    institucion = (institucion or "").strip() or INSTITUCION_LOCAL
+    _registrar_causas(cita, personal, [permitidas[c] for c in vistos],
+                      RegistroDiferimiento.CUESTIONARIO_PERSONAL, institucion)
+    _cerrar_no_apto(cita, personal)
+    _commit()
+
+
+def diferir_por_mediciones(cita, personal):
+    """
+    Las causas salen de las mediciones no aptas; el personal no las elige.
+    La cita pasa a No apto.
+    """
+    _exigir_ajeno(cita, personal)
+    if cita.estado != Cita.CONFIRMADA:
+        raise ErrorJornada("Solo una cita confirmada puede quedar no apta.")
+    causas = causas_de_medicion(cita)
+    if not causas:
+        raise ErrorJornada("No hay mediciones fuera de rango para diferir.")
+    _registrar_causas(cita, personal, causas,
+                      RegistroDiferimiento.MEDICION, INSTITUCION_LOCAL)
+    _cerrar_no_apto(cita, personal)
     _commit()
 
 
@@ -369,11 +468,20 @@ def unidades_de(cita):
             .all())
 
 
-def registrar_extraccion(cita, personal, observacion, n_unidades=0):
+def causas_de_incidente():
+    """Cada tipo de incidente de extracción con su fila del catálogo."""
+    tipos = list(criterios.EXTRACCION)
+    causas = _causas_por_nombre([criterios.EXTRACCION[t] for t in tipos])
+    return list(zip(tipos, causas))
+
+
+def registrar_extraccion(cita, personal, observacion, n_unidades=0, incidente=None):
     """
     Cierra la cita y deja la extracción.
     Cada unidad completada pasa a laboratorio, con vencimiento a 30 días.
     Si no se completó ninguna, no hay fila en unidad ni código de unidad.
+    El incidente, si lo hay, deja su diferimiento de origen EXTRACCION; la
+    cita igual queda Completada.
     """
     _exigir_ajeno(cita, personal)
     if cita.tipo_cita == Cita.MUESTRA:
@@ -387,6 +495,11 @@ def registrar_extraccion(cita, personal, observacion, n_unidades=0):
         raise ErrorJornada("Solo una cita confirmada puede completarse.")
     if n_unidades < 0:
         raise ErrorJornada("La cantidad de unidades no es válida.")
+    causa_incidente = None
+    if incidente is not None:
+        if incidente not in criterios.EXTRACCION:
+            raise ErrorJornada("Ese incidente no corresponde a la extracción.")
+        causa_incidente = _causas_por_nombre([criterios.EXTRACCION[incidente]])[0]
 
     observacion = (observacion or "").strip()
     if not observacion:
@@ -438,6 +551,10 @@ def registrar_extraccion(cita, personal, observacion, n_unidades=0):
             tipo=Notificacion.AGRADECIMIENTO,
             mensaje="Gracias por donar. Tu extracción quedó registrada en el banco de sangre.",
         ))
+
+    if causa_incidente is not None:
+        _registrar_causas(cita, personal, [causa_incidente],
+                          RegistroDiferimiento.EXTRACCION, INSTITUCION_LOCAL)
 
     cita.id_personal = id_al_cerrar(Cita.COMPLETADA, personal, CITA_CERRADA, ErrorJornada)
     cita.estado = Cita.COMPLETADA
@@ -492,7 +609,6 @@ def registrar_muestra(cita, personal, observacion):
     muestra = MuestraCompatibilidad(
         id_extraccion=extraccion.id_extraccion,
         id_solicitud=solicitud.id_solicitud,
-        codigo=_codigo("MC"),
         fecha=fecha,
     )
     db.session.add(muestra)
@@ -668,6 +784,9 @@ def ficha(id_usuario):
         "vigente": vigente,
         "vigentes": vigentes,
         "restriccion": restriccion_de(vigente),
+        "externo_activo": any(
+            r.institucion_diagnostico.strip().lower() != INSTITUCION_LOCAL.lower()
+            for r in vigentes),
         "diferimientos": diferimientos,
         "unidades": unidades,
         "transiciones": transiciones,

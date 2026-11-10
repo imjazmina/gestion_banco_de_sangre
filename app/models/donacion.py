@@ -228,6 +228,7 @@ class RegistroDiferimiento(db.Model):
     CUESTIONARIO_SISTEMA = "CUESTIONARIO_SISTEMA"
     CUESTIONARIO_PERSONAL = "CUESTIONARIO_PERSONAL"
     MEDICION = "MEDICION"
+    EXTRACCION = "EXTRACCION"
     LABORATORIO = "LABORATORIO"
 
 
@@ -254,7 +255,6 @@ class MuestraCompatibilidad(db.Model):
         nullable=False, unique=True)
     id_solicitud = db.Column(
         db.Integer, db.ForeignKey("solicitud.id_solicitud"), nullable=False)
-    codigo = db.Column(db.String(40), nullable=False, unique=True)
     fecha = db.Column(db.DateTime, nullable=False, default=datetime.now)
 
     solicitud = db.relationship("Solicitud")

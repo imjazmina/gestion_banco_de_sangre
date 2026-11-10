@@ -5,7 +5,7 @@ from flask import Blueprint, flash, redirect, request, url_for
 
 from app.controllers.comun.acceso import operador_actual, pintar, requiere
 from app.controllers.comun.simulacion import agendar_resultado
-from app.controllers.licenciado import jornada
+from app.controllers.licenciado import criterios, jornada
 from app.controllers.licenciado.jornada import ErrorJornada
 
 licenciado_extraccion_bp = Blueprint(
@@ -17,10 +17,7 @@ REACCIONES = ("Normal", "Lipotimia", "Otras")
 ANTICOAGULANTES = ("ACD-A", "CPD-A", "SAG MANITOL")
 BOLSAS = ("Simple", "Doble", "Triple", "Cuádruple")
 MOMENTOS = ("Durante", "Posterior")
-TIPOS = (
-    "Hematoma", "Febril", "Lipotimia", "Alérgica", "Náuseas",
-    "Dolor local", "Hipotensión", "Hormigueo", "Vasovagal", "Otro",
-)
+TIPOS = tuple(criterios.EXTRACCION)
 RESULTADOS = ("Sin sangre", "Parcial", "Completa")
 CLAVES = (
     "Brazo", "Punción", "Reacción", "Anticoagulante", "Bolsa", "Marca",
@@ -197,10 +194,12 @@ def ver(cita_id):
     personal = operador_actual()["usuario"]
     if request.method == "POST":
         try:
-            observacion, n_unidades = _observacion(
-                request.form, request.form.get("accion") or "")
+            accion = request.form.get("accion") or ""
+            observacion, n_unidades = _observacion(request.form, accion)
+            incidente = request.form.get("tipo") if accion == "incidencia" else None
             unidades = jornada.registrar_extraccion(
-                cita, personal, observacion, n_unidades=n_unidades)
+                cita, personal, observacion, n_unidades=n_unidades,
+                incidente=incidente)
             for unidad in unidades:
                 agendar_resultado(unidad.id_unidad)
         except ErrorJornada as exc:
@@ -224,6 +223,6 @@ def ver(cita_id):
         anticoagulantes=ANTICOAGULANTES,
         bolsas=BOLSAS,
         momentos=MOMENTOS,
-        tipos=TIPOS,
+        incidentes=[] if extraccion else jornada.causas_de_incidente(),
         resultados=RESULTADOS,
     )

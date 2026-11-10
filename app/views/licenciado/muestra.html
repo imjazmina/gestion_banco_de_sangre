@@ -24,9 +24,6 @@
       <div><p class="data-label">Paciente</p><p class="data-value" style="font-weight:500;">{{ cita.donante.nombre_completo }}</p></div>
       <div><p class="data-label">Cédula</p><p class="data-value mono" style="font-weight:500;">{{ cita.donante.documento_visible }}</p></div>
       <div><p class="data-label">Código de extracción</p><p class="data-value mono" style="font-weight:500;">{{ extraccion.codigo_unico }}</p></div>
-      {% if muestra %}
-      <div><p class="data-label">Código de muestra</p><p class="data-value mono" style="font-weight:500;">{{ muestra.codigo }}</p></div>
-      {% endif %}
       {% for etiqueta, valor in filas %}
       {% if valor %}
       <div><p class="data-label">{{ etiqueta }}</p><p class="data-value" style="font-weight:500;">{{ valor }}</p></div>

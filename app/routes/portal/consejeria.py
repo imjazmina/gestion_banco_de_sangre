@@ -31,6 +31,7 @@ def _pantalla(usuario, id_resultado=None, id_citacion=None, muestra=False):
         sin_horarios=sin_horarios,
         horario=horario,
         hoy=date.today(),
+        confirmar=request.args.get("confirmar", type=int),
     )
 
 

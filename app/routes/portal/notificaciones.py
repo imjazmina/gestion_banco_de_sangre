@@ -37,7 +37,7 @@ TITULOS = {
     "ASIGNACION_SOLICITANTE": "Un donante se sumó a tu solicitud",
     "META_COMPLETA":          "Solicitud completa",
     "CITACION_GENERICA":      "Mensaje del banco de sangre",
-    "SOLICITUD_ABIERTA":      "Solicitud abierta",
+    "SOLICITUD_ABIERTA":      "Agenda tu muestra de compatibilidad en Mi Cita",
     "SOLICITUD_VENCIDA":      "Solicitud vencida",
     "PRESELECCION_COMPATIBLE": "Podrías ser compatible",
 }

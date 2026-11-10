@@ -124,7 +124,7 @@
 
         {% set externos = diferimientos|rejectattr('id_cita')|list %}
         {% if externos %}
-        <h3 class="kicker" style="margin-top:20px;">Diferimientos sin cita en este banco</h3>
+        <h3 class="kicker" style="margin-top:20px;">Diferimientos fuera del banco</h3>
         <div class="stack">
           {% for d in externos %}
           <div class="summary">
@@ -150,7 +150,7 @@
             <label>Motivo interno</label>
             <textarea class="control" name="motivo" rows="2"></textarea>
           </div>
-          <button class="btn btn-primary" type="submit">Registrar derivación</button>
+          <button class="btn btn-primary" type="submit" style="margin-top:12px;">Registrar derivación</button>
         </form>
         {% endfor %}
         {% endif %}
@@ -190,7 +190,11 @@
 
   {% if id_cita_flujo %}
   <div class="row-end mt-4">
+    {% if externo_activo %}
+    {{ btn('Evaluar donante', 'teal', 'md', icon='activity', disabled=true) }}
+    {% else %}
     {{ btn('Evaluar donante', 'teal', 'md', url_for('licenciado_cuestionario.ver', cita_id=id_cita_flujo), 'activity') }}
+    {% endif %}
   </div>
   {% endif %}
 </div>

@@ -533,7 +533,7 @@ def _avisar_compatibles(solicitud):
     texto = (
         "Hay una solicitud de donación que podría coincidir con tu grupo. "
         "Es una preselección por ABO y Rh: la compatibilidad definitiva "
-        "la confirma el personal de salud."
+        "la confirma el laboratorio."
     )
     ahora = datetime.now()
     for donante in candidatos_de(solicitud):
