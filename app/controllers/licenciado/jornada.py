@@ -449,7 +449,7 @@ def registrar_diferimiento(cita, personal, ids_diferimiento, institucion):
             "Ese motivo no es un diferimiento temporal del cuestionario.")
     institucion = (institucion or "").strip() or INSTITUCION_LOCAL
     _registrar_causas(cita, personal, [permitidas[c] for c in vistos],
-                      RegistroDiferimiento.CUESTIONARIO_PERSONAL, institucion)
+                      RegistroDiferimiento.CUESTIONARIO, institucion)
     _cerrar_no_apto(cita, personal)
     _commit()
 

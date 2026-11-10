@@ -997,15 +997,15 @@ SELECT maqueta_medicion((SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usu
 SELECT maqueta_cita('4123456', 'Donacion altruista', DATE '2025-11-30', TIME '08:00', 'No apto', NULL, '10000001');
 SELECT maqueta_diferimiento('4123456', 'Hemoglobina fuera de rango', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '4123456' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2025-11-30') AND h.hora_inicio = TIME '08:00' LIMIT 1), 'MEDICION', 'Hospital Regional de Luque', DATE '2025-11-30', NULL);
 SELECT maqueta_medicion((SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='4123456' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2025-11-30') LIMIT 1), 'HB', 11.8, TIMESTAMP '2025-11-30 08:10');
-SELECT maqueta_diferimiento('5234567', NULL, NULL, 'CUESTIONARIO_PERSONAL', 'Hospital Bautista', DATE '2026-11-09', NULL);
+SELECT maqueta_diferimiento('5234567', NULL, NULL, 'Cuestionario', 'Hospital Bautista', DATE '2026-11-09', NULL);
 SELECT maqueta_diferimiento('2345678', 'HBsAg (Hepatitis B)', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '2345678' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2025-07-10') AND h.hora_inicio = TIME '10:30' LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2025-07-10', NULL);
 SELECT maqueta_cita('7222222', 'Donacion altruista', DATE '2026-06-20', TIME '10:30', 'No apto', NULL, '10000001');
-SELECT maqueta_diferimiento('7222222', 'Tatuaje, piercing o acupuntura', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '7222222' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-06-20') AND h.hora_inicio = TIME '10:30' LIMIT 1), 'CUESTIONARIO_PERSONAL', 'Hospital Regional de Luque', DATE '2026-06-20', NULL);
+SELECT maqueta_diferimiento('7222222', 'Tatuaje, piercing o acupuntura', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '7222222' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-06-20') AND h.hora_inicio = TIME '10:30' LIMIT 1), 'Cuestionario', 'Hospital Regional de Luque', DATE '2026-06-20', NULL);
 SELECT maqueta_cita('7333333', 'Donacion altruista', DATE '2025-09-02', TIME '08:00', 'No apto', NULL, '10000001');
 SELECT maqueta_diferimiento('7333333', 'Hemoglobina fuera de rango', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '7333333' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2025-09-02') AND h.hora_inicio = TIME '08:00' LIMIT 1), 'MEDICION', 'Hospital Regional de Luque', DATE '2025-09-02', NULL);
 SELECT maqueta_medicion((SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='7333333' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2025-09-02') LIMIT 1), 'HB', 11.0, TIMESTAMP '2025-09-02 08:15');
 SELECT maqueta_diferimiento('7444444', 'Anti-HCV (Hepatitis C)', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '7444444' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2025-04-14') AND h.hora_inicio = TIME '09:00' LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2025-04-14', NULL);
-SELECT maqueta_diferimiento('7555555', NULL, NULL, 'CUESTIONARIO_PERSONAL', 'Hospital Nacional de Itauguá', DATE '2026-11-09', NULL);
+SELECT maqueta_diferimiento('7555555', NULL, NULL, 'Cuestionario', 'Hospital Nacional de Itauguá', DATE '2026-11-09', NULL);
 SELECT maqueta_diferimiento('5485567', 'VIH 1/2', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '5485567' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-08-20') AND h.hora_inicio = TIME '11:00' LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2026-08-20', NULL);
 
 -- Citaciones de consejería (solo permanentes con resultado)
@@ -1112,10 +1112,6 @@ DECLARE
   v_reaccion varchar;
   v_causa varchar;
   v_causa2 varchar;
-  v_origen varchar;
-  v_origen2 varchar;
-  v_pers varchar;
-  v_pers2 varchar;
   v_tipo_cita varchar;
   v_tipo_inc varchar;
   v_momento varchar;
@@ -1269,11 +1265,9 @@ BEGIN
           v_cita := maqueta_cita(
             v_doc, 'Donacion altruista', v_fecha, v_hora, 'No apto',
             NULL, '10000001', v_esc = 8);
-          v_origen := CASE WHEN v_i % 2 = 0 THEN 'CUESTIONARIO_SISTEMA' ELSE 'CUESTIONARIO_PERSONAL' END;
-          v_pers := CASE WHEN v_origen = 'CUESTIONARIO_SISTEMA' THEN NULL ELSE '10000001' END;
           PERFORM maqueta_diferimiento(
-            v_doc, v_causa, v_cita, v_origen,
-            'Hospital Regional de Luque', v_fecha, NULL, v_pers);
+            v_doc, v_causa, v_cita, 'Cuestionario',
+            'Hospital Regional de Luque', v_fecha, NULL, '10000001');
           IF v_i % 3 = 0 THEN
             v_idx2 := 1 + (v_idx % array_length(v_causas, 1));
             IF v_causas[v_idx2] = 'Embarazo o lactancia' AND v_gen <> 'Femenino' THEN
@@ -1283,13 +1277,9 @@ BEGIN
               v_idx2 := CASE WHEN v_idx = 1 THEN 2 ELSE 1 END;
             END IF;
             v_causa2 := v_causas[v_idx2];
-            v_origen2 := CASE
-              WHEN v_origen = 'CUESTIONARIO_SISTEMA' THEN 'CUESTIONARIO_PERSONAL'
-              ELSE 'CUESTIONARIO_SISTEMA' END;
-            v_pers2 := CASE WHEN v_origen2 = 'CUESTIONARIO_SISTEMA' THEN NULL ELSE '10000001' END;
             PERFORM maqueta_diferimiento(
-              v_doc, v_causa2, v_cita, v_origen2,
-              'Hospital Regional de Luque', v_fecha, NULL, v_pers2);
+              v_doc, v_causa2, v_cita, 'Cuestionario',
+              'Hospital Regional de Luque', v_fecha, NULL, '10000001');
           END IF;
         END IF;
 
@@ -1472,17 +1462,10 @@ BEGIN
     JOIN usuario u ON u.id_usuario = rd.id_donante
     JOIN cita c ON c.id_cita = rd.id_cita
     WHERE u.documento LIKE '91%'
-      AND rd.origen = 'CUESTIONARIO_SISTEMA'
-      AND c.fecha_hora_creacion::time <> time '00:01'
-  ) OR NOT EXISTS (
-    SELECT 1 FROM registro_diferimiento rd
-    JOIN usuario u ON u.id_usuario = rd.id_donante
-    JOIN cita c ON c.id_cita = rd.id_cita
-    WHERE u.documento LIKE '91%'
-      AND rd.origen = 'CUESTIONARIO_PERSONAL'
+      AND rd.origen = 'Cuestionario'
       AND c.fecha_hora_creacion::time <> time '00:01'
   ) THEN
-    RAISE EXCEPTION 'Falta diferimiento de cuestionario A o B';
+    RAISE EXCEPTION 'Falta diferimiento de cuestionario';
   END IF;
 
   IF NOT EXISTS (

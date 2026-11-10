@@ -143,7 +143,7 @@ CREATE TABLE solicitud (
         AND unidades_asignadas >= 0
         AND unidades_asignadas <= unidades_requeridas
     ),
-    CONSTRAINT ck_solicitud_estado CHECK (estado IN ('Creada', 'Publicada', 'Cerrada', 'Vencida', 'Revocada')),
+    CONSTRAINT ck_solicitud_estado CHECK (estado IN ('Pendiente', 'Publicada', 'Cerrada', 'Vencida', 'Revocada')),
     CONSTRAINT ck_solicitud_publicacion CHECK (estado <> 'Publicada' OR consentimiento_publicacion),
     CONSTRAINT ck_solicitud_tipo_publicado CHECK (estado <> 'Publicada' OR id_tipo_sangre IS NOT NULL)
 );
@@ -317,8 +317,7 @@ CREATE TABLE registro_diferimiento (
     CONSTRAINT fk_registro_cita FOREIGN KEY (id_cita) REFERENCES cita (id_cita),
     CONSTRAINT fk_registro_personal FOREIGN KEY (id_personal) REFERENCES usuario (id_usuario),
     CONSTRAINT ck_registro_origen CHECK (origen IN (
-        'CUESTIONARIO_SISTEMA',
-        'CUESTIONARIO_PERSONAL',
+        'Cuestionario',
         'MEDICION',
         'EXTRACCION',
         'LABORATORIO'

@@ -227,8 +227,7 @@ class RegistroDiferimiento(db.Model):
 
     causa = db.relationship("Diferimiento", lazy="joined")
 
-    CUESTIONARIO_SISTEMA = "CUESTIONARIO_SISTEMA"
-    CUESTIONARIO_PERSONAL = "CUESTIONARIO_PERSONAL"
+    CUESTIONARIO = "Cuestionario"
     MEDICION = "MEDICION"
     EXTRACCION = "EXTRACCION"
     LABORATORIO = "LABORATORIO"
