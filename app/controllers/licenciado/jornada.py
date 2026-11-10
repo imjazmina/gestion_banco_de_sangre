@@ -223,39 +223,61 @@ def mediciones_aptas(cita):
     return all(m.apto for m in filas)
 
 
-def guardar_mediciones(cita, personal, formulario):
-    _exigir_ajeno(cita, personal)
-    if not parte_b_completa(cita):
-        raise ErrorJornada("Primero completá la parte B del cuestionario.")
-    if mediciones_de(cita):
-        raise ErrorJornada("Los signos de esta cita ya fueron registrados.")
-    if cita.estado not in (Cita.PENDIENTE, Cita.CONFIRMADA):
-        raise ErrorJornada("Esta cita ya no admite mediciones.")
-
-    tipos = tipos_medicion()
-    ahora = datetime.now()
-    filas = []
-    for tipo in tipos:
+def valores_del_formulario(formulario):
+    """Pares (tipo, valor) del POST. Falla si falta algún número."""
+    pares = []
+    for tipo in tipos_medicion():
         texto = (formulario.get(tipo.codigo) or "").strip().replace(",", ".")
         try:
             valor = float(texto)
         except ValueError:
             raise ErrorJornada(f"Ingresá un número para {tipo.nombre}.")
-        fila = Medicion(
-            id_cita=cita.id_cita,
-            id_personal=personal.id_usuario,
-            id_tipo_medicion=tipo.id_tipo_medicion,
-            valor=valor,
-            apto=False,
-            observaciones=fuera_de_rango(tipo, valor),
-            fecha=ahora,
-        )
-        db.session.add(fila)
-        filas.append(fila)
+        pares.append((tipo, valor))
+    return pares
+
+
+def guardar_mediciones(cita, personal, formulario):
+    """
+    Alta o actualización de signos mientras la cita siga abierta.
+    Así se puede corregir un valor fuera de rango antes de diferir.
+    """
+    _exigir_ajeno(cita, personal)
+    if not parte_b_completa(cita):
+        raise ErrorJornada("Primero completá la parte B del cuestionario.")
+    if cita.estado not in (Cita.PENDIENTE, Cita.CONFIRMADA):
+        raise ErrorJornada("Esta cita ya no admite mediciones.")
+
+    pares = valores_del_formulario(formulario)
+    existentes = {m.id_tipo_medicion: m for m in mediciones_de(cita)}
+    ahora = datetime.now()
+    nuevas, modificadas = [], []
+    for tipo, valor in pares:
+        fila = existentes.get(tipo.id_tipo_medicion)
+        if fila is None:
+            fila = Medicion(
+                id_cita=cita.id_cita,
+                id_personal=personal.id_usuario,
+                id_tipo_medicion=tipo.id_tipo_medicion,
+                valor=valor,
+                apto=False,
+                observaciones=fuera_de_rango(tipo, valor),
+                fecha=ahora,
+            )
+            db.session.add(fila)
+            nuevas.append(fila)
+        else:
+            fila.valor = valor
+            fila.observaciones = fuera_de_rango(tipo, valor)
+            fila.id_personal = personal.id_usuario
+            fila.fecha = ahora
+            modificadas.append(fila)
     db.session.flush()
-    for fila in filas:
+    for fila in nuevas:
         Auditoria.registrar(personal.id_usuario, "MEDICION",
                             fila.id_medicion, Auditoria.ALTA)
+    for fila in modificadas:
+        Auditoria.registrar(personal.id_usuario, "MEDICION",
+                            fila.id_medicion, Auditoria.MODIFICACION)
     _commit()
 
 
