@@ -51,7 +51,7 @@ def pendientes(registros):
     return salida
 
 
-def registrar(registro, personal, establecimiento, motivo):
+def registrar(registro, personal, motivo):
     if not es_externo(registro):
         raise ErrorDerivacion(
             "La derivación solo se registra si el diagnóstico no es de este banco.")
@@ -61,9 +61,10 @@ def registrar(registro, personal, establecimiento, motivo):
     if Derivacion.query.filter_by(
             id_registro_diferimiento=registro.id_registro).first():
         raise ErrorDerivacion("Ese diferimiento ya tiene una derivación.")
-    establecimiento = (establecimiento or "").strip()
+    establecimiento = (registro.institucion_diagnostico or "").strip()
     if not establecimiento:
-        raise ErrorDerivacion("Indicá el establecimiento de destino.")
+        raise ErrorDerivacion(
+            "El diferimiento no tiene institución de diagnóstico.")
     fila = Derivacion(
         id_registro_diferimiento=registro.id_registro,
         id_personal=personal.id_usuario,

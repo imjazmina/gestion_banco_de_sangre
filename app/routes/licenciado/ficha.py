@@ -50,9 +50,8 @@ def derivar(donor_id):
         return redirect(url_for("licenciado_ficha.ver", donor_id=donor_id))
     try:
         registrar(registro, operador_actual()["usuario"],
-                  request.form.get("establecimiento"),
                   request.form.get("motivo"))
-        flash("Derivación registrada.", "ok")
+        flash("Atención registrada.", "ok")
     except ErrorDerivacion as exc:
         flash(str(exc), "error")
     return redirect(url_for("licenciado_ficha.ver", donor_id=donor_id))

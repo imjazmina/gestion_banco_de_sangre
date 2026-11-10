@@ -106,7 +106,9 @@ def _motivos(filas=None):
         filas = RegistroDiferimiento.query.all()
     conteo = {}
     for fila in filas:
-        nombre = fila.causa.nombre if fila.causa is not None else "Sin causa"
+        if fila.causa is None:
+            continue
+        nombre = fila.causa.nombre
         conteo[nombre] = conteo.get(nombre, 0) + 1
     return [{"causa": k, "n": v} for k, v in sorted(conteo.items(), key=lambda p: -p[1])]
 

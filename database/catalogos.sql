@@ -493,7 +493,14 @@ DECLARE
   v_resultado integer;
 BEGIN
   SELECT id_usuario INTO v_don FROM usuario WHERE documento = p_doc;
-  SELECT id_diferimiento INTO v_dif FROM diferimiento WHERE nombre = p_causa;
+  IF p_causa IS NULL THEN
+    v_dif := NULL;
+  ELSE
+    SELECT id_diferimiento INTO v_dif FROM diferimiento WHERE nombre = p_causa;
+    IF v_dif IS NULL THEN
+      RAISE EXCEPTION 'causa desconocida: %', p_causa;
+    END IF;
+  END IF;
   IF p_personal IS NULL THEN
     v_pers := NULL;
   ELSE
@@ -514,12 +521,22 @@ BEGIN
       RAISE EXCEPTION 'diferimiento de laboratorio sin resultado reactivo: %', p_doc;
     END IF;
   END IF;
-  SELECT r.id_registro INTO v_id
-    FROM registro_diferimiento r
-   WHERE r.id_donante = v_don
-     AND r.id_diferimiento = v_dif
-     AND r.fecha_inicio = p_inicio
-   LIMIT 1;
+  IF p_causa IS NULL THEN
+    SELECT r.id_registro INTO v_id
+      FROM registro_diferimiento r
+     WHERE r.id_donante = v_don
+       AND r.id_diferimiento IS NULL
+       AND r.institucion_diagnostico = p_institucion
+       AND r.fecha_inicio = p_inicio
+     LIMIT 1;
+  ELSE
+    SELECT r.id_registro INTO v_id
+      FROM registro_diferimiento r
+     WHERE r.id_donante = v_don
+       AND r.id_diferimiento = v_dif
+       AND r.fecha_inicio = p_inicio
+     LIMIT 1;
+  END IF;
   IF v_id IS NOT NULL THEN
     RETURN v_id;
   END IF;
@@ -980,7 +997,7 @@ SELECT maqueta_medicion((SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usu
 SELECT maqueta_cita('4123456', 'Donacion altruista', DATE '2025-11-30', TIME '08:00', 'No apto', NULL, '10000001');
 SELECT maqueta_diferimiento('4123456', 'Hemoglobina fuera de rango', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '4123456' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2025-11-30') AND h.hora_inicio = TIME '08:00' LIMIT 1), 'MEDICION', 'Hospital Regional de Luque', DATE '2025-11-30', NULL);
 SELECT maqueta_medicion((SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='4123456' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2025-11-30') LIMIT 1), 'HB', 11.8, TIMESTAMP '2025-11-30 08:10');
-SELECT maqueta_diferimiento('5234567', 'Presión arterial fuera de rango', NULL, 'CUESTIONARIO_PERSONAL', 'Hospital Bautista', DATE '2026-11-09', NULL);
+SELECT maqueta_diferimiento('5234567', NULL, NULL, 'CUESTIONARIO_PERSONAL', 'Hospital Bautista', DATE '2026-11-09', NULL);
 SELECT maqueta_diferimiento('2345678', 'HBsAg (Hepatitis B)', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '2345678' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2025-07-10') AND h.hora_inicio = TIME '10:30' LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2025-07-10', NULL);
 SELECT maqueta_cita('7222222', 'Donacion altruista', DATE '2026-06-20', TIME '10:30', 'No apto', NULL, '10000001');
 SELECT maqueta_diferimiento('7222222', 'Tatuaje, piercing o acupuntura', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '7222222' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-06-20') AND h.hora_inicio = TIME '10:30' LIMIT 1), 'CUESTIONARIO_PERSONAL', 'Hospital Regional de Luque', DATE '2026-06-20', NULL);
@@ -988,7 +1005,7 @@ SELECT maqueta_cita('7333333', 'Donacion altruista', DATE '2025-09-02', TIME '08
 SELECT maqueta_diferimiento('7333333', 'Hemoglobina fuera de rango', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '7333333' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2025-09-02') AND h.hora_inicio = TIME '08:00' LIMIT 1), 'MEDICION', 'Hospital Regional de Luque', DATE '2025-09-02', NULL);
 SELECT maqueta_medicion((SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='7333333' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2025-09-02') LIMIT 1), 'HB', 11.0, TIMESTAMP '2025-09-02 08:15');
 SELECT maqueta_diferimiento('7444444', 'Anti-HCV (Hepatitis C)', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '7444444' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2025-04-14') AND h.hora_inicio = TIME '09:00' LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2025-04-14', NULL);
-SELECT maqueta_diferimiento('7555555', 'Enfermedad infecciosa reciente', NULL, 'CUESTIONARIO_PERSONAL', 'Hospital Nacional de Itauguá', DATE '2026-11-09', NULL);
+SELECT maqueta_diferimiento('7555555', NULL, NULL, 'CUESTIONARIO_PERSONAL', 'Hospital Nacional de Itauguá', DATE '2026-11-09', NULL);
 SELECT maqueta_diferimiento('5485567', 'VIH 1/2', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '5485567' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-08-20') AND h.hora_inicio = TIME '11:00' LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2026-08-20', NULL);
 
 -- Citaciones de consejería (solo permanentes con resultado)

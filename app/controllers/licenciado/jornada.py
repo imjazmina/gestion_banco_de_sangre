@@ -727,14 +727,32 @@ def restriccion_de(registro):
     return "temporal"
 
 
+def indicador_externo(registros):
+    """
+    De otro hospital solo se conoce la institución. No hay causa del catálogo.
+    """
+    origenes = []
+    vistos = set()
+    for registro in registros:
+        if registro.institucion_diagnostico.strip().lower() == INSTITUCION_LOCAL.lower():
+            continue
+        nombre = registro.institucion_diagnostico.strip()
+        if nombre.lower() in vistos:
+            continue
+        vistos.add(nombre.lower())
+        origenes.append(nombre)
+    return origenes
+
+
 def historial(citas, diferimientos):
     """
-    Una fila por cita cerrada. Si esa atención tiene varios diferimientos,
-    cada uno conserva motivo, tipo, inicio y fin. Los externos no tienen
-    cita y van aparte.
+    Una fila por cita cerrada de este banco, con su diferimiento.
+    El de otra institución no trae causa: conserva la fecha y la institución.
     """
     por_cita = {}
     for registro in diferimientos:
+        if registro.institucion_diagnostico.strip().lower() != INSTITUCION_LOCAL.lower():
+            continue
         if registro.id_cita:
             por_cita.setdefault(registro.id_cita, []).append(registro)
     filas = []
@@ -752,6 +770,24 @@ def historial(citas, diferimientos):
                 "inicio": registro.fecha_inicio,
                 "fin": registro.fecha_fin,
             } for registro in por_cita.get(cita.id_cita, [])],
+        })
+    hoy = date.today()
+    vistos = set()
+    for registro in diferimientos:
+        if registro.institucion_diagnostico.strip().lower() == INSTITUCION_LOCAL.lower():
+            continue
+        if registro.fecha_fin is not None and registro.fecha_fin <= hoy:
+            continue
+        nombre = registro.institucion_diagnostico.strip()
+        if nombre.lower() in vistos:
+            continue
+        vistos.add(nombre.lower())
+        filas.append({
+            "fecha": registro.fecha_inicio,
+            "tipo": None,
+            "estado": Cita.NO_APTO,
+            "institucion": nombre,
+            "causas": [],
         })
     filas.sort(key=lambda f: f["fecha"] or date.min, reverse=True)
     return filas
@@ -776,6 +812,11 @@ def ficha(id_usuario):
                      .all())
     vigentes = diferimientos_vigentes(donante)
     vigente = elegir_vigente(vigentes)
+    origenes = indicador_externo(vigentes)
+    locales = [
+        r for r in vigentes
+        if r.institucion_diagnostico.strip().lower() == INSTITUCION_LOCAL.lower()
+    ]
     completadas = [c for c in citas if c.estado == Cita.COMPLETADA]
     fechas_completadas = [c.fecha_cita for c in completadas if c.fecha_cita]
     unidades = Unidad.query.filter_by(id_donante=id_usuario).all()
@@ -805,6 +846,8 @@ def ficha(id_usuario):
         "ultima_donacion": max(fechas_completadas) if fechas_completadas else None,
         "vigente": vigente,
         "vigentes": vigentes,
+        "vigentes_locales": locales,
+        "origenes": origenes,
         "restriccion": restriccion_de(vigente),
         "externo_activo": any(
             r.institucion_diagnostico.strip().lower() != INSTITUCION_LOCAL.lower()

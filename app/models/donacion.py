@@ -203,6 +203,8 @@ class RegistroDiferimiento(db.Model):
     Varios registros pueden compartir la misma cita o el mismo resultado.
     Cada uno guarda su causa, su tipo y sus fechas. fecha_fin la completa
     el trigger fn_registro_fecha_fin; queda nula si es permanente.
+    Si el diagnóstico es de otra institución, no hay causa: id_diferimiento
+    queda nulo y se conserva la fecha de inicio.
     """
     __tablename__ = "registro_diferimiento"
 
@@ -210,7 +212,7 @@ class RegistroDiferimiento(db.Model):
     id_donante = db.Column(
         db.Integer, db.ForeignKey("usuario.id_usuario"), nullable=False)
     id_diferimiento = db.Column(
-        db.Integer, db.ForeignKey("diferimiento.id_diferimiento"), nullable=False)
+        db.Integer, db.ForeignKey("diferimiento.id_diferimiento"))
     id_cita = db.Column(db.Integer, db.ForeignKey("cita.id_cita"))
     id_personal = db.Column(db.Integer, db.ForeignKey("usuario.id_usuario"))
     origen = db.Column(db.String(30), nullable=False)

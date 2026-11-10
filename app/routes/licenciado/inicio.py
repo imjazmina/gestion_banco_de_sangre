@@ -36,6 +36,11 @@ def _contexto(encontrado=None, vigentes=None):
         previa=vista_previa(),
         encontrado=encontrado,
         vigentes=vigentes or [],
+        origenes=jornada.indicador_externo(vigentes or []),
+        vigentes_locales=[
+            r for r in (vigentes or [])
+            if r.institucion_diagnostico.strip().lower() == jornada.INSTITUCION_LOCAL.lower()
+        ],
         restriccion=jornada.restriccion_de(elegir_vigente(vigentes or [])),
     )
 

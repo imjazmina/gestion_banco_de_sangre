@@ -89,16 +89,24 @@
             {% endif %}
           </div>
 
-          {% if vigentes %}
-            {% set tono = 'info' if restriccion == 'externo' else ('danger' if restriccion == 'permanente' else 'warn') %}
-            {% call alerta(tono, 'Diferimiento vigente' if vigentes|length == 1 else 'Diferimientos vigentes') %}
-              No se abre una atención nueva mientras quede al menos uno activo.
-              <ul style="margin:8px 0 0;padding-left:16px;">
-                {% for d in vigentes %}
-                <li>{{ d.causa.nombre }} · {{ d.causa.tipo }} · inicio {{ d.fecha_inicio.strftime('%d/%m/%Y') }}{% if d.fecha_fin %} · fin {{ d.fecha_fin.strftime('%d/%m/%Y') }}{% else %} · sin fecha de fin{% endif %}</li>
-                {% endfor %}
-              </ul>
-            {% endcall %}
+          {% if origenes or vigentes_locales %}
+            {% if origenes and not vigentes_locales %}
+              {% call alerta('info', 'Diferimiento vigente de otra institución' if origenes|length == 1 else 'Diferimientos vigentes de otra institución') %}
+                No se abre una atención nueva mientras quede al menos uno activo.
+                {% for origen in origenes %}<p style="margin:8px 0 0;">Origen: {{ origen }}</p>{% endfor %}
+              {% endcall %}
+            {% else %}
+              {% set tono = 'danger' if restriccion == 'permanente' else 'warn' %}
+              {% call alerta(tono, 'Diferimiento vigente' if (vigentes_locales|length + origenes|length) == 1 else 'Diferimientos vigentes') %}
+                No se abre una atención nueva mientras quede al menos uno activo.
+                <ul style="margin:8px 0 0;padding-left:16px;">
+                  {% for d in vigentes_locales %}
+                  <li>{{ d.causa.nombre }} · {{ d.causa.tipo }} · inicio {{ d.fecha_inicio.strftime('%d/%m/%Y') }}{% if d.fecha_fin %} · fin {{ d.fecha_fin.strftime('%d/%m/%Y') }}{% else %} · sin fecha de fin{% endif %}</li>
+                  {% endfor %}
+                  {% for origen in origenes %}<li>Origen: {{ origen }}</li>{% endfor %}
+                </ul>
+              {% endcall %}
+            {% endif %}
           {% else %}
             {% call alerta('ok', 'Sin diferimiento vigente') %}
               Al abrir la ficha se le asigna la primera franja de hoy con cupo.
