@@ -143,7 +143,7 @@ CREATE TABLE solicitud (
         AND unidades_asignadas >= 0
         AND unidades_asignadas <= unidades_requeridas
     ),
-    CONSTRAINT ck_solicitud_estado CHECK (estado IN ('Pendiente', 'Publicada', 'Cerrada', 'Vencida', 'Revocada')),
+    CONSTRAINT ck_solicitud_estado CHECK (estado IN ('Creada', 'Pendiente', 'Publicada', 'Cerrada', 'Vencida', 'Revocada')),
     CONSTRAINT ck_solicitud_publicacion CHECK (estado <> 'Publicada' OR consentimiento_publicacion),
     CONSTRAINT ck_solicitud_tipo_publicado CHECK (estado <> 'Publicada' OR id_tipo_sangre IS NOT NULL)
 );
