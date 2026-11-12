@@ -18,9 +18,9 @@ from app.controllers.portal.agenda import (
     diferimiento_vigente, diferimientos_vigentes, elegir_vigente,
 )
 from app.models import (
-    Auditoria, Cita, Cuestionario, Diferimiento, Extraccion, HorarioDisponible,
-    Medicion, MuestraCompatibilidad, Notificacion, Pregunta, RegistroDiferimiento,
-    TipoMedicion, TransicionEstado, Unidad, Usuario, db,
+    Auditoria, Cita, Cuestionario, DetalleDiferimiento, Diferimiento, Extraccion,
+    HorarioDisponible, Medicion, MuestraCompatibilidad, Notificacion, Pregunta,
+    RegistroDiferimiento, TipoMedicion, TransicionEstado, Unidad, Usuario, db,
 )
 
 INSTITUCION_LOCAL = "Hospital Regional de Luque"
@@ -387,42 +387,63 @@ def _ids(crudos):
     return vistos
 
 
-def _registrar_causas(cita, personal, causas, origen, institucion):
+def _registrar_causas(cita, personal, causas, origen, institucion, id_resultado=None):
     """
-    Un registro por causa, en la misma atención. No hace commit.
+    Un acto por cita y un detalle por causa. No hace commit.
 
-    `fecha_fin` la escribe el trigger: inicio más días si es temporal,
-    nula si es permanente.
+    `fecha_fin` de cada detalle la escribe el trigger: inicio más días si
+    es temporal, nula si es permanente.
     """
     hoy = date.today()
-    registros = []
-    for causa in causas:
-        registro = RegistroDiferimiento(
+    acto = RegistroDiferimiento.query.filter_by(id_cita=cita.id_cita).first()
+    if acto is None:
+        acto = RegistroDiferimiento(
             id_donante=cita.id_usuario,
-            id_diferimiento=causa.id_diferimiento,
             id_cita=cita.id_cita,
-            id_personal=personal.id_usuario,
+            id_personal=personal.id_usuario if personal is not None else None,
             origen=origen,
             institucion_diagnostico=institucion,
             fecha_inicio=hoy,
         )
-        db.session.add(registro)
-        registros.append(registro)
+        db.session.add(acto)
+        db.session.flush()
+        if personal is not None:
+            Auditoria.registrar(personal.id_usuario, "REGISTRO_DIFERIMIENTO",
+                                acto.id_registro, Auditoria.ALTA)
+    elif acto.origen != origen:
+        db.session.rollback()
+        raise ErrorJornada("Esa cita ya tiene diferimientos de otro origen.")
+    vistos = []
+    pares = []
+    for causa in causas:
+        if causa.id_diferimiento in vistos:
+            continue
+        vistos.append(causa.id_diferimiento)
+        ya = DetalleDiferimiento.query.filter_by(
+            id_registro=acto.id_registro,
+            id_diferimiento=causa.id_diferimiento).first()
+        if ya is not None:
+            pares.append((causa, ya))
+            continue
+        detalle = DetalleDiferimiento(
+            id_registro=acto.id_registro,
+            id_diferimiento=causa.id_diferimiento,
+            id_resultado=id_resultado,
+        )
+        db.session.add(detalle)
+        pares.append((causa, detalle))
     db.session.flush()
-    for causa, registro in zip(causas, registros):
-        db.session.refresh(registro)
-        if causa.tipo == Diferimiento.TEMPORAL and registro.fecha_fin is None:
+    for causa, detalle in pares:
+        db.session.refresh(detalle)
+        if causa.tipo == Diferimiento.TEMPORAL and detalle.fecha_fin is None:
             db.session.rollback()
             raise ErrorJornada(
                 "El diferimiento temporal no quedó con fecha de finalización.")
-        if causa.tipo == Diferimiento.PERMANENTE and registro.fecha_fin is not None:
+        if causa.tipo == Diferimiento.PERMANENTE and detalle.fecha_fin is not None:
             db.session.rollback()
             raise ErrorJornada(
                 "El diferimiento permanente no admite fecha de finalización.")
-    for registro in registros:
-        Auditoria.registrar(personal.id_usuario, "REGISTRO_DIFERIMIENTO",
-                            registro.id_registro, Auditoria.ALTA)
-    return registros
+    return acto
 
 
 def _cerrar_no_apto(cita, personal):
@@ -720,9 +741,13 @@ def restriccion_de(registro):
     """
     if registro is None:
         return "ninguna"
-    if registro.institucion_diagnostico != INSTITUCION_LOCAL:
+    institucion = (registro.institucion_diagnostico or "").strip()
+    if institucion.lower() != INSTITUCION_LOCAL.lower():
         return "externo"
-    if registro.causa.tipo == Diferimiento.PERMANENTE:
+    causa = getattr(registro, "causa", None)
+    if causa is None:
+        return "externo"
+    if causa.tipo == Diferimiento.PERMANENTE:
         return "permanente"
     return "temporal"
 
@@ -746,37 +771,40 @@ def indicador_externo(registros):
 
 def historial(citas, diferimientos):
     """
-    Una fila por cita cerrada de este banco, con su diferimiento.
-    El de otra institución no trae causa: conserva la fecha y la institución.
+    Una fila por cita cerrada de este banco, con las causas del acto.
+    De otra institución la UI no muestra la causa: solo fecha e institución.
     """
     por_cita = {}
     for registro in diferimientos:
+        if not registro.id_cita:
+            continue
         if registro.institucion_diagnostico.strip().lower() != INSTITUCION_LOCAL.lower():
             continue
-        if registro.id_cita:
-            por_cita.setdefault(registro.id_cita, []).append(registro)
+        por_cita[registro.id_cita] = registro
     filas = []
     for cita in citas:
         if cita.estado in Cita.ACTIVAS:
             continue
+        acto = por_cita.get(cita.id_cita)
         filas.append({
             "fecha": cita.fecha_cita,
             "tipo": etiqueta_tipo(cita.tipo_cita),
             "estado": cita.estado,
             "institucion": INSTITUCION_LOCAL,
             "causas": [{
-                "nombre": registro.causa.nombre,
-                "tipo": registro.causa.tipo,
-                "inicio": registro.fecha_inicio,
-                "fin": registro.fecha_fin,
-            } for registro in por_cita.get(cita.id_cita, [])],
+                "nombre": detalle.causa.nombre,
+                "tipo": detalle.causa.tipo,
+                "inicio": acto.fecha_inicio,
+                "fin": detalle.fecha_fin,
+            } for detalle in (acto.detalles if acto is not None else [])],
         })
     hoy = date.today()
     vistos = set()
     for registro in diferimientos:
         if registro.institucion_diagnostico.strip().lower() == INSTITUCION_LOCAL.lower():
             continue
-        if registro.fecha_fin is not None and registro.fecha_fin <= hoy:
+        if registro.detalles and not any(
+                d.fecha_fin is None or d.fecha_fin > hoy for d in registro.detalles):
             continue
         nombre = registro.institucion_diagnostico.strip()
         if nombre.lower() in vistos:
@@ -853,6 +881,7 @@ def ficha(id_usuario):
             r.institucion_diagnostico.strip().lower() != INSTITUCION_LOCAL.lower()
             for r in vigentes),
         "diferimientos": diferimientos,
+        "detalles": [d for r in diferimientos for d in r.detalles],
         "unidades": unidades,
         "transiciones": transiciones,
         "resultados": resultados,

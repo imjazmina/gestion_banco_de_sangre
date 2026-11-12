@@ -42,7 +42,6 @@ class Usuario(db.Model):
     # Nula cuando la cuenta fue suprimida (CHECK ck_usuario_supresion).
     contrasena = db.Column(db.String(64))
     consentimiento_privacidad = db.Column(db.Boolean, nullable=False)
-    estado = db.Column(db.Boolean, nullable=False, default=True)
     cuenta_suprimida = db.Column(db.Boolean, nullable=False, default=False)
     # El schema no le pone DEFAULT now(): lo tiene que poner la aplicación.
     fecha_alta = db.Column(db.DateTime, nullable=False, default=datetime.now)

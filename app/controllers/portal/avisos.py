@@ -164,7 +164,7 @@ def pendientes_de_habilitacion(ahora=None):
     """
     from app.controllers.portal.agenda import diferimiento_vigente
     from app.controllers.portal.perfil import habilitacion
-    from app.models import RegistroDiferimiento, Usuario
+    from app.models import DetalleDiferimiento, Usuario
 
     ahora = ahora or datetime.now()
     hoy = ahora.date()
@@ -173,11 +173,11 @@ def pendientes_de_habilitacion(ahora=None):
                   Notificacion.fecha_envio >= datetime.combine(hoy, datetime.min.time()))
           .all()}
     por_diferimiento = {
-        r.id_donante for r in RegistroDiferimiento.query
-        .filter(RegistroDiferimiento.fecha_fin == hoy).all()
+        d.id_donante for d in DetalleDiferimiento.query
+        .filter(DetalleDiferimiento.fecha_fin == hoy).all()
     }
     listos = []
-    for usuario in Usuario.query.filter_by(estado=True, cuenta_suprimida=False).all():
+    for usuario in Usuario.query.filter_by(cuenta_suprimida=False).all():
         if usuario.id_usuario in ya:
             continue
         if usuario.id_usuario in por_diferimiento:

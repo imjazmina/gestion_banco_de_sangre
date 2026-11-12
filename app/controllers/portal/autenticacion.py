@@ -141,7 +141,6 @@ def registrar_donante(datos, contrasena):
             genero=datos["genero"],
             contrasena=hashear(contrasena),
             consentimiento_privacidad=True,
-            estado=True,
             cuenta_suprimida=False,
             fecha_alta=datetime.now(),
         )
@@ -181,7 +180,7 @@ def autenticar(correo, contrasena):
 
     Se busca por el correo principal y se verifica usuario.contrasena.
     El correo institucional y la clave del perfil no abren el portal.
-    Una cuenta suprimida, dada de baja o sin rol DONANTE no entra.
+    Una cuenta suprimida o sin rol DONANTE no entra.
     """
     correo = (correo or "").strip().lower()
     if not correo or not contrasena or correo_es_institucional(correo):
@@ -193,7 +192,7 @@ def autenticar(correo, contrasena):
                        Correo.es_principal.is_(True))
                .first())
 
-    if usuario is None or not usuario.estado or usuario.cuenta_suprimida:
+    if usuario is None or usuario.cuenta_suprimida:
         return None
     if not usuario.tiene_rol(Rol.DONANTE):
         return None

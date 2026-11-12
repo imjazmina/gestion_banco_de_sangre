@@ -60,7 +60,7 @@ def _usuario_por_correo(correo):
                .filter(func.lower(Correo.direccion) == correo,
                        Correo.es_principal.is_(True))
                .first())
-    if usuario is None or not usuario.estado or usuario.cuenta_suprimida:
+    if usuario is None or usuario.cuenta_suprimida:
         return None
     return usuario
 
@@ -105,7 +105,6 @@ def usuario_del_token(token):
         return None
 
     usuario = Usuario.query.filter_by(id_usuario=sin_verificar,
-                                      estado=True,
                                       cuenta_suprimida=False).first()
     if usuario is None or not usuario.contrasena:
         return None

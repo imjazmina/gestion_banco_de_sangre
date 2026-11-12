@@ -17,8 +17,8 @@ from datetime import date, datetime, timedelta
 from sqlalchemy import func
 
 from app.models import (
-    Cita, Diferimiento, Extraccion, RegistroDiferimiento, ResultadoCompatibilidad,
-    ResultadoLaboratorio,
+    Cita, DetalleDiferimiento, Diferimiento, Extraccion, RegistroDiferimiento,
+    ResultadoCompatibilidad, ResultadoLaboratorio,
     Rol, Solicitud, TipoSangre, TransicionEstado, Unidad, Usuario, UsuarioRol, db,
 )
 
@@ -77,8 +77,8 @@ def armar(desde=None, hasta=None):
     no_aptas = [c for c in citas
                 if c.estado == Cita.NO_APTO and c.fecha_cita
                 and _en_periodo(c.fecha_cita, desde, hasta)]
-    diferimientos = RegistroDiferimiento.query.all()
-    difs = [d for d in diferimientos if _en_periodo(d.fecha_inicio, desde, hasta)]
+    difs = [d for d in DetalleDiferimiento.query.all()
+            if _en_periodo(d.fecha_inicio, desde, hasta)]
     lipotimias = sum(1 for e in del_periodo if "lipotimia" in (e.observacion or "").lower())
     return {
         "desde": desde,
@@ -103,7 +103,7 @@ def armar(desde=None, hasta=None):
 
 def _motivos(filas=None):
     if filas is None:
-        filas = RegistroDiferimiento.query.all()
+        filas = DetalleDiferimiento.query.all()
     conteo = {}
     for fila in filas:
         if fila.causa is None:
@@ -288,8 +288,10 @@ def _registros_diferimiento(desde, hasta):
     cargados sin cita asociada (los que vienen de otra institución).
     """
     return (db.session.query(RegistroDiferimiento, Diferimiento)
+            .join(DetalleDiferimiento,
+                  DetalleDiferimiento.id_registro == RegistroDiferimiento.id_registro)
             .join(Diferimiento,
-                  Diferimiento.id_diferimiento == RegistroDiferimiento.id_diferimiento)
+                  Diferimiento.id_diferimiento == DetalleDiferimiento.id_diferimiento)
             .filter(RegistroDiferimiento.fecha_inicio >= desde,
                     RegistroDiferimiento.fecha_inicio <= hasta)
             .all())
@@ -488,10 +490,10 @@ def _registrados(desde, hasta):
 def _marcadores(desde, hasta):
     """Cada reactivo cuenta por la causa permanente que lo confirmó."""
     filas = (db.session.query(Diferimiento.nombre, func.count())
-             .join(RegistroDiferimiento,
-                   RegistroDiferimiento.id_diferimiento == Diferimiento.id_diferimiento)
+             .join(DetalleDiferimiento,
+                   DetalleDiferimiento.id_diferimiento == Diferimiento.id_diferimiento)
              .join(ResultadoLaboratorio,
-                   ResultadoLaboratorio.id_resultado == RegistroDiferimiento.id_resultado)
+                   ResultadoLaboratorio.id_resultado == DetalleDiferimiento.id_resultado)
              .join(Unidad, Unidad.id_unidad == ResultadoLaboratorio.id_unidad)
              .join(Extraccion, Extraccion.id_extraccion == Unidad.id_extraccion)
              .join(Cita, Cita.id_cita == Extraccion.id_cita)

@@ -21,8 +21,9 @@ from datetime import date, datetime
 from sqlalchemy import func, text
 
 from app import calendario
-from app.models import (db, Auditoria, Cita, HorarioDisponible, MuestraCompatibilidad,
-                        Notificacion, RegistroDiferimiento, Solicitud)
+from app.models import (db, Auditoria, Cita, DetalleDiferimiento, HorarioDisponible,
+                        MuestraCompatibilidad, Notificacion, RegistroDiferimiento,
+                        Solicitud)
 
 # Usuario de servicio del mostrador en la maqueta. No firma vencimientos:
 # esos los graba Sistema (documento 00000002).
@@ -61,13 +62,15 @@ def diferimientos_vigentes(usuario):
     Todos los diferimientos que hoy siguen bloqueando al donante.
 
     Activo: permanente (`fecha_fin` nula) o temporal con fin posterior a hoy.
-    Cada fila conserva su causa, tipo y fechas.
     """
-    filas = (RegistroDiferimiento.query
-             .filter(RegistroDiferimiento.id_donante == usuario.id_usuario,
-                     (RegistroDiferimiento.fecha_fin.is_(None)) |
-                     (RegistroDiferimiento.fecha_fin > date.today()))
-             .all())
+    hoy = date.today()
+    locales = (DetalleDiferimiento.query
+               .join(RegistroDiferimiento)
+               .filter(RegistroDiferimiento.id_donante == usuario.id_usuario,
+                       (DetalleDiferimiento.fecha_fin.is_(None)) |
+                       (DetalleDiferimiento.fecha_fin > hoy))
+               .all())
+    filas = list(locales)
     return sorted(filas, key=lambda d: (
         0 if d.fecha_fin is None else 1,
         date.max if d.fecha_fin is None else d.fecha_fin,

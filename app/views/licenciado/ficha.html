@@ -166,7 +166,7 @@
           {% endif %}
           {% for r in resultados if r.id_unidad == u.id_unidad %}
           <p style="margin:8px 0 0;font-size:12px;">Resultado simulado: {{ badge(r.resultado, 'danger' if r.resultado == 'Reactivo' else 'ok') }}</p>
-          {% for d in diferimientos if d.id_resultado == r.id_resultado %}
+          {% for d in detalles if d.id_resultado == r.id_resultado %}
           <p class="faint" style="margin:4px 0 0;font-size:12px;">{{ d.causa.nombre }} · {{ d.causa.tipo }} · inicio {{ d.fecha_inicio.strftime('%d/%m/%Y') }}{% if d.fecha_fin %} · fin {{ d.fecha_fin.strftime('%d/%m/%Y') }}{% else %} · sin fecha de fin{% endif %}</p>
           {% endfor %}
           {% endfor %}

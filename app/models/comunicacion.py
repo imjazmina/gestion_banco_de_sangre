@@ -5,12 +5,7 @@ from app.models import db
 
 
 class Notificacion(db.Model):
-    """
-    Aviso dirigido a un usuario.
-
-    El schema no tiene columna "leido", así que por ahora no hay forma de
-    marcar una notificación como vista: se listan todas.
-    """
+    """Aviso dirigido a un usuario. Se listan todas, sin marca de lectura."""
     __tablename__ = "notificacion"
 
     id_notificacion = db.Column(db.Integer, primary_key=True)
