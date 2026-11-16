@@ -690,7 +690,7 @@ def presentacion(desde, hasta, error="", con_hemovigilancia=True):
             ),
         },
         "stock": {
-            "nombre": "Stock / Transfusiones",
+            "nombre": "Stock / Solicitudes",
             "filas": _filas(
                 [["Indicador", "Valor"], ["Volumen disponible", str(volumen)],
                  ["Próximos a vencer", str(por_vencer)],

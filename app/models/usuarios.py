@@ -15,7 +15,6 @@ class Rol(db.Model):
     DONANTE = "DONANTE"
     ENFERMERIA = "ENFERMERIA"
     JEFATURA = "JEFATURA"
-    ADMIN = "ADMIN"
 
     def __repr__(self):
         return f"<Rol {self.codigo}>"

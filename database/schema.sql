@@ -12,7 +12,7 @@ CREATE TABLE rol (
     codigo varchar(30) NOT NULL,
     nombre varchar(80) NOT NULL,
     CONSTRAINT uq_rol_codigo UNIQUE (codigo),
-    CONSTRAINT ck_rol_codigo CHECK (codigo IN ('DONANTE', 'ENFERMERIA', 'JEFATURA', 'ADMIN'))
+    CONSTRAINT ck_rol_codigo CHECK (codigo IN ('DONANTE', 'ENFERMERIA', 'JEFATURA'))
 );
 
 CREATE TABLE tipo_sangre (
