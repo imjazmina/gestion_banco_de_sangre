@@ -511,7 +511,7 @@ def usuario_en_ambito(ambito):
     sid, datos = elegida
     usuario = (Usuario.query
                .filter_by(id_usuario=datos["id_usuario"],
-                          estado=True, cuenta_suprimida=False)
+                          cuenta_suprimida=False)
                .first())
     if usuario is None:
         _almacen.revocar_id(datos["id"])

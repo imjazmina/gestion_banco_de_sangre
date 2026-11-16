@@ -25,7 +25,7 @@ from app.models.catalogos import (     # noqa: E402
 )
 from app.models.donacion import (      # noqa: E402
     Solicitud, HistorialSolicitud, Cita, HistorialCita, HistorialCitaConsejeria,
-    Cuestionario, Medicion, RegistroDiferimiento,
+    Cuestionario, Medicion, RegistroDiferimiento, DetalleDiferimiento,
     Extraccion, MuestraCompatibilidad, ResultadoCompatibilidad,
     Unidad, TransicionEstado, ResultadoLaboratorio,
     Asignacion, CitacionConsejeria, Derivacion,
@@ -41,6 +41,7 @@ __all__ = [
     "Diferimiento", "HorarioDisponible", "ContenidoPortal",
     "Solicitud", "HistorialSolicitud", "Cita", "HistorialCita",
     "HistorialCitaConsejeria", "Cuestionario", "Medicion", "RegistroDiferimiento",
+    "DetalleDiferimiento",
     "Extraccion", "MuestraCompatibilidad", "ResultadoCompatibilidad",
     "Unidad", "TransicionEstado", "ResultadoLaboratorio",
     "Asignacion", "CitacionConsejeria", "Derivacion",

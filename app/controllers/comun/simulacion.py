@@ -20,9 +20,9 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.models import (
     Asignacion, Auditoria, Cita, CompatibilidadAboRh,
-    Diferimiento, Extraccion, HistorialSolicitud, MuestraCompatibilidad,
-    Notificacion, RegistroDiferimiento, ResultadoCompatibilidad,
-    ResultadoLaboratorio, Solicitud, TipoSangre,
+    DetalleDiferimiento, Diferimiento, Extraccion, HistorialSolicitud,
+    MuestraCompatibilidad, Notificacion, RegistroDiferimiento,
+    ResultadoCompatibilidad, ResultadoLaboratorio, Solicitud, TipoSangre,
     TransicionEstado, Unidad, Usuario, db,
 )
 
@@ -91,7 +91,6 @@ def usuario_sistema():
         genero="Femenino",
         contrasena=None,
         consentimiento_privacidad=True,
-        estado=True,
         cuenta_suprimida=False,
         fecha_alta=datetime.now(),
     )
@@ -248,28 +247,38 @@ def _reactivo(unidad, personal, extraccion, tipo):
     db.session.flush()
     Auditoria.registrar(personal.id_usuario, "RESULTADO_LABORATORIO",
                         resultado.id_resultado, Auditoria.ALTA)
-    registros = []
-    for causa in elegidas:
-        registro = RegistroDiferimiento(
+    acto = RegistroDiferimiento.query.filter_by(id_cita=extraccion.id_cita).first()
+    if acto is None:
+        acto = RegistroDiferimiento(
             id_donante=unidad.id_donante,
-            id_diferimiento=causa.id_diferimiento,
             id_cita=extraccion.id_cita,
             id_personal=None,
             origen=RegistroDiferimiento.LABORATORIO,
             institucion_diagnostico=INSTITUCION_LOCAL,
             fecha_inicio=date.today(),
+        )
+        db.session.add(acto)
+        db.session.flush()
+        Auditoria.registrar(personal.id_usuario, "REGISTRO_DIFERIMIENTO",
+                            acto.id_registro, Auditoria.ALTA)
+    elif acto.origen != RegistroDiferimiento.LABORATORIO:
+        raise ErrorSimulacion("Esa cita ya tiene diferimientos de otro origen.")
+    for causa in elegidas:
+        if DetalleDiferimiento.query.filter_by(
+                id_registro=acto.id_registro,
+                id_diferimiento=causa.id_diferimiento).first():
+            continue
+        detalle = DetalleDiferimiento(
+            id_registro=acto.id_registro,
+            id_diferimiento=causa.id_diferimiento,
             id_resultado=resultado.id_resultado,
         )
-        db.session.add(registro)
-        registros.append(registro)
-    db.session.flush()
-    for registro in registros:
-        db.session.refresh(registro)
-        if registro.fecha_fin is not None:
+        db.session.add(detalle)
+        db.session.flush()
+        db.session.refresh(detalle)
+        if detalle.fecha_fin is not None:
             raise ErrorSimulacion(
                 "Un diferimiento permanente de laboratorio no admite fecha de fin.")
-        Auditoria.registrar(personal.id_usuario, "REGISTRO_DIFERIMIENTO",
-                            registro.id_registro, Auditoria.ALTA)
     _copiar_tipificacion(unidad, tipo)
     _transicion(
         unidad, personal, Unidad.DESCARTADA,
@@ -519,7 +528,6 @@ def candidatos_de(solicitud):
     return (Usuario.query
             .join(primera, primera.c.id_donante == Usuario.id_usuario)
             .filter(primera.c.id_tipo_sangre.in_(ids),
-                    Usuario.estado.is_(True),
                     Usuario.cuenta_suprimida.is_(False),
                     Usuario.id_usuario != solicitud.id_solicitante)
             .order_by(Usuario.apellido)
@@ -559,7 +567,6 @@ def _solicitante_de_servicio():
         genero="Femenino",
         contrasena=None,
         consentimiento_privacidad=True,
-        estado=True,
         cuenta_suprimida=False,
         fecha_alta=datetime.now(),
     )
@@ -632,11 +639,11 @@ def _tarea_compatibilidad(app, id_muestra):
 
 def simular_compatibilidad(id_muestra):
     """
-    Tipifica la muestra y registra el PAI.
+    Tipifica la muestra. Solo si el PAI es positivo guarda la causa.
 
     Si el paciente ya tiene tipificación, se reutiliza y no se pisa.
-    El PAI positivo difiere y abre consejería. No cambia el consentimiento
-    ni descarta unidades. Publica solo con consentimiento y resultado.
+    El PAI positivo difiere y abre consejería. El negativo no se persiste.
+    Publica solo con consentimiento y resultado.
     """
     db.session.execute(
         text("SELECT pg_advisory_xact_lock(:clave)"),
@@ -671,17 +678,18 @@ def simular_compatibilidad(id_muestra):
         tipo = random.choice(tipos)
 
     positivo = random.random() < PROBABILIDAD_REACTIVO
-    nombre = (ResultadoCompatibilidad.PAI_POSITIVO if positivo
-              else ResultadoCompatibilidad.PAI_NEGATIVO)
-    causa = Diferimiento.query.filter_by(nombre=nombre).first()
-    if causa is None:
-        db.session.rollback()
-        raise ErrorSimulacion("Falta el PAI en el catálogo de diferimientos.")
+    causa = None
+    if positivo:
+        causa = Diferimiento.query.filter_by(
+            nombre=ResultadoCompatibilidad.PAI_POSITIVO).first()
+        if causa is None:
+            db.session.rollback()
+            raise ErrorSimulacion("Falta PAI positivo en el catálogo de diferimientos.")
 
     resultado = ResultadoCompatibilidad(
         id_muestra=muestra.id_muestra,
         id_tipo_sangre=tipo.id_tipo_sangre,
-        id_diferimiento=causa.id_diferimiento,
+        id_diferimiento=causa.id_diferimiento if causa is not None else None,
         fecha=datetime.now(),
     )
     db.session.add(resultado)
@@ -698,24 +706,33 @@ def simular_compatibilidad(id_muestra):
         _avisar_compatibles(solicitud)
 
     if positivo:
-        registro = RegistroDiferimiento(
-            id_donante=cita.id_usuario,
+        acto = RegistroDiferimiento.query.filter_by(id_cita=cita.id_cita).first()
+        if acto is None:
+            acto = RegistroDiferimiento(
+                id_donante=cita.id_usuario,
+                id_cita=cita.id_cita,
+                id_personal=None,
+                origen=RegistroDiferimiento.LABORATORIO,
+                institucion_diagnostico=INSTITUCION_LOCAL,
+                fecha_inicio=date.today(),
+            )
+            db.session.add(acto)
+            db.session.flush()
+            Auditoria.registrar(personal.id_usuario, "REGISTRO_DIFERIMIENTO",
+                                acto.id_registro, Auditoria.ALTA)
+        elif acto.origen != RegistroDiferimiento.LABORATORIO:
+            db.session.rollback()
+            raise ErrorSimulacion("Esa cita ya tiene diferimientos de otro origen.")
+        detalle = DetalleDiferimiento(
+            id_registro=acto.id_registro,
             id_diferimiento=causa.id_diferimiento,
-            id_cita=cita.id_cita,
-            id_personal=None,
-            origen=RegistroDiferimiento.LABORATORIO,
-            institucion_diagnostico=INSTITUCION_LOCAL,
-            fecha_inicio=date.today(),
-            id_resultado_compatibilidad=resultado.id_resultado_compatibilidad,
         )
-        db.session.add(registro)
+        db.session.add(detalle)
         db.session.flush()
-        db.session.refresh(registro)
-        if registro.fecha_fin is not None:
+        db.session.refresh(detalle)
+        if detalle.fecha_fin is not None:
             raise ErrorSimulacion(
                 "Un diferimiento permanente de laboratorio no admite fecha de fin.")
-        Auditoria.registrar(personal.id_usuario, "REGISTRO_DIFERIMIENTO",
-                            registro.id_registro, Auditoria.ALTA)
         db.session.add(Notificacion(
             id_usuario=cita.id_usuario,
             tipo=Notificacion.CITACION_GENERICA,

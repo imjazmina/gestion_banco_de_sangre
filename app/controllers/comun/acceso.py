@@ -82,7 +82,7 @@ def intentar_ingreso(email, contrasena):
         return None, "Correo o contraseña incorrectos."
 
     usuario = perfil.usuario
-    if (usuario is None or not usuario.estado or usuario.cuenta_suprimida
+    if (usuario is None or usuario.cuenta_suprimida
             or not verificar(contrasena, perfil.contrasena)):
         return None, "Correo o contraseña incorrectos."
     if (usuario.tiene_rol(Rol.JEFATURA) and usuario.tiene_rol(Rol.ENFERMERIA)):

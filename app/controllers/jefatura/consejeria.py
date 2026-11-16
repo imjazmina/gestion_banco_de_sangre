@@ -3,8 +3,9 @@ from datetime import date
 
 from app.controllers.comun.estados import CITACION_CERRADA, id_al_cerrar
 from app.models import (
-    Auditoria, Buzon, CitacionConsejeria, HistorialCitaConsejeria,
-    RegistroDiferimiento, Usuario, db,
+    Auditoria, Buzon, CitacionConsejeria, DetalleDiferimiento, Extraccion,
+    HistorialCitaConsejeria, MuestraCompatibilidad, RegistroDiferimiento,
+    ResultadoCompatibilidad, Usuario, db,
 )
 
 
@@ -64,14 +65,28 @@ def evolucion(citacion):
 def registros_de(citacion):
     """Diferimientos de laboratorio asociados a ese resultado. Puede haber varios."""
     if citacion.id_resultado is not None:
-        return (RegistroDiferimiento.query
+        return (DetalleDiferimiento.query
                 .filter_by(id_resultado=citacion.id_resultado)
-                .order_by(RegistroDiferimiento.id_registro)
+                .order_by(DetalleDiferimiento.id_detalle)
                 .all())
     if citacion.id_resultado_compatibilidad is not None:
-        return (RegistroDiferimiento.query
-                .filter_by(id_resultado_compatibilidad=citacion.id_resultado_compatibilidad)
-                .order_by(RegistroDiferimiento.id_registro)
+        # La muestra no enlaza el detalle: se llega por la cita de la extracción.
+        resultado = db.session.get(
+            ResultadoCompatibilidad, citacion.id_resultado_compatibilidad)
+        if resultado is None or resultado.id_diferimiento is None:
+            return []
+        muestra = db.session.get(MuestraCompatibilidad, resultado.id_muestra)
+        if muestra is None:
+            return []
+        extraccion = db.session.get(Extraccion, muestra.id_extraccion)
+        if extraccion is None:
+            return []
+        return (DetalleDiferimiento.query
+                .join(RegistroDiferimiento)
+                .filter(RegistroDiferimiento.id_cita == extraccion.id_cita,
+                        RegistroDiferimiento.origen == RegistroDiferimiento.LABORATORIO,
+                        DetalleDiferimiento.id_diferimiento == resultado.id_diferimiento)
+                .order_by(DetalleDiferimiento.id_detalle)
                 .all())
     return []
 

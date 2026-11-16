@@ -293,7 +293,6 @@ def suprimir_cuenta(usuario):
         usuario.nombre = None
         usuario.apellido = None
         usuario.contrasena = None
-        usuario.estado = False
         usuario.cuenta_suprimida = True
 
         Auditoria.registrar(usuario.id_usuario, "USUARIO",

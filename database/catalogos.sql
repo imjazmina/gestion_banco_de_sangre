@@ -14,7 +14,7 @@
 --  * Permanente (p. ej. VIH 1/2): dias_rehabilitacion y fecha_fin nulos.
 --    No existe la causa «Criterio permanente de exclusión».
 --  * Temporal: fecha_fin la calcula el trigger (fecha_inicio + días del catálogo).
---  * Diferimiento externo: solo institución, sin cita (no se puede continuar).
+--  * Otra institución: misma estructura; la UI no muestra la causa.
 --  * Extracción de compatibilidad: donante del padrón, no el paciente.
 --  * Cada unidad nace con fecha_vencimiento = día de la extracción + 30.
 --  * El año 2026 carga entre 50 y 200 casos por mes (documentos 91MMNNN).
@@ -123,8 +123,7 @@ INSERT INTO diferimiento (nombre, tipo, dias_rehabilitacion) VALUES
   ('HTLV I/II',                          'Permanente',  NULL),
   ('Anti-HBc (Hepatitis B)',            'Permanente',  NULL),
   ('CMV',                                'Permanente',  NULL),
-  ('PAI positivo',                       'Permanente',  NULL),
-  ('PAI negativo',                       'Temporal',      0)
+  ('PAI positivo',                       'Permanente',  NULL)
 ON CONFLICT (nombre) DO NOTHING;
 
 -- ---------- Cuestionario ----------
@@ -180,10 +179,10 @@ WHERE NOT EXISTS (SELECT 1 FROM pregunta q WHERE q.enunciado = p.enunciado);
 
 -- ---------- Personal de turno ----------
 INSERT INTO usuario (documento, nombre, apellido, fecha_nacimiento, genero,
-                     contrasena, consentimiento_privacidad, estado,
+                     contrasena, consentimiento_privacidad,
                      cuenta_suprimida, fecha_alta)
 SELECT '00000000', 'Personal', 'de turno', DATE '2000-01-01', 'Femenino',
-       NULL, true, true, false, timestamp '2020-01-01 08:00'
+       NULL, true, false, timestamp '2020-01-01 08:00'
 WHERE NOT EXISTS (SELECT 1 FROM usuario WHERE documento = '00000000');
 
 INSERT INTO perfil_personal (id_usuario, registro_profesional,
@@ -207,27 +206,27 @@ SELECT u.id_usuario, r.id_rol
 -- no entra al portal ni al panel. Cubre AUDITORIA.id_usuario y
 -- TRANSICION_ESTADO.id_personal, ambos NOT NULL.
 INSERT INTO usuario (documento, nombre, apellido, fecha_nacimiento, genero,
-                     contrasena, consentimiento_privacidad, estado,
+                     contrasena, consentimiento_privacidad,
                      cuenta_suprimida, fecha_alta)
 SELECT '00000002', 'Sistema', NULL, DATE '2000-01-01', 'Femenino',
-       NULL, true, true, false, timestamp '2020-01-01 08:00'
+       NULL, true, false, timestamp '2020-01-01 08:00'
 WHERE NOT EXISTS (SELECT 1 FROM usuario WHERE documento = '00000002');
 
 -- ---------- Enfermería y jefatura ----------
 INSERT INTO usuario (documento, nombre, apellido, fecha_nacimiento, genero,
-                     contrasena, consentimiento_privacidad, estado,
+                     contrasena, consentimiento_privacidad,
                      cuenta_suprimida, fecha_alta)
 SELECT '10000001', 'María', 'Recalde', DATE '1988-04-12', 'Femenino',
        '$2b$12$tywo9SOoAO7h2RdyK549pOQG91A7HbPik7i28IllrBfFOhNf2S25u',
-       true, true, false, timestamp '2020-03-01 08:00'
+       true, false, timestamp '2020-03-01 08:00'
 WHERE NOT EXISTS (SELECT 1 FROM usuario WHERE documento = '10000001');
 
 INSERT INTO usuario (documento, nombre, apellido, fecha_nacimiento, genero,
-                     contrasena, consentimiento_privacidad, estado,
+                     contrasena, consentimiento_privacidad,
                      cuenta_suprimida, fecha_alta)
 SELECT '10000002', 'Jorge', 'Fernández', DATE '1976-11-03', 'Masculino',
        '$2b$12$tywo9SOoAO7h2RdyK549pOQG91A7HbPik7i28IllrBfFOhNf2S25u',
-       true, true, false, timestamp '2018-06-01 08:00'
+       true, false, timestamp '2018-06-01 08:00'
 WHERE NOT EXISTS (SELECT 1 FROM usuario WHERE documento = '10000002');
 
 INSERT INTO perfil_personal (id_usuario, registro_profesional,
@@ -379,9 +378,9 @@ BEGIN
   SELECT id_usuario INTO v_id FROM usuario WHERE documento = p_doc;
   IF v_id IS NULL THEN
     INSERT INTO usuario (documento, nombre, apellido, fecha_nacimiento, genero,
-                         contrasena, consentimiento_privacidad, estado,
+                         contrasena, consentimiento_privacidad,
                          cuenta_suprimida, fecha_alta)
-    VALUES (p_doc, p_nom, p_ape, p_nac, p_gen, NULL, true, true, false,
+    VALUES (p_doc, p_nom, p_ape, p_nac, p_gen, NULL, true, false,
             p_alta)
     RETURNING id_usuario INTO v_id;
   END IF;
@@ -477,6 +476,7 @@ END;
 $$;
 
 DROP FUNCTION IF EXISTS maqueta_diferimiento(varchar, varchar, integer, varchar, varchar, date, date);
+DROP FUNCTION IF EXISTS maqueta_diferimiento(varchar, varchar, integer, varchar, varchar, date, date, varchar);
 
 CREATE OR REPLACE FUNCTION maqueta_diferimiento(
   p_doc varchar, p_causa varchar, p_cita integer, p_origen varchar,
@@ -491,15 +491,15 @@ DECLARE
   v_dif integer;
   v_pers integer;
   v_resultado integer;
+  v_origen varchar(30);
 BEGIN
   SELECT id_usuario INTO v_don FROM usuario WHERE documento = p_doc;
-  IF p_causa IS NULL THEN
-    v_dif := NULL;
-  ELSE
-    SELECT id_diferimiento INTO v_dif FROM diferimiento WHERE nombre = p_causa;
-    IF v_dif IS NULL THEN
-      RAISE EXCEPTION 'causa desconocida: %', p_causa;
-    END IF;
+  SELECT id_diferimiento INTO v_dif FROM diferimiento WHERE nombre = p_causa;
+  IF v_dif IS NULL THEN
+    RAISE EXCEPTION 'causa desconocida: %', p_causa;
+  END IF;
+  IF p_origen IS NULL THEN
+    RAISE EXCEPTION 'El diferimiento requiere origen';
   END IF;
   IF p_personal IS NULL THEN
     v_pers := NULL;
@@ -517,35 +517,44 @@ BEGIN
        AND r.resultado = 'Reactivo'
      ORDER BY r.id_resultado
      LIMIT 1;
-    IF v_resultado IS NULL THEN
+    IF v_resultado IS NULL AND p_causa IS DISTINCT FROM 'PAI positivo' THEN
       RAISE EXCEPTION 'diferimiento de laboratorio sin resultado reactivo: %', p_doc;
     END IF;
   END IF;
-  IF p_causa IS NULL THEN
-    SELECT r.id_registro INTO v_id
+
+  IF p_cita IS NOT NULL THEN
+    SELECT r.id_registro, r.origen INTO v_id, v_origen
       FROM registro_diferimiento r
-     WHERE r.id_donante = v_don
-       AND r.id_diferimiento IS NULL
-       AND r.institucion_diagnostico = p_institucion
-       AND r.fecha_inicio = p_inicio
+     WHERE r.id_cita = p_cita
      LIMIT 1;
+    IF v_id IS NOT NULL AND v_origen IS DISTINCT FROM p_origen THEN
+      RAISE EXCEPTION 'La cita ya tiene diferimientos de origen %', v_origen;
+    END IF;
   ELSE
     SELECT r.id_registro INTO v_id
       FROM registro_diferimiento r
      WHERE r.id_donante = v_don
-       AND r.id_diferimiento = v_dif
+       AND r.id_cita IS NULL
+       AND r.institucion_diagnostico = p_institucion
        AND r.fecha_inicio = p_inicio
      LIMIT 1;
   END IF;
-  IF v_id IS NOT NULL THEN
+  IF v_id IS NULL THEN
+    INSERT INTO registro_diferimiento (
+        id_donante, id_cita, id_personal, origen,
+        institucion_diagnostico, fecha_inicio)
+    VALUES (v_don, p_cita, v_pers, p_origen, p_institucion, p_inicio)
+    RETURNING id_registro INTO v_id;
+  END IF;
+  IF EXISTS (
+      SELECT 1 FROM detalle_diferimiento d
+       WHERE d.id_registro = v_id AND d.id_diferimiento = v_dif
+  ) THEN
     RETURN v_id;
   END IF;
-  INSERT INTO registro_diferimiento (
-      id_donante, id_diferimiento, id_cita, id_personal, origen,
-      institucion_diagnostico, fecha_inicio, fecha_fin, id_resultado)
-  VALUES (v_don, v_dif, p_cita, v_pers, p_origen, p_institucion, p_inicio, p_fin,
-          v_resultado)
-  RETURNING id_registro INTO v_id;
+  INSERT INTO detalle_diferimiento (
+      id_registro, id_diferimiento, fecha_fin, id_resultado)
+  VALUES (v_id, v_dif, p_fin, v_resultado);
   RETURN v_id;
 END;
 $$;
@@ -980,11 +989,11 @@ SELECT e.id_extraccion, c.id_solicitud, e.fecha
    AND NOT EXISTS (
        SELECT 1 FROM muestra_compatibilidad m WHERE m.id_extraccion = e.id_extraccion);
 
+-- PAI negativo: tipificación sin causa de diferimiento.
 INSERT INTO resultado_compatibilidad (id_muestra, id_tipo_sangre, id_diferimiento, fecha)
-SELECT m.id_muestra, maqueta_id_tipo('O+'), d.id_diferimiento, m.fecha
+SELECT m.id_muestra, maqueta_id_tipo('O+'), NULL, m.fecha
   FROM muestra_compatibilidad m
   JOIN extraccion e ON e.id_extraccion = m.id_extraccion
-  JOIN diferimiento d ON d.nombre = 'PAI negativo'
  WHERE e.codigo_unico = 'EX-2026-EC02'
    AND NOT EXISTS (
        SELECT 1 FROM resultado_compatibilidad r WHERE r.id_muestra = m.id_muestra);
@@ -997,7 +1006,7 @@ SELECT maqueta_medicion((SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usu
 SELECT maqueta_cita('4123456', 'Donacion altruista', DATE '2025-11-30', TIME '08:00', 'No apto', NULL, '10000001');
 SELECT maqueta_diferimiento('4123456', 'Hemoglobina fuera de rango', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '4123456' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2025-11-30') AND h.hora_inicio = TIME '08:00' LIMIT 1), 'MEDICION', 'Hospital Regional de Luque', DATE '2025-11-30', NULL);
 SELECT maqueta_medicion((SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='4123456' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2025-11-30') LIMIT 1), 'HB', 11.8, TIMESTAMP '2025-11-30 08:10');
-SELECT maqueta_diferimiento('5234567', NULL, NULL, 'Cuestionario', 'Hospital Bautista', DATE '2026-11-09', NULL);
+SELECT maqueta_diferimiento('5234567', 'Tatuaje, piercing o acupuntura', NULL, 'Cuestionario', 'Hospital Bautista', DATE '2026-11-09', DATE '2026-12-18', NULL);
 SELECT maqueta_diferimiento('2345678', 'HBsAg (Hepatitis B)', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '2345678' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2025-07-10') AND h.hora_inicio = TIME '10:30' LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2025-07-10', NULL);
 SELECT maqueta_cita('7222222', 'Donacion altruista', DATE '2026-06-20', TIME '10:30', 'No apto', NULL, '10000001');
 SELECT maqueta_diferimiento('7222222', 'Tatuaje, piercing o acupuntura', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '7222222' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-06-20') AND h.hora_inicio = TIME '10:30' LIMIT 1), 'Cuestionario', 'Hospital Regional de Luque', DATE '2026-06-20', NULL);
@@ -1005,7 +1014,7 @@ SELECT maqueta_cita('7333333', 'Donacion altruista', DATE '2025-09-02', TIME '08
 SELECT maqueta_diferimiento('7333333', 'Hemoglobina fuera de rango', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '7333333' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2025-09-02') AND h.hora_inicio = TIME '08:00' LIMIT 1), 'MEDICION', 'Hospital Regional de Luque', DATE '2025-09-02', NULL);
 SELECT maqueta_medicion((SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario=c.id_usuario WHERE u.documento='7333333' AND c.fecha_hora_creacion=maqueta_reserva(DATE '2025-09-02') LIMIT 1), 'HB', 11.0, TIMESTAMP '2025-09-02 08:15');
 SELECT maqueta_diferimiento('7444444', 'Anti-HCV (Hepatitis C)', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '7444444' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2025-04-14') AND h.hora_inicio = TIME '09:00' LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2025-04-14', NULL);
-SELECT maqueta_diferimiento('7555555', NULL, NULL, 'Cuestionario', 'Hospital Nacional de Itauguá', DATE '2026-11-09', NULL);
+SELECT maqueta_diferimiento('7555555', 'Tatuaje, piercing o acupuntura', NULL, 'Cuestionario', 'Hospital Nacional de Itauguá', DATE '2026-11-09', DATE '2026-12-04', NULL);
 SELECT maqueta_diferimiento('5485567', 'VIH 1/2', (SELECT c.id_cita FROM cita c JOIN usuario u ON u.id_usuario = c.id_usuario JOIN horario_disponible h ON h.id_horario = c.id_horario WHERE u.documento = '5485567' AND c.fecha_hora_creacion = maqueta_reserva(DATE '2026-08-20') AND h.hora_inicio = TIME '11:00' LIMIT 1), 'LABORATORIO', 'Hospital Regional de Luque', DATE '2026-08-20', NULL);
 
 -- Citaciones de consejería (solo permanentes con resultado)
@@ -1039,11 +1048,11 @@ SELECT don.id_usuario,
 
 -- ---------- Solicitud de prueba (una cuenta, una solicitud Creada) ----------
 INSERT INTO usuario (documento, nombre, apellido, fecha_nacimiento, genero,
-                     contrasena, consentimiento_privacidad, estado,
+                     contrasena, consentimiento_privacidad,
                      cuenta_suprimida, fecha_alta)
 SELECT '81000001', 'Carmen', 'Ferreira', DATE '1987-06-14', 'Femenino',
        '$2b$12$7Uiuz.EAbyZtiwAqGKssqOrUDX2ZDAzE2gZGv9HcmB2r0AepQ3f/m',
-       true, true, false, timestamp '2026-11-01 09:00'
+       true, false, timestamp '2026-11-01 09:00'
 WHERE NOT EXISTS (SELECT 1 FROM usuario WHERE documento = '81000001');
 
 INSERT INTO correo (id_usuario, direccion, es_principal)
@@ -1327,30 +1336,21 @@ BEGIN
         SELECT v_ext, v_sol, v_fecha::timestamp + v_hora
          WHERE NOT EXISTS (
              SELECT 1 FROM muestra_compatibilidad m WHERE m.id_extraccion = v_ext);
-        v_pai := CASE WHEN v_i % 4 = 0 THEN 'PAI positivo' ELSE 'PAI negativo' END;
-        INSERT INTO resultado_compatibilidad (
-            id_muestra, id_tipo_sangre, id_diferimiento, fecha)
-        SELECT m.id_muestra, maqueta_id_tipo(v_grupo), d.id_diferimiento, m.fecha
-          FROM muestra_compatibilidad m
-          JOIN diferimiento d ON d.nombre = v_pai
-         WHERE m.id_extraccion = v_ext
-           AND NOT EXISTS (
-               SELECT 1 FROM resultado_compatibilidad r
-                WHERE r.id_muestra = m.id_muestra);
-        IF v_pai = 'PAI positivo' THEN
-          INSERT INTO registro_diferimiento (
-              id_donante, id_diferimiento, id_cita, id_personal, origen,
-              institucion_diagnostico, fecha_inicio, id_resultado_compatibilidad)
-          SELECT don.id_usuario, d.id_diferimiento, v_cita, NULL, 'LABORATORIO',
-                 'Hospital Regional de Luque', v_fecha, rc.id_resultado_compatibilidad
-            FROM usuario don
+        -- PAI negativo: tipificación sin id_diferimiento. Positivo: causa + registro.
+        IF v_i % 4 = 0 THEN
+          v_pai := 'PAI positivo';
+          INSERT INTO resultado_compatibilidad (
+              id_muestra, id_tipo_sangre, id_diferimiento, fecha)
+          SELECT m.id_muestra, maqueta_id_tipo(v_grupo), d.id_diferimiento, m.fecha
+            FROM muestra_compatibilidad m
             JOIN diferimiento d ON d.nombre = 'PAI positivo'
-            JOIN muestra_compatibilidad m ON m.id_extraccion = v_ext
-            JOIN resultado_compatibilidad rc ON rc.id_muestra = m.id_muestra
-           WHERE don.documento = v_doc
+           WHERE m.id_extraccion = v_ext
              AND NOT EXISTS (
-                 SELECT 1 FROM registro_diferimiento r
-                  WHERE r.id_resultado_compatibilidad = rc.id_resultado_compatibilidad);
+                 SELECT 1 FROM resultado_compatibilidad r
+                  WHERE r.id_muestra = m.id_muestra);
+          PERFORM maqueta_diferimiento(
+            v_doc, 'PAI positivo', v_cita, 'LABORATORIO',
+            'Hospital Regional de Luque', v_fecha, NULL, NULL);
           INSERT INTO citacion_consejeria (
               id_donante, id_personal, id_horario, id_resultado_compatibilidad, estado)
           SELECT don.id_usuario, NULL,
@@ -1363,6 +1363,15 @@ BEGIN
              AND NOT EXISTS (
                  SELECT 1 FROM citacion_consejeria c
                   WHERE c.id_resultado_compatibilidad = rc.id_resultado_compatibilidad);
+        ELSE
+          INSERT INTO resultado_compatibilidad (
+              id_muestra, id_tipo_sangre, id_diferimiento, fecha)
+          SELECT m.id_muestra, maqueta_id_tipo(v_grupo), NULL, m.fecha
+            FROM muestra_compatibilidad m
+           WHERE m.id_extraccion = v_ext
+             AND NOT EXISTS (
+                 SELECT 1 FROM resultado_compatibilidad r
+                  WHERE r.id_muestra = m.id_muestra);
         END IF;
       END IF;
     END LOOP;
@@ -1447,8 +1456,8 @@ BEGIN
     SELECT 1 FROM unidad un
     JOIN usuario u ON u.id_usuario = un.id_donante
     JOIN resultado_laboratorio r ON r.id_unidad = un.id_unidad
-    JOIN registro_diferimiento rd ON rd.id_resultado = r.id_resultado
-    JOIN diferimiento d ON d.id_diferimiento = rd.id_diferimiento
+    JOIN detalle_diferimiento dd ON dd.id_resultado = r.id_resultado
+    JOIN diferimiento d ON d.id_diferimiento = dd.id_diferimiento
     WHERE u.documento LIKE '91%'
       AND r.resultado = 'Reactivo'
       AND un.estado = 'Descartada'
@@ -1541,13 +1550,15 @@ BEGIN
   END IF;
 
   IF NOT EXISTS (
-    SELECT 1 FROM registro_diferimiento rd
-    JOIN diferimiento d ON d.id_diferimiento = rd.id_diferimiento
+    SELECT 1 FROM detalle_diferimiento dd
+    JOIN registro_diferimiento rd ON rd.id_registro = dd.id_registro
+    JOIN diferimiento d ON d.id_diferimiento = dd.id_diferimiento
     JOIN usuario u ON u.id_usuario = rd.id_donante
     WHERE u.documento LIKE '91%' AND d.tipo = 'Temporal'
   ) OR NOT EXISTS (
-    SELECT 1 FROM registro_diferimiento rd
-    JOIN diferimiento d ON d.id_diferimiento = rd.id_diferimiento
+    SELECT 1 FROM detalle_diferimiento dd
+    JOIN registro_diferimiento rd ON rd.id_registro = dd.id_registro
+    JOIN diferimiento d ON d.id_diferimiento = dd.id_diferimiento
     JOIN usuario u ON u.id_usuario = rd.id_donante
     WHERE u.documento LIKE '91%' AND d.tipo = 'Permanente'
   ) THEN
@@ -1556,10 +1567,11 @@ BEGIN
 
   FOREACH v_marca IN ARRAY v_marcas LOOP
     IF NOT EXISTS (
-      SELECT 1 FROM registro_diferimiento rd
-      JOIN diferimiento d ON d.id_diferimiento = rd.id_diferimiento
+      SELECT 1 FROM detalle_diferimiento dd
+      JOIN registro_diferimiento rd ON rd.id_registro = dd.id_registro
+      JOIN diferimiento d ON d.id_diferimiento = dd.id_diferimiento
       JOIN usuario u ON u.id_usuario = rd.id_donante
-      JOIN resultado_laboratorio r ON r.id_resultado = rd.id_resultado
+      JOIN resultado_laboratorio r ON r.id_resultado = dd.id_resultado
       WHERE u.documento LIKE '91%'
         AND d.nombre = v_marca
         AND r.resultado = 'Reactivo'
@@ -1678,7 +1690,7 @@ SELECT
   (SELECT count(*) FROM solicitud WHERE estado = 'Cerrada') AS solicitudes_cerradas,
   (SELECT count(*) FROM solicitud WHERE estado = 'Publicada') AS solicitudes_publicadas,
   (SELECT count(*) FROM cita WHERE estado = 'No apto') AS citas_no_apto,
-  (SELECT count(*) FROM registro_diferimiento rd JOIN diferimiento d ON d.id_diferimiento = rd.id_diferimiento
+  (SELECT count(*) FROM detalle_diferimiento dd JOIN diferimiento d ON d.id_diferimiento = dd.id_diferimiento
     WHERE d.tipo = 'Temporal') AS dif_temporales,
-  (SELECT count(*) FROM registro_diferimiento rd JOIN diferimiento d ON d.id_diferimiento = rd.id_diferimiento
+  (SELECT count(*) FROM detalle_diferimiento dd JOIN diferimiento d ON d.id_diferimiento = dd.id_diferimiento
     WHERE d.tipo = 'Permanente') AS dif_permanentes;

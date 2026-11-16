@@ -1,11 +1,4 @@
-"""
-Notificaciones del donante.
-
-El esquema no tiene columna "leido", así que no se puede marcar una como
-vista: se listan todas, de la más reciente a la más vieja. Agregar esa
-columna es uno de los puntos a decidir con el módulo de administración
-(ver EQUIPO.md).
-"""
+"""Notificaciones del donante. Se listan todas, de la más reciente a la más vieja."""
 from flask import Blueprint, render_template
 
 from app.controllers.sesion import requiere_login, usuario_actual

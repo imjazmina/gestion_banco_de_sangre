@@ -79,7 +79,7 @@ class Diferimiento(db.Model):
     """
     Catálogo de causas de diferimiento.
 
-    dias_rehabilitacion alimenta el trigger fn_registro_fecha_fin, que
+    dias_rehabilitacion alimenta el trigger fn_detalle_fecha_fin, que
     calcula la fecha de habilitación. Los permanentes van en NULL.
     """
     __tablename__ = "diferimiento"

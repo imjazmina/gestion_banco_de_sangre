@@ -20,7 +20,11 @@ def esta_vigente(registro, hoy=None):
     if registro is None:
         return False
     hoy = hoy or date.today()
-    return registro.fecha_fin is None or registro.fecha_fin > hoy
+    detalles = list(getattr(registro, "detalles", None) or [])
+    if not detalles:
+        fin = getattr(registro, "fecha_fin", None)
+        return fin is None or fin > hoy
+    return any(d.fecha_fin is None or d.fecha_fin > hoy for d in detalles)
 
 
 def puede_derivar(registro):

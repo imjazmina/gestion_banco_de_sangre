@@ -198,39 +198,71 @@ class Medicion(db.Model):
 
 class RegistroDiferimiento(db.Model):
     """
-    Diferimiento aplicado a un donante concreto.
+    Acto de diferimiento: un origen por cita.
 
-    Varios registros pueden compartir la misma cita o el mismo resultado.
-    Cada uno guarda su causa, su tipo y sus fechas. fecha_fin la completa
-    el trigger fn_registro_fecha_fin; queda nula si es permanente.
-    Si el diagnóstico es de otra institución, no hay causa: id_diferimiento
-    queda nulo y se conserva la fecha de inicio.
+    Las causas y fecha_fin van en detalle_diferimiento. Otra institución
+    se simula con la misma fila (otra institucion_diagnostico).
     """
     __tablename__ = "registro_diferimiento"
 
     id_registro = db.Column(db.Integer, primary_key=True)
     id_donante = db.Column(
         db.Integer, db.ForeignKey("usuario.id_usuario"), nullable=False)
-    id_diferimiento = db.Column(
-        db.Integer, db.ForeignKey("diferimiento.id_diferimiento"))
-    id_cita = db.Column(db.Integer, db.ForeignKey("cita.id_cita"))
+    id_cita = db.Column(db.Integer, db.ForeignKey("cita.id_cita"), unique=True)
     id_personal = db.Column(db.Integer, db.ForeignKey("usuario.id_usuario"))
     origen = db.Column(db.String(30), nullable=False)
     institucion_diagnostico = db.Column(db.String(120), nullable=False)
     fecha_inicio = db.Column(db.Date, nullable=False)
-    fecha_fin = db.Column(db.Date)
-    id_resultado = db.Column(
-        db.Integer, db.ForeignKey("resultado_laboratorio.id_resultado"))
-    id_resultado_compatibilidad = db.Column(
-        db.Integer,
-        db.ForeignKey("resultado_compatibilidad.id_resultado_compatibilidad"))
 
-    causa = db.relationship("Diferimiento", lazy="joined")
+    detalles = db.relationship(
+        "DetalleDiferimiento", lazy="joined",
+        order_by="DetalleDiferimiento.id_detalle",
+        back_populates="registro")
 
     CUESTIONARIO = "Cuestionario"
     MEDICION = "MEDICION"
     EXTRACCION = "EXTRACCION"
     LABORATORIO = "LABORATORIO"
+
+
+class DetalleDiferimiento(db.Model):
+    """Una causa del acto. fecha_fin la completa fn_detalle_fecha_fin."""
+    __tablename__ = "detalle_diferimiento"
+
+    id_detalle = db.Column(db.Integer, primary_key=True)
+    id_registro = db.Column(
+        db.Integer, db.ForeignKey("registro_diferimiento.id_registro"),
+        nullable=False)
+    id_diferimiento = db.Column(
+        db.Integer, db.ForeignKey("diferimiento.id_diferimiento"),
+        nullable=False)
+    fecha_fin = db.Column(db.Date)
+    id_resultado = db.Column(
+        db.Integer, db.ForeignKey("resultado_laboratorio.id_resultado"))
+
+    causa = db.relationship("Diferimiento", lazy="joined")
+    registro = db.relationship(
+        "RegistroDiferimiento", lazy="joined", back_populates="detalles")
+
+    @property
+    def fecha_inicio(self):
+        return self.registro.fecha_inicio
+
+    @property
+    def institucion_diagnostico(self):
+        return self.registro.institucion_diagnostico
+
+    @property
+    def id_donante(self):
+        return self.registro.id_donante
+
+    @property
+    def origen(self):
+        return self.registro.origen
+
+    @property
+    def id_cita(self):
+        return self.registro.id_cita
 
 
 class Extraccion(db.Model):
@@ -263,7 +295,7 @@ class MuestraCompatibilidad(db.Model):
 
 
 class ResultadoCompatibilidad(db.Model):
-    """Tipificación y PAI de una muestra. No descarta unidades."""
+    """Tipificación de una muestra. PAI solo si es positivo."""
     __tablename__ = "resultado_compatibilidad"
 
     id_resultado_compatibilidad = db.Column(db.Integer, primary_key=True)
@@ -272,8 +304,9 @@ class ResultadoCompatibilidad(db.Model):
         nullable=False, unique=True)
     id_tipo_sangre = db.Column(
         db.Integer, db.ForeignKey("tipo_sangre.id_tipo_sangre"), nullable=False)
+    # NULL si el PAI no es positivo: no se guarda el negativo.
     id_diferimiento = db.Column(
-        db.Integer, db.ForeignKey("diferimiento.id_diferimiento"), nullable=False)
+        db.Integer, db.ForeignKey("diferimiento.id_diferimiento"))
     fecha = db.Column(db.DateTime, nullable=False, default=datetime.now)
 
     tipo_sangre = db.relationship("TipoSangre", lazy="joined")
@@ -281,7 +314,6 @@ class ResultadoCompatibilidad(db.Model):
     muestra = db.relationship("MuestraCompatibilidad")
 
     PAI_POSITIVO = "PAI positivo"
-    PAI_NEGATIVO = "PAI negativo"
 
 
 class Unidad(db.Model):
